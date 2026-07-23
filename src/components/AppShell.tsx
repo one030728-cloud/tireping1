@@ -1,0 +1,27 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import Sidebar from "./Sidebar";
+import Footer from "./Footer";
+import Breadcrumb from "./Breadcrumb";
+
+export default function AppShell({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const pathname = usePathname();
+  const showSidebar = user && pathname !== "/login" && pathname !== "/";
+  const showFooter = pathname !== "/login";
+
+  return (
+    <div className="flex-1 w-full max-w-[1240px] mx-auto flex flex-col">
+      <div className="flex-1 flex">
+        {showSidebar && <Sidebar />}
+        <main className="flex-1 min-w-0">
+          {showSidebar && <Breadcrumb />}
+          {children}
+        </main>
+      </div>
+      {showFooter && <Footer />}
+    </div>
+  );
+}
