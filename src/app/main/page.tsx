@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronRight, Clock, Search } from "lucide-react";
+import Carousel from "@/components/Carousel";
 import RequireAuth from "@/components/RequireAuth";
 import TireCard from "@/components/TireCard";
 import { EVENTS, MANUFACTURERS, NOTICES, TIRES } from "@/lib/mockData";
@@ -133,11 +134,11 @@ function MainContent() {
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-2 lg:overflow-visible">
+      <Carousel>
         {eventTires.map((t) => (
           <TireCard key={t.id} tire={t} />
         ))}
-      </div>
+      </Carousel>
     </section>
   );
 
@@ -149,11 +150,11 @@ function MainContent() {
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-2 lg:overflow-visible">
+      <Carousel>
         {bestTires.map((t) => (
           <TireCard key={t.id} tire={t} />
         ))}
-      </div>
+      </Carousel>
     </section>
   );
 
