@@ -98,7 +98,7 @@ function SellContent() {
           <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50 data-[state=open]:animate-[overlay-show_200ms_ease-out] data-[state=closed]:animate-[overlay-hide_180ms_ease-in]" />
           <Dialog.Content
             aria-describedby={undefined}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-sm card rounded-2xl p-6 z-50 shadow-[var(--shadow-lg)] data-[state=open]:animate-[fade-slide-up_220ms_ease-out_both]"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-2rem)] max-w-sm max-h-[90vh] overflow-y-auto card rounded-2xl p-6 z-50 shadow-[var(--shadow-lg)] data-[state=open]:animate-[fade-slide-up_220ms_ease-out_both]"
           >
             <div className="flex items-center justify-between mb-4">
               <Dialog.Title className="font-bold text-lg">신규 타이어 등록</Dialog.Title>
@@ -223,7 +223,7 @@ function SellContent() {
                       {l.price.toLocaleString()}원
                     </td>
                     <td className="py-3 px-4 tabular-nums">{l.stock}</td>
-                    <td className="py-3 px-4">{l.registeredAt}</td>
+                    <td className="py-3 px-4 whitespace-nowrap">{l.registeredAt}</td>
                     <td className="py-3 px-4">
                       <button
                         onClick={() => toggleStatus(l.id)}

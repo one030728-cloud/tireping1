@@ -64,7 +64,7 @@ function CartContent() {
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           aria-label="수량 감소"
-                          className="w-7 h-7 flex items-center justify-center rounded border border-border hover:bg-surface-2 active:scale-90"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90"
                         >
                           <Minus size={13} />
                         </button>
@@ -77,7 +77,7 @@ function CartContent() {
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           aria-label="수량 증가"
-                          className="w-7 h-7 flex items-center justify-center rounded border border-border hover:bg-surface-2 active:scale-90"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90"
                         >
                           <Plus size={13} />
                         </button>

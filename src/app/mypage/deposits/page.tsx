@@ -20,8 +20,8 @@ function DepositsContent() {
             <tr className="text-left text-muted border-b border-border">
               <th className="py-2 pr-3 font-medium">통합주문번호</th>
               <th className="py-2 pr-3 font-medium">주문상품</th>
-              <th className="py-2 pr-3 font-medium">결제 금액</th>
-              <th className="py-2 pr-3 font-medium">환불 금액</th>
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">결제 금액</th>
+              <th className="py-2 pr-3 font-medium whitespace-nowrap">환불 금액</th>
               <th className="py-2 pr-3 font-medium">주문일자</th>
             </tr>
           </thead>

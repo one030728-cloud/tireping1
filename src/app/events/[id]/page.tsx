@@ -31,7 +31,7 @@ function EventDetailContent() {
         style={{ background: event.bannerGradient }}
       >
         <span
-          className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+          className={`text-xs font-bold px-2.5 py-1.5 rounded-full ${
             event.status === "ongoing"
               ? "bg-gradient-to-r from-brand-light to-brand text-white shadow-[0_2px_8px_-2px_rgba(99,102,241,0.55)]"
               : "bg-black/40 text-white"

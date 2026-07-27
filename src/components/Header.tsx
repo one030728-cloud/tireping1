@@ -105,10 +105,12 @@ export default function Header() {
         </div>
 
         {user && NOTICES[0] && (
-          <div className="hidden lg:flex items-center gap-1.5 flex-1 mx-6 overflow-hidden text-muted">
+          <div className="hidden lg:flex items-center gap-1.5 flex-1 mx-6 text-muted">
             <Megaphone size={14} className="shrink-0" />
-            <div className="whitespace-nowrap text-xs animate-[ticker_18s_linear_infinite]">
-              {NOTICES[0].title}
+            <div className="relative flex-1 h-4 overflow-hidden">
+              <div className="absolute whitespace-nowrap text-xs animate-[ticker_18s_linear_infinite]">
+                {NOTICES[0].title}
+              </div>
             </div>
           </div>
         )}
@@ -261,7 +263,7 @@ export default function Header() {
           <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50 lg:hidden data-[state=open]:animate-[overlay-show_200ms_ease-out] data-[state=closed]:animate-[overlay-hide_180ms_ease-in]" />
           <Dialog.Content
             aria-describedby={undefined}
-            className="fixed inset-y-0 left-0 w-72 max-w-[85%] bg-surface shadow-[var(--shadow-lg)] p-5 flex flex-col gap-1 overflow-y-auto z-50 lg:hidden data-[state=open]:animate-[slide-in-from-left_250ms_ease-out] data-[state=closed]:animate-[slide-out-to-left_200ms_ease-in]"
+            className="fixed inset-y-0 left-0 w-72 max-w-[85%] bg-surface shadow-[var(--shadow-lg)] p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] flex flex-col gap-1 overflow-y-auto z-50 lg:hidden data-[state=open]:animate-[slide-in-from-left_250ms_ease-out] data-[state=closed]:animate-[slide-out-to-left_200ms_ease-in]"
           >
             <div className="flex items-center justify-between mb-4">
               <Dialog.Title className="font-bold text-brand text-lg">메뉴</Dialog.Title>

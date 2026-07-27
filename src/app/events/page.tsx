@@ -35,8 +35,10 @@ function EventsContent() {
           <button
             key={t.key}
             onClick={() => router.push(`/events?tab=${t.key}`)}
-            className={`flex-1 pb-3 text-sm font-semibold border-b-2 -mb-px ${
-              tab === t.key ? "border-brand text-brand" : "border-transparent text-muted"
+            className={`flex-1 pb-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              tab === t.key
+                ? "border-brand text-brand"
+                : "border-transparent text-muted hover:text-foreground hover:border-border"
             }`}
           >
             {t.label}
@@ -62,7 +64,7 @@ function EventsContent() {
                 className="aspect-[16/9] rounded-xl mb-2 border border-border transition-transform group-hover:-translate-y-1 group-hover:shadow-lg"
                 style={{ background: e.bannerGradient }}
               />
-              <p className="text-sm font-semibold group-hover:text-brand">{e.title}</p>
+              <p className="text-sm font-semibold line-clamp-2 group-hover:text-brand">{e.title}</p>
               <p className="text-xs text-muted mt-0.5">{e.period}</p>
             </Link>
           ))}

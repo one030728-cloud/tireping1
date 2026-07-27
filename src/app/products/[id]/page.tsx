@@ -205,7 +205,7 @@ function ProductDetailContent() {
               <th className="py-3 px-4 font-medium">판매가</th>
               <th className="py-3 px-4 font-medium">재고수량</th>
               <th className="py-3 px-4 font-medium">최소주문수량</th>
-              <th className="py-3 px-4 font-medium">출고여부 / 배송</th>
+              <th className="py-3 px-4 font-medium whitespace-nowrap">출고여부 / 배송</th>
               <th className="py-3 px-4 font-medium">수량</th>
               <th className="py-3 px-4 font-medium"></th>
             </tr>
@@ -257,7 +257,7 @@ function ProductDetailContent() {
                     onChange={(e) =>
                       setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))
                     }
-                    className="h-9 w-16 px-2 rounded-lg border border-border text-center"
+                    className="h-9 w-16 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                   />
                 </td>
                 <td className="py-3 px-4">
@@ -328,7 +328,7 @@ function ProductDetailContent() {
                 onChange={(e) =>
                   setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))
                 }
-                className="h-10 w-20 px-2 rounded-lg border border-border text-center"
+                className="h-10 w-20 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
               />
               <button
                 onClick={() => handleAdd(seller, false)}

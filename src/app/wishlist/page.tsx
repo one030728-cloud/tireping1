@@ -24,9 +24,9 @@ function WishlistContent() {
               <thead>
                 <tr className="text-left text-muted border-b border-border">
                   <th className="py-3 px-4 font-medium">업체구분</th>
-                  <th className="py-3 px-4 font-medium">업체코드 / 방문</th>
-                  <th className="py-3 px-4 font-medium">업체 소재지</th>
-                  <th className="py-3 px-4 font-medium">업체 소개글</th>
+                  <th className="py-3 px-4 font-medium whitespace-nowrap">업체코드 / 방문</th>
+                  <th className="py-3 px-4 font-medium whitespace-nowrap">업체 소재지</th>
+                  <th className="py-3 px-4 font-medium whitespace-nowrap">업체 소개글</th>
                   <th className="py-3 px-4 font-medium">찜한일자</th>
                   <th className="py-3 px-4 font-medium">삭제</th>
                 </tr>
@@ -41,7 +41,7 @@ function WishlistContent() {
                     <td className="py-3 px-4 font-medium">{s.code}</td>
                     <td className="py-3 px-4">{s.location}</td>
                     <td className="py-3 px-4">{s.intro}</td>
-                    <td className="py-3 px-4">{s.wishedAt}</td>
+                    <td className="py-3 px-4 whitespace-nowrap">{s.wishedAt}</td>
                     <td className="py-3 px-4">
                       <button
                         onClick={() => removeWish(s.id)}
