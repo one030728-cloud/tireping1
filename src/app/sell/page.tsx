@@ -103,7 +103,7 @@ function SellContent() {
             <div className="flex items-center justify-between mb-4">
               <Dialog.Title className="font-bold text-lg">신규 타이어 등록</Dialog.Title>
               <Dialog.Close asChild>
-                <button aria-label="닫기" className="p-1 text-muted hover:text-foreground">
+                <button aria-label="닫기" className="p-2 -mr-2 text-muted hover:text-foreground">
                   <X size={20} />
                 </button>
               </Dialog.Close>
@@ -195,7 +195,7 @@ function SellContent() {
       ) : (
         <>
           <div className="hidden lg:block overflow-x-auto card">
-            <table className="w-full text-sm border-collapse">
+            <table className="min-w-[780px] w-full text-sm border-collapse">
               <thead>
                 <tr className="text-left text-muted border-b border-border">
                   <th className="py-3 px-4 font-medium">제조사</th>
@@ -255,7 +255,7 @@ function SellContent() {
             {listings.map((l, i) => (
               <div
                 key={l.id}
-                className="card card-hover p-4 animate-[fade-slide-up_400ms_ease-out_both]"
+                className="card p-4 animate-[fade-slide-up_400ms_ease-out_both]"
                 style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
               >
                 <div className="flex items-start justify-between mb-2">

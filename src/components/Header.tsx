@@ -238,7 +238,7 @@ export default function Header() {
                 logout();
                 router.push("/");
               }}
-              className="p-2 text-foreground/70 hover:text-accent"
+              className="p-2.5 -m-2.5 text-foreground/70 hover:text-accent"
               title="로그아웃"
             >
               <LogOut size={20} />
@@ -266,7 +266,7 @@ export default function Header() {
             <div className="flex items-center justify-between mb-4">
               <Dialog.Title className="font-bold text-brand text-lg">메뉴</Dialog.Title>
               <Dialog.Close asChild>
-                <button aria-label="닫기" className="p-1 text-muted hover:text-foreground">
+                <button aria-label="닫기" className="p-2 -mr-2 text-muted hover:text-foreground">
                   <X size={20} />
                 </button>
               </Dialog.Close>
@@ -355,7 +355,7 @@ export default function Header() {
                 <Link
                   href="/login"
                   onClick={() => setMenuOpen(false)}
-                  className="btn-primary mt-2 px-3 py-3 text-sm text-center"
+                  className="btn-primary mt-2 h-11 px-3 text-sm text-center"
                 >
                   로그인
                 </Link>

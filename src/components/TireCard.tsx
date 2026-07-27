@@ -15,7 +15,7 @@ export default function TireCard({
       className={`group card card-hover ${fixedWidth ? "min-w-[160px] w-40 shrink-0" : "w-full"} p-3 flex flex-col gap-1`}
     >
       <ImagePlaceholder
-        className="w-full h-16 mb-1 transition-transform duration-300 group-hover:scale-[1.04]"
+        className="w-full aspect-[4/3] mb-2 transition-transform duration-300 group-hover:scale-[1.04]"
         manufacturer={tire.manufacturer}
       />
       <div className="flex items-center justify-between">

@@ -8,7 +8,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden lg:flex w-56 shrink-0 flex-col gap-1 py-6 pr-4 border-r border-border">
+    <aside className="hidden lg:flex w-56 shrink-0 flex-col gap-1 py-6 pr-4 border-r border-border sticky top-16 self-start max-h-[calc(100vh-4rem)] overflow-y-auto">
       {SIDEBAR_LINKS.map((link) => {
         const active = pathname === link.href.split("?")[0];
         return (
@@ -49,13 +49,16 @@ export default function Sidebar() {
         })}
       </div>
 
-      <div className="mt-6 rounded-2xl overflow-hidden relative bg-gradient-to-br from-accent via-accent to-brand text-white p-4 text-sm font-bold shadow-[var(--shadow-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-8px_rgba(244,63,94,0.5)]">
+      <Link
+        href="/events?tab=ongoing"
+        className="mt-6 rounded-2xl overflow-hidden relative block bg-gradient-to-br from-accent via-accent to-brand text-white p-4 text-sm font-bold shadow-[var(--shadow-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-8px_rgba(244,63,94,0.5)]"
+      >
         <div className="absolute -right-4 -top-6 w-20 h-20 rounded-full bg-white/15 blur-sm" />
         <div className="relative">
           타이어존 GRAND EVENT
           <p className="text-xs font-normal mt-1 opacity-90">지금 바로 이벤트를 확인해보세요</p>
         </div>
-      </div>
+      </Link>
     </aside>
   );
 }

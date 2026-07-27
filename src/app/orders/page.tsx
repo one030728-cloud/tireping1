@@ -36,7 +36,7 @@ function OrdersContent() {
       )}
 
       {orders.length === 0 ? (
-        <div className="text-center text-muted py-16 animate-[fade-slide-up_400ms_ease-out_both]">
+        <div className="card text-center text-muted py-16 animate-[fade-slide-up_400ms_ease-out_both]">
           <PackageSearch size={32} className="mx-auto mb-3 text-border" strokeWidth={1.5} />
           주문 내역이 없습니다.
         </div>
@@ -45,7 +45,7 @@ function OrdersContent() {
           {orders.map((o, i) => (
             <div
               key={o.id}
-              className="card card-hover p-4 flex items-center justify-between animate-[fade-slide-up_400ms_ease-out_both]"
+              className="card p-4 flex items-center justify-between animate-[fade-slide-up_400ms_ease-out_both]"
               style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
             >
               <div>

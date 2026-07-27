@@ -37,7 +37,7 @@ export default function Breadcrumb() {
       <Link href="/main" className="hover:text-brand hover:underline underline-offset-2">
         HOME
       </Link>
-      <ChevronRight size={12} />
+      <ChevronRight size={14} />
       {isSell ? (
         <span className="text-foreground font-medium">{label}</span>
       ) : (
@@ -45,7 +45,7 @@ export default function Breadcrumb() {
           <Link href="/products" className="hover:text-brand hover:underline underline-offset-2">
             타이어 구매
           </Link>
-          <ChevronRight size={12} />
+          <ChevronRight size={14} />
           <span className="text-foreground font-medium">{label}</span>
         </>
       )}

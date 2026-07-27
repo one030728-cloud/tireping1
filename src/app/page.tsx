@@ -22,7 +22,7 @@ function GuestHome() {
   return (
     <div className="px-4 py-5 flex flex-col gap-8">
       {ongoingEvent && (
-        <div className="relative rounded-2xl overflow-hidden h-32 lg:h-56 shadow-[var(--shadow-lg)] animate-[fade-slide-up_400ms_ease-out_both]">
+        <div className="relative rounded-2xl overflow-hidden h-32 md:h-44 lg:h-56 shadow-[var(--shadow-lg)] animate-[fade-slide-up_400ms_ease-out_both]">
           {bannerImage ? (
             <>
               <Image
@@ -67,7 +67,7 @@ function GuestHome() {
         </div>
       )}
 
-      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+      <div className="flex flex-col gap-8 md:grid md:grid-cols-2 md:gap-4 md:items-start">
         <section className="lg:card lg:p-4">
           <div
             className="flex items-center justify-between mb-3 animate-[fade-slide-up_400ms_ease-out_both]"
@@ -104,7 +104,7 @@ function GuestHome() {
       </div>
 
       <div
-        className="card rounded-2xl p-8 text-center flex flex-col items-center gap-3 relative overflow-hidden animate-[fade-slide-up_400ms_ease-out_both]"
+        className="card rounded-2xl p-8 max-w-xl mx-auto w-full text-center flex flex-col items-center gap-3 relative overflow-hidden animate-[fade-slide-up_400ms_ease-out_both]"
         style={{ animationDelay: "300ms" }}
       >
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-brand/5 blur-2xl" />

@@ -14,7 +14,7 @@ export default function Footer() {
           <p>경기도 어딘가시 어딘가로 123 / 고객센터 : 1588-0000</p>
           <p className="mt-1">copyright ⓒ tirezone. 데모 사이트입니다.</p>
         </div>
-        <div className="text-right sm:text-right shrink-0">
+        <div className="text-left sm:text-right shrink-0">
           <p className="text-foreground/70 font-semibold">고객센터</p>
           <a
             href="tel:1588-0000"

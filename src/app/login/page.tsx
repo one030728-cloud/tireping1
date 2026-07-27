@@ -56,7 +56,7 @@ export default function LoginPage() {
             onChange={(e) => setId(e.target.value)}
             placeholder="아이디 입력"
             autoComplete="username"
-            className="h-12 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+            className="h-11 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
             required
           />
           <input
@@ -65,7 +65,7 @@ export default function LoginPage() {
             type="password"
             placeholder="비밀번호 입력"
             autoComplete="current-password"
-            className="h-12 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+            className="h-11 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
             required
           />
 
@@ -75,7 +75,7 @@ export default function LoginPage() {
             </p>
           )}
 
-          <button type="submit" disabled={submitting} className="btn-primary h-12 mt-2">
+          <button type="submit" disabled={submitting} className="btn-primary h-11 mt-2">
             {submitting ? "로그인 중..." : "로그인"}
           </button>
 

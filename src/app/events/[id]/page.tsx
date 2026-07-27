@@ -27,7 +27,7 @@ function EventDetailContent() {
         <ChevronLeft size={16} /> 이벤트 목록
       </Link>
       <div
-        className="h-48 rounded-2xl mb-5 flex items-end p-5"
+        className="h-32 md:h-44 lg:h-56 rounded-2xl mb-5 flex items-end p-5"
         style={{ background: event.bannerGradient }}
       >
         <span

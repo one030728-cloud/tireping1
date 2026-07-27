@@ -1,12 +1,16 @@
+import Link from "next/link";
 import { Lock } from "lucide-react";
 import type { Tire } from "@/lib/types";
 import ImagePlaceholder from "./ImagePlaceholder";
 
 export default function GuestTireCard({ tire }: { tire: Tire }) {
   return (
-    <div className="group card card-hover min-w-[160px] w-40 shrink-0 p-3 flex flex-col gap-1">
+    <Link
+      href="/login"
+      className="group card card-hover min-w-[160px] w-40 shrink-0 p-3 flex flex-col gap-1"
+    >
       <ImagePlaceholder
-        className="w-full h-16 mb-1 transition-transform duration-300 group-hover:scale-[1.04]"
+        className="w-full aspect-[4/3] mb-2 transition-transform duration-300 group-hover:scale-[1.04]"
         manufacturer={tire.manufacturer}
       />
       <div className="flex items-center justify-between">
@@ -31,6 +35,6 @@ export default function GuestTireCard({ tire }: { tire: Tire }) {
         <Lock size={12} />
         판매가 로그인 후 확인
       </div>
-    </div>
+    </Link>
   );
 }

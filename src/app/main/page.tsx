@@ -39,7 +39,7 @@ function MainContent() {
   const banner = ongoingEvent && (
     <Link
       href={`/events/${ongoingEvent.id}`}
-      className="relative block rounded-2xl overflow-hidden h-32 lg:h-56 shadow-[var(--shadow-lg)] transition-transform hover:-translate-y-0.5"
+      className="relative block rounded-2xl overflow-hidden h-32 md:h-44 lg:h-56 shadow-[var(--shadow-lg)] transition-transform hover:-translate-y-0.5"
     >
       {bannerImage ? (
         <Image

@@ -1,6 +1,6 @@
 "use client";
 
-import { Star } from "lucide-react";
+import { Star, Trash2 } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import { useWishlist } from "@/lib/wishlist";
 
@@ -45,9 +45,9 @@ function WishlistContent() {
                     <td className="py-3 px-4">
                       <button
                         onClick={() => removeWish(s.id)}
-                        className="text-xs text-muted hover:text-accent"
+                        className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent"
                       >
-                        삭제
+                        <Trash2 size={13} /> 삭제
                       </button>
                     </td>
                   </tr>
@@ -60,7 +60,7 @@ function WishlistContent() {
             {sellers.map((s, i) => (
               <div
                 key={s.id}
-                className="card card-hover p-4 animate-[fade-slide-up_400ms_ease-out_both]"
+                className="card p-4 animate-[fade-slide-up_400ms_ease-out_both]"
                 style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
               >
                 <div className="flex items-start justify-between mb-1.5">
@@ -70,9 +70,9 @@ function WishlistContent() {
                   </div>
                   <button
                     onClick={() => removeWish(s.id)}
-                    className="text-xs text-muted hover:text-accent shrink-0"
+                    className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent shrink-0"
                   >
-                    삭제
+                    <Trash2 size={13} /> 삭제
                   </button>
                 </div>
                 <p className="text-sm text-muted">{s.intro}</p>

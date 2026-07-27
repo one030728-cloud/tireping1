@@ -56,11 +56,11 @@ function FactoryPriceContent() {
 
       <p className="text-sm text-muted mb-3">총 {groups.length}개의 상품</p>
 
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:gap-4">
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-4">
         {groups.map((g, i) => (
           <div
             key={g.id}
-            className="card card-hover p-4 animate-[fade-slide-up_400ms_ease-out_both]"
+            className="card p-4 animate-[fade-slide-up_400ms_ease-out_both]"
             style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
           >
             <div className="flex items-start gap-3 mb-3">
@@ -86,7 +86,7 @@ function FactoryPriceContent() {
                 <button
                   disabled={restockRequested.includes(g.id)}
                   onClick={() => setRestockRequested((prev) => [...prev, g.id])}
-                  className="text-xs font-semibold text-brand border border-brand rounded-md px-3 py-1.5 hover:bg-brand/5 active:scale-95 disabled:opacity-50 disabled:text-muted disabled:border-border disabled:active:scale-100"
+                  className="text-xs font-semibold text-brand border border-brand rounded-lg px-3 py-1.5 hover:bg-brand/5 active:scale-95 disabled:opacity-50 disabled:text-muted disabled:border-border disabled:active:scale-100"
                 >
                   {restockRequested.includes(g.id) ? "요청완료" : "재고 입고요청"}
                 </button>

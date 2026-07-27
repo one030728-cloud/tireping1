@@ -45,12 +45,12 @@ function EventsContent() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center text-muted py-16 text-sm animate-[fade-slide-up_400ms_ease-out_both]">
+        <div className="card text-center text-muted py-16 text-sm animate-[fade-slide-up_400ms_ease-out_both]">
           <Bell size={32} className="mx-auto mb-3 text-border" strokeWidth={1.5} />
           해당하는 이벤트가 없습니다.
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
           {filtered.map((e, i) => (
             <Link
               key={e.id}
@@ -59,7 +59,7 @@ function EventsContent() {
               style={{ animationDelay: `${i * 50}ms` }}
             >
               <div
-                className="h-32 rounded-xl mb-2 transition-transform group-hover:-translate-y-1 group-hover:shadow-lg"
+                className="aspect-[16/9] rounded-xl mb-2 border border-border transition-transform group-hover:-translate-y-1 group-hover:shadow-lg"
                 style={{ background: e.bannerGradient }}
               />
               <p className="text-sm font-semibold group-hover:text-brand">{e.title}</p>

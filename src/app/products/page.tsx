@@ -54,12 +54,12 @@ function ProductsContent() {
       <p className="text-sm text-muted mb-3">총 {results.length}개 상품</p>
 
       {results.length === 0 ? (
-        <div className="text-center text-muted py-16 text-sm animate-[fade-slide-up_400ms_ease-out_both]">
+        <div className="card text-center text-muted py-16 text-sm animate-[fade-slide-up_400ms_ease-out_both]">
           <SearchX size={32} className="mx-auto mb-3 text-border" strokeWidth={1.5} />
           조건에 맞는 타이어가 없습니다.
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {results.map((t, i) => (
             <div
               key={t.id}

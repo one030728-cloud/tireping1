@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShoppingCart } from "lucide-react";
+import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import { useCart } from "@/lib/cart";
 import { useOrders } from "@/lib/orders";
@@ -22,7 +22,7 @@ function CartContent() {
       </p>
 
       {items.length === 0 ? (
-        <div className="text-center py-16 animate-[fade-slide-up_400ms_ease-out_both]">
+        <div className="card text-center py-16 animate-[fade-slide-up_400ms_ease-out_both]">
           <ShoppingCart size={32} className="mx-auto mb-3 text-border" strokeWidth={1.5} />
           <p className="text-muted mb-4">장바구니에 담은 상품이 없습니다.</p>
           <Link href="/products" className="text-brand font-semibold">
@@ -32,7 +32,7 @@ function CartContent() {
       ) : (
         <>
           <div className="hidden lg:block overflow-x-auto card">
-            <table className="w-full text-sm border-collapse">
+            <table className="min-w-[880px] w-full text-sm border-collapse">
               <thead>
                 <tr className="text-left text-muted border-b border-border">
                   <th className="py-3 px-4 font-medium">제조사</th>
@@ -63,9 +63,10 @@ function CartContent() {
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="w-7 h-7 rounded border border-border hover:bg-surface-2 active:scale-90"
+                          aria-label="수량 감소"
+                          className="w-7 h-7 flex items-center justify-center rounded border border-border hover:bg-surface-2 active:scale-90"
                         >
-                          -
+                          <Minus size={13} />
                         </button>
                         <span
                           key={item.quantity}
@@ -75,9 +76,10 @@ function CartContent() {
                         </span>
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="w-7 h-7 rounded border border-border hover:bg-surface-2 active:scale-90"
+                          aria-label="수량 증가"
+                          className="w-7 h-7 flex items-center justify-center rounded border border-border hover:bg-surface-2 active:scale-90"
                         >
-                          +
+                          <Plus size={13} />
                         </button>
                       </div>
                     </td>
@@ -88,9 +90,9 @@ function CartContent() {
                     <td className="py-3 px-4">
                       <button
                         onClick={() => removeItem(item.id)}
-                        className="text-xs text-muted hover:text-accent"
+                        className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent"
                       >
-                        삭제
+                        <Trash2 size={13} /> 삭제
                       </button>
                     </td>
                   </tr>
@@ -103,7 +105,7 @@ function CartContent() {
             {items.map((item, i) => (
               <div
                 key={item.id}
-                className="card card-hover p-4 animate-[fade-slide-up_400ms_ease-out_both]"
+                className="card p-4 animate-[fade-slide-up_400ms_ease-out_both]"
                 style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
               >
                 <div className="flex items-start justify-between mb-2">
@@ -118,18 +120,19 @@ function CartContent() {
                   </div>
                   <button
                     onClick={() => removeItem(item.id)}
-                    className="text-xs text-muted hover:text-accent shrink-0"
+                    className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent shrink-0"
                   >
-                    삭제
+                    <Trash2 size={13} /> 삭제
                   </button>
                 </div>
                 <div className="flex items-center justify-between mt-3">
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="w-8 h-8 rounded-lg border border-border hover:bg-surface-2 active:scale-90"
+                      aria-label="수량 감소"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90"
                     >
-                      -
+                      <Minus size={14} />
                     </button>
                     <span
                       key={item.quantity}
@@ -139,9 +142,10 @@ function CartContent() {
                     </span>
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-8 h-8 rounded-lg border border-border hover:bg-surface-2 active:scale-90"
+                      aria-label="수량 증가"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90"
                     >
-                      +
+                      <Plus size={14} />
                     </button>
                   </div>
                   <span className="font-bold tabular-nums">
