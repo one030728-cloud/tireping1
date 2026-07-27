@@ -134,7 +134,7 @@ function MainContent() {
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <Carousel>
+      <Carousel autoPlayInterval={3000}>
         {eventTires.map((t) => (
           <TireCard key={t.id} tire={t} />
         ))}
