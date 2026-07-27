@@ -27,6 +27,13 @@ function animateScrollTo(
   requestAnimationFrame(step);
 }
 
+function cardPitch(track: HTMLElement): number {
+  const first = track.children[0] as HTMLElement | undefined;
+  const second = track.children[1] as HTMLElement | undefined;
+  if (first && second) return second.offsetLeft - first.offsetLeft;
+  return track.clientWidth * 0.8;
+}
+
 export default function Carousel({
   children,
   autoPlayInterval,
@@ -51,7 +58,7 @@ export default function Carousel({
     } else if (direction === -1 && atStart) {
       target = maxScroll;
     } else {
-      target = track.scrollLeft + track.clientWidth * 0.8 * direction;
+      target = track.scrollLeft + cardPitch(track) * direction;
     }
     target = Math.max(0, Math.min(target, maxScroll));
     animateScrollTo(track, target, 450, animationTokenRef);
@@ -68,7 +75,7 @@ export default function Carousel({
 
   return (
     <div
-      className="relative group/carousel"
+      className="relative group/carousel max-w-2xl"
       onMouseEnter={() => {
         pausedRef.current = true;
       }}
