@@ -48,9 +48,11 @@ function cardPitch(track: HTMLElement): number {
 export default function Carousel({
   children,
   autoPlayInterval,
+  className = "max-w-2xl",
 }: {
   children: ReactNode[];
   autoPlayInterval?: number;
+  className?: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
@@ -86,7 +88,7 @@ export default function Carousel({
 
   return (
     <div
-      className="relative group/carousel max-w-2xl"
+      className={`relative group/carousel ${className}`}
       onMouseEnter={() => {
         pausedRef.current = true;
       }}

@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { EVENTS, TIRES } from "@/lib/mockData";
+import Carousel from "@/components/Carousel";
 import GuestTireCard from "@/components/GuestTireCard";
 
 const BANNER_IMAGES: Partial<Record<string, string>> = {
@@ -76,17 +77,11 @@ function GuestHome() {
             이벤트 진행 중 타이어
           </h2>
         </div>
-        <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-6 lg:overflow-visible">
-          {eventTires.map((t, i) => (
-            <div
-              key={t.id}
-              className="shrink-0 animate-[fade-slide-up_400ms_ease-out_both]"
-              style={{ animationDelay: `${i * 50}ms` }}
-            >
-              <GuestTireCard tire={t} />
-            </div>
+        <Carousel autoPlayInterval={3000} className="max-w-none">
+          {eventTires.map((t) => (
+            <GuestTireCard key={t.id} tire={t} />
           ))}
-        </div>
+        </Carousel>
       </section>
 
       <section>
@@ -99,17 +94,11 @@ function GuestHome() {
             판매 인기 타이어
           </h2>
         </div>
-        <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-6 lg:overflow-visible">
-          {bestTires.map((t, i) => (
-            <div
-              key={t.id}
-              className="shrink-0 animate-[fade-slide-up_400ms_ease-out_both]"
-              style={{ animationDelay: `${i * 50}ms` }}
-            >
-              <GuestTireCard tire={t} />
-            </div>
+        <Carousel className="max-w-none">
+          {bestTires.map((t) => (
+            <GuestTireCard key={t.id} tire={t} />
           ))}
-        </div>
+        </Carousel>
       </section>
 
       <div
