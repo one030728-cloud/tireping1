@@ -128,7 +128,7 @@ export default function Header() {
                 <DropdownMenu.Content
                   align="end"
                   sideOffset={8}
-                  className="w-72 rounded-lg border border-border bg-surface shadow-lg py-1.5 z-50"
+                  className="w-72 rounded-lg border border-border bg-surface shadow-lg py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
                 >
                   <p className="px-3 py-2 text-xs font-semibold text-muted border-b border-border">
                     공지사항
@@ -176,7 +176,7 @@ export default function Header() {
                   <DropdownMenu.Content
                     align="end"
                     sideOffset={8}
-                    className="w-48 rounded-lg border border-border bg-surface shadow-lg py-1.5 z-50"
+                    className="w-48 rounded-lg border border-border bg-surface shadow-lg py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
                   >
                     {MYPAGE_LINKS.map((link) => (
                       <DropdownMenu.Item key={link.href} asChild>
@@ -221,10 +221,10 @@ export default function Header() {
 
       <Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50 lg:hidden" />
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50 lg:hidden data-[state=open]:animate-[overlay-show_200ms_ease-out] data-[state=closed]:animate-[overlay-hide_180ms_ease-in]" />
           <Dialog.Content
             aria-describedby={undefined}
-            className="fixed inset-y-0 left-0 w-72 max-w-[85%] bg-surface shadow-xl p-5 flex flex-col gap-1 overflow-y-auto z-50 lg:hidden"
+            className="fixed inset-y-0 left-0 w-72 max-w-[85%] bg-surface shadow-xl p-5 flex flex-col gap-1 overflow-y-auto z-50 lg:hidden data-[state=open]:animate-[slide-in-from-left_250ms_ease-out] data-[state=closed]:animate-[slide-out-to-left_200ms_ease-in]"
           >
             <div className="flex items-center justify-between mb-4">
               <Dialog.Title className="font-bold text-brand text-lg">메뉴</Dialog.Title>
@@ -275,20 +275,26 @@ export default function Header() {
                     className={`transition-transform ${mypageOpen ? "rotate-90" : ""}`}
                   />
                 </button>
-                {mypageOpen && (
-                  <div className="pl-3 flex flex-col gap-1 border-l border-border ml-3">
-                    {MYPAGE_LINKS.map((link) => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        onClick={() => setMenuOpen(false)}
-                        className="px-3 py-2.5 rounded-lg text-sm text-muted hover:bg-background hover:text-foreground"
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
+                <div
+                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                    mypageOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="pl-3 flex flex-col gap-1 border-l border-border ml-3">
+                      {MYPAGE_LINKS.map((link) => (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setMenuOpen(false)}
+                          className="px-3 py-2.5 rounded-lg text-sm text-muted hover:bg-background hover:text-foreground"
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </div>
                   </div>
-                )}
+                </div>
               </>
             ) : (
               <>
