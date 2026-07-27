@@ -8,7 +8,7 @@ import Breadcrumb from "./Breadcrumb";
 import ScrollToTopButton from "./ScrollToTopButton";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const pathname = usePathname();
   const showSidebar = user && pathname !== "/login" && pathname !== "/";
   const showFooter = pathname !== "/login";
@@ -19,7 +19,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {showSidebar && <Sidebar />}
         <main className="flex-1 min-w-0">
           {showSidebar && <Breadcrumb />}
-          <div key={pathname} className="animate-[fade-slide-up_320ms_ease-out_both]">
+          <div
+            key={`${pathname}-${loading}`}
+            className="animate-[fade-slide-up_320ms_ease-out_both]"
+          >
             {children}
           </div>
         </main>
