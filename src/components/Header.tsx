@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -28,6 +28,20 @@ export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const cartCount = items.reduce((sum, i) => sum + i.quantity, 0);
+
+  const profileCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function openProfileMenu() {
+    if (profileCloseTimeoutRef.current) {
+      clearTimeout(profileCloseTimeoutRef.current);
+      profileCloseTimeoutRef.current = null;
+    }
+    setProfileMenuOpen(true);
+  }
+
+  function scheduleCloseProfileMenu() {
+    profileCloseTimeoutRef.current = setTimeout(() => setProfileMenuOpen(false), 150);
+  }
 
   return (
     <header className="sticky top-0 z-40 header-glass border-b border-border/70 shadow-[var(--shadow-xs)]">
@@ -165,8 +179,8 @@ export default function Header() {
             <DropdownMenu.Root open={profileMenuOpen} onOpenChange={setProfileMenuOpen}>
               <div
                 className="hidden lg:block"
-                onMouseEnter={() => setProfileMenuOpen(true)}
-                onMouseLeave={() => setProfileMenuOpen(false)}
+                onMouseEnter={openProfileMenu}
+                onMouseLeave={scheduleCloseProfileMenu}
               >
                 <DropdownMenu.Trigger asChild>
                   <Link
@@ -186,6 +200,8 @@ export default function Header() {
                   <DropdownMenu.Content
                     align="end"
                     sideOffset={8}
+                    onMouseEnter={openProfileMenu}
+                    onMouseLeave={scheduleCloseProfileMenu}
                     className="w-48 rounded-xl border border-border bg-surface shadow-[var(--shadow-lg)] py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
                   >
                     {MYPAGE_LINKS.map((link) => (
