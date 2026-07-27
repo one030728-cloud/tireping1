@@ -3,6 +3,23 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+function easeInOutQuad(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function animateScrollTo(el: HTMLElement, to: number, duration: number) {
+  const from = el.scrollLeft;
+  const change = to - from;
+  if (change === 0) return;
+  const start = performance.now();
+  function step(now: number) {
+    const progress = Math.min((now - start) / duration, 1);
+    el.scrollLeft = from + change * easeInOutQuad(progress);
+    if (progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
 export default function Carousel({
   children,
   autoPlayInterval,
@@ -19,11 +36,11 @@ export default function Carousel({
     const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
     const atStart = track.scrollLeft <= 1;
     if (direction === 1 && atEnd) {
-      track.scrollTo({ left: 0, behavior: "smooth" });
+      animateScrollTo(track, 0, 450);
     } else if (direction === -1 && atStart) {
-      track.scrollTo({ left: track.scrollWidth, behavior: "smooth" });
+      animateScrollTo(track, track.scrollWidth, 450);
     } else {
-      track.scrollBy({ left: track.clientWidth * 0.8 * direction, behavior: "smooth" });
+      animateScrollTo(track, track.scrollLeft + track.clientWidth * 0.8 * direction, 450);
     }
   }
 
@@ -50,7 +67,7 @@ export default function Carousel({
     >
       <div
         ref={trackRef}
-        className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {children.map((child, i) => (
           <div key={i} className="snap-start shrink-0">
