@@ -1,18 +1,25 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type MutableRefObject, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 function easeInOutQuad(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
 
-function animateScrollTo(el: HTMLElement, to: number, duration: number) {
+function animateScrollTo(
+  el: HTMLElement,
+  to: number,
+  duration: number,
+  tokenRef: MutableRefObject<number>,
+) {
+  const token = ++tokenRef.current;
   const from = el.scrollLeft;
   const change = to - from;
   if (change === 0) return;
   const start = performance.now();
   function step(now: number) {
+    if (tokenRef.current !== token) return;
     const progress = Math.min((now - start) / duration, 1);
     el.scrollLeft = from + change * easeInOutQuad(progress);
     if (progress < 1) requestAnimationFrame(step);
@@ -29,28 +36,35 @@ export default function Carousel({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
+  const animationTokenRef = useRef(0);
 
-  function slide(direction: -1 | 1) {
+  const slide = useCallback((direction: -1 | 1) => {
     const track = trackRef.current;
     if (!track) return;
-    const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    if (maxScroll <= 0) return;
+    const atEnd = track.scrollLeft >= maxScroll - 1;
     const atStart = track.scrollLeft <= 1;
+    let target: number;
     if (direction === 1 && atEnd) {
-      animateScrollTo(track, 0, 450);
+      target = 0;
     } else if (direction === -1 && atStart) {
-      animateScrollTo(track, track.scrollWidth, 450);
+      target = maxScroll;
     } else {
-      animateScrollTo(track, track.scrollLeft + track.clientWidth * 0.8 * direction, 450);
+      target = track.scrollLeft + track.clientWidth * 0.8 * direction;
     }
-  }
+    target = Math.max(0, Math.min(target, maxScroll));
+    animateScrollTo(track, target, 450, animationTokenRef);
+  }, []);
 
   useEffect(() => {
     if (!autoPlayInterval) return;
     const id = setInterval(() => {
-      if (!pausedRef.current) slide(1);
+      const track = trackRef.current;
+      if (!pausedRef.current && track && track.offsetParent !== null) slide(1);
     }, autoPlayInterval);
     return () => clearInterval(id);
-  }, [autoPlayInterval]);
+  }, [autoPlayInterval, slide]);
 
   return (
     <div
@@ -67,7 +81,7 @@ export default function Carousel({
     >
       <div
         ref={trackRef}
-        className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {children.map((child, i) => (
           <div key={i} className="snap-start shrink-0">
