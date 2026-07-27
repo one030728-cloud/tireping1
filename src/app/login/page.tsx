@@ -38,14 +38,16 @@ export default function LoginPage() {
   return (
     <div className="flex justify-center px-4 py-16">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-extrabold text-brand">타이어존</h1>
+        <div className="text-center mb-8 animate-[fade-slide-up_400ms_ease-out_both]">
+          <h1 className="text-2xl font-extrabold bg-gradient-to-r from-brand-light to-brand-dark bg-clip-text text-transparent">
+            타이어존
+          </h1>
           <p className="text-sm text-muted mt-1">사업자전용 타이어거래소</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="bg-surface border border-border rounded-2xl p-6 flex flex-col gap-3 shadow-sm"
+          className="card rounded-2xl p-6 flex flex-col gap-3 shadow-[var(--shadow-lg)] animate-[fade-slide-up_450ms_ease-out_both]"
         >
           <h2 className="text-center font-bold mb-1">회원 로그인</h2>
 
@@ -54,7 +56,7 @@ export default function LoginPage() {
             onChange={(e) => setId(e.target.value)}
             placeholder="아이디 입력"
             autoComplete="username"
-            className="h-12 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40"
+            className="h-12 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
             required
           />
           <input
@@ -63,17 +65,17 @@ export default function LoginPage() {
             type="password"
             placeholder="비밀번호 입력"
             autoComplete="current-password"
-            className="h-12 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40"
+            className="h-12 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
             required
           />
 
-          {error && <p className="text-sm text-accent">{error}</p>}
+          {error && (
+            <p key={error} className="text-sm text-accent animate-[shake_350ms_ease-out]">
+              {error}
+            </p>
+          )}
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="h-12 rounded-lg bg-brand hover:bg-brand-dark text-white font-semibold mt-2 disabled:opacity-60"
-          >
+          <button type="submit" disabled={submitting} className="btn-primary h-12 mt-2">
             {submitting ? "로그인 중..." : "로그인"}
           </button>
 
@@ -91,8 +93,9 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="text-xs text-muted bg-background rounded-lg p-3 mt-2 leading-relaxed">
-            데모 계정 · 아이디: <b>demo</b> / 비밀번호: <b>demo1234</b>
+          <div className="text-xs text-muted bg-surface-2 border border-dashed border-border-strong rounded-lg p-3 mt-2 leading-relaxed">
+            데모 계정 · 아이디: <b className="text-foreground">demo</b> / 비밀번호:{" "}
+            <b className="text-foreground">demo1234</b>
           </div>
         </form>
       </div>

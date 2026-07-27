@@ -21,7 +21,7 @@ function GuestHome() {
   return (
     <div className="px-4 py-5 flex flex-col gap-8">
       {ongoingEvent && (
-        <div className="relative rounded-2xl overflow-hidden h-32 lg:h-56">
+        <div className="relative rounded-2xl overflow-hidden h-32 lg:h-56 shadow-[var(--shadow-lg)]">
           {bannerImage ? (
             <>
               <Image
@@ -40,7 +40,7 @@ function GuestHome() {
                 </div>
                 <Link
                   href="/login"
-                  className="text-xs font-semibold bg-white text-foreground px-3 py-1.5 rounded-full"
+                  className="text-xs font-semibold bg-white text-foreground px-3 py-1.5 rounded-full hover:shadow-md hover:-translate-y-0.5 active:scale-95"
                 >
                   로그인하고 가격 확인하기
                 </Link>
@@ -57,7 +57,7 @@ function GuestHome() {
               </div>
               <Link
                 href="/login"
-                className="text-xs font-semibold bg-black/80 text-white px-3 py-1.5 rounded-full"
+                className="text-xs font-semibold bg-black/80 text-white px-3 py-1.5 rounded-full hover:shadow-md hover:-translate-y-0.5 active:scale-95"
               >
                 로그인하고 가격 확인하기
               </Link>
@@ -68,33 +68,52 @@ function GuestHome() {
 
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold">이벤트 진행 중 타이어</h2>
+          <h2 className="font-bold flex items-center gap-2">
+            <span className="w-1 h-4 rounded-full bg-gradient-to-b from-accent-light to-accent" />
+            이벤트 진행 중 타이어
+          </h2>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-6 lg:overflow-visible">
-          {eventTires.map((t) => (
-            <GuestTireCard key={t.id} tire={t} />
+          {eventTires.map((t, i) => (
+            <div
+              key={t.id}
+              className="shrink-0 animate-[fade-slide-up_400ms_ease-out_both]"
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <GuestTireCard tire={t} />
+            </div>
           ))}
         </div>
       </section>
 
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold">판매 인기 타이어</h2>
+          <h2 className="font-bold flex items-center gap-2">
+            <span className="w-1 h-4 rounded-full bg-gradient-to-b from-brand-light to-brand" />
+            판매 인기 타이어
+          </h2>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-6 lg:overflow-visible">
-          {bestTires.map((t) => (
-            <GuestTireCard key={t.id} tire={t} />
+          {bestTires.map((t, i) => (
+            <div
+              key={t.id}
+              className="shrink-0 animate-[fade-slide-up_400ms_ease-out_both]"
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <GuestTireCard tire={t} />
+            </div>
           ))}
         </div>
       </section>
 
-      <div className="bg-surface border border-border rounded-2xl p-8 text-center flex flex-col items-center gap-3">
-        <p className="font-bold text-lg">사업자 로그인 후 실시간 판매가를 확인하세요</p>
-        <p className="text-sm text-muted">타이어존은 사업자 전용 B2B 타이어 거래 플랫폼입니다.</p>
-        <Link
-          href="/login"
-          className="h-11 px-6 rounded-lg bg-brand text-white font-semibold flex items-center"
-        >
+      <div className="card rounded-2xl p-8 text-center flex flex-col items-center gap-3 relative overflow-hidden">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-brand/5 blur-2xl" />
+        <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-accent/5 blur-2xl" />
+        <p className="font-bold text-lg relative">사업자 로그인 후 실시간 판매가를 확인하세요</p>
+        <p className="text-sm text-muted relative">
+          타이어존은 사업자 전용 B2B 타이어 거래 플랫폼입니다.
+        </p>
+        <Link href="/login" className="btn-primary relative h-11 px-6">
           로그인 / 회원가입
         </Link>
       </div>

@@ -100,6 +100,7 @@ function ProductDetailContent() {
   const dot = searchParams.get("dot");
   const product = useMemo(() => resolveProduct(params.id, dot), [params.id, dot]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const lowestPrice = product ? Math.min(...product.sellers.map((s) => s.price)) : 0;
 
   if (!product) {
     return (
@@ -157,7 +158,7 @@ function ProductDetailContent() {
       <h1 className="text-xl font-extrabold mb-1">상품 상세정보</h1>
       <p className="text-xs text-muted mb-4">{product.manufacturer}</p>
 
-      <div className="bg-surface border border-border rounded-xl p-5 mb-5 flex flex-col lg:flex-row gap-4 lg:gap-6">
+      <div className="card p-5 mb-5 flex flex-col lg:flex-row gap-4 lg:gap-6">
         <ImagePlaceholder
           className="w-full h-32 lg:w-40 lg:h-40 shrink-0"
           manufacturer={product.manufacturer}
@@ -180,7 +181,7 @@ function ProductDetailContent() {
         </div>
       </div>
 
-      <div className="bg-surface border border-border rounded-xl p-5 mb-5 text-sm leading-relaxed text-muted lg:grid lg:grid-cols-2 lg:gap-8">
+      <div className="card p-5 mb-5 text-sm leading-relaxed text-muted lg:grid lg:grid-cols-2 lg:gap-8">
         <div>
           <h3 className="text-foreground font-bold mb-2">배송 안내</h3>
           <p>1. 본 상품은 택배 배송 상품입니다. 타이어 특성상 묶음배송이 불가능합니다.</p>
@@ -195,7 +196,7 @@ function ProductDetailContent() {
 
       <h3 className="font-bold mb-3">판매점별 비교</h3>
 
-      <div className="hidden lg:block overflow-x-auto bg-surface border border-border rounded-xl mb-8">
+      <div className="hidden lg:block overflow-x-auto card mb-8">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left text-muted border-b border-border">
@@ -229,6 +230,11 @@ function ProductDetailContent() {
                     />
                   </button>
                   {seller.code}
+                  {seller.price === lowestPrice && (
+                    <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent align-middle">
+                      최저가
+                    </span>
+                  )}
                 </td>
                 <td className="py-3 px-4 text-brand font-bold tabular-nums">
                   {seller.discountRate}%
@@ -258,13 +264,13 @@ function ProductDetailContent() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleAdd(seller, false)}
-                      className="h-9 px-3 rounded-lg border border-brand text-brand font-semibold text-xs whitespace-nowrap hover:bg-brand/5 active:scale-95"
+                      className="btn-outline h-9 px-3 text-xs whitespace-nowrap"
                     >
                       장바구니
                     </button>
                     <button
                       onClick={() => handleAdd(seller, true)}
-                      className="h-9 px-3 rounded-lg bg-brand text-white font-semibold text-xs whitespace-nowrap hover:bg-brand-dark active:scale-95"
+                      className="btn-primary h-9 px-3 text-xs whitespace-nowrap"
                     >
                       바로구매
                     </button>
@@ -280,7 +286,7 @@ function ProductDetailContent() {
         {product.sellers.map((seller, i) => (
           <div
             key={seller.code}
-            className="bg-surface border border-border rounded-xl p-4 hover:shadow-md animate-[fade-slide-up_400ms_ease-out_both]"
+            className="card card-hover p-4 animate-[fade-slide-up_400ms_ease-out_both]"
             style={{ animationDelay: `${i * 60}ms` }}
           >
             <div className="flex items-center justify-between mb-2">
@@ -298,6 +304,11 @@ function ProductDetailContent() {
                   />
                 </button>
                 {seller.code}
+                {seller.price === lowestPrice && (
+                  <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
+                    최저가
+                  </span>
+                )}
               </span>
               <span className="text-xs text-muted">{seller.courier}</span>
             </div>
@@ -321,13 +332,13 @@ function ProductDetailContent() {
               />
               <button
                 onClick={() => handleAdd(seller, false)}
-                className="flex-1 h-10 rounded-lg border border-brand text-brand font-semibold text-sm hover:bg-brand/5 active:scale-95"
+                className="btn-outline flex-1 h-10 text-sm"
               >
                 장바구니 담기
               </button>
               <button
                 onClick={() => handleAdd(seller, true)}
-                className="flex-1 h-10 rounded-lg bg-brand text-white font-semibold text-sm hover:bg-brand-dark active:scale-95"
+                className="btn-primary flex-1 h-10 text-sm"
               >
                 바로 구매
               </button>

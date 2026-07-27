@@ -31,7 +31,7 @@ function CartContent() {
         </div>
       ) : (
         <>
-          <div className="hidden lg:block overflow-x-auto bg-surface border border-border rounded-xl">
+          <div className="hidden lg:block overflow-x-auto card">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="text-left text-muted border-b border-border">
@@ -103,7 +103,7 @@ function CartContent() {
             {items.map((item, i) => (
               <div
                 key={item.id}
-                className="bg-surface border border-border rounded-xl p-4 hover:shadow-md animate-[fade-slide-up_400ms_ease-out_both]"
+                className="card card-hover p-4 animate-[fade-slide-up_400ms_ease-out_both]"
                 style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
               >
                 <div className="flex items-start justify-between mb-2">
@@ -152,7 +152,7 @@ function CartContent() {
             ))}
           </div>
 
-          <div className="bg-surface border border-border rounded-xl p-4 mt-5 flex items-center justify-between">
+          <div className="card p-4 mt-5 flex items-center justify-between">
             <span className="font-semibold">합계금액</span>
             <span
               key={total}
@@ -165,7 +165,7 @@ function CartContent() {
           <div className="flex gap-2 mt-4 pb-8">
             <button
               onClick={clear}
-              className="h-12 px-5 rounded-lg border border-border text-sm font-semibold hover:bg-background active:scale-95"
+              className="h-12 px-5 rounded-xl border border-border text-sm font-semibold hover:bg-surface-2 active:scale-95 transition-all"
             >
               전체삭제
             </button>
@@ -175,7 +175,7 @@ function CartContent() {
                 clear();
                 router.push("/orders?justOrdered=1");
               }}
-              className="flex-1 h-12 rounded-lg bg-brand text-white font-semibold hover:bg-brand-dark active:scale-95"
+              className="btn-primary flex-1 h-12"
             >
               주문하기
             </button>

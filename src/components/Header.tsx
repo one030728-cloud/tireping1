@@ -30,7 +30,7 @@ export default function Header() {
   const cartCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
-    <header className="sticky top-0 z-40 bg-surface border-b border-border">
+    <header className="sticky top-0 z-40 header-glass border-b border-border/70 shadow-[var(--shadow-xs)]">
       <div className="max-w-[1240px] mx-auto flex items-center justify-between px-4 h-16">
         <div className="flex items-center gap-6">
           <button
@@ -56,7 +56,7 @@ export default function Header() {
             <nav className="hidden lg:flex items-center gap-2">
               <Link
                 href="/main"
-                className="px-4 h-9 flex items-center rounded-full bg-brand text-white text-sm font-semibold"
+                className="px-4 h-9 flex items-center rounded-full text-white text-sm font-semibold bg-gradient-to-br from-brand-light to-brand shadow-[0_4px_14px_-4px_rgba(29,93,240,0.5)] hover:brightness-105 transition-[filter]"
               >
                 타이어 구매
               </Link>
@@ -138,7 +138,7 @@ export default function Header() {
                 <DropdownMenu.Content
                   align="end"
                   sideOffset={8}
-                  className="w-72 rounded-lg border border-border bg-surface shadow-lg py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
+                  className="w-72 rounded-xl border border-border bg-surface shadow-[var(--shadow-lg)] py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
                 >
                   <p className="px-3 py-2 text-xs font-semibold text-muted border-b border-border">
                     공지사항
@@ -173,7 +173,7 @@ export default function Header() {
                     href="/mypage/status"
                     className="flex items-center gap-2 pl-3 border-l border-border hover:opacity-80"
                   >
-                    <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xs font-bold">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-light to-brand-dark text-white flex items-center justify-center text-xs font-bold shadow-[0_2px_8px_-2px_rgba(29,93,240,0.5)]">
                       {user.businessName.slice(0, 1)}
                     </div>
                     <div className="leading-tight text-left">
@@ -186,7 +186,7 @@ export default function Header() {
                   <DropdownMenu.Content
                     align="end"
                     sideOffset={8}
-                    className="w-48 rounded-lg border border-border bg-surface shadow-lg py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
+                    className="w-48 rounded-xl border border-border bg-surface shadow-[var(--shadow-lg)] py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
                   >
                     {MYPAGE_LINKS.map((link) => (
                       <DropdownMenu.Item key={link.href} asChild>
@@ -234,7 +234,7 @@ export default function Header() {
           <Dialog.Overlay className="fixed inset-0 bg-black/40 z-50 lg:hidden data-[state=open]:animate-[overlay-show_200ms_ease-out] data-[state=closed]:animate-[overlay-hide_180ms_ease-in]" />
           <Dialog.Content
             aria-describedby={undefined}
-            className="fixed inset-y-0 left-0 w-72 max-w-[85%] bg-surface shadow-xl p-5 flex flex-col gap-1 overflow-y-auto z-50 lg:hidden data-[state=open]:animate-[slide-in-from-left_250ms_ease-out] data-[state=closed]:animate-[slide-out-to-left_200ms_ease-in]"
+            className="fixed inset-y-0 left-0 w-72 max-w-[85%] bg-surface shadow-[var(--shadow-lg)] p-5 flex flex-col gap-1 overflow-y-auto z-50 lg:hidden data-[state=open]:animate-[slide-in-from-left_250ms_ease-out] data-[state=closed]:animate-[slide-out-to-left_200ms_ease-in]"
           >
             <div className="flex items-center justify-between mb-4">
               <Dialog.Title className="font-bold text-brand text-lg">메뉴</Dialog.Title>
@@ -328,7 +328,7 @@ export default function Header() {
                 <Link
                   href="/login"
                   onClick={() => setMenuOpen(false)}
-                  className="mt-2 px-3 py-3 rounded-lg text-sm font-semibold bg-brand text-white text-center"
+                  className="btn-primary mt-2 px-3 py-3 text-sm text-center"
                 >
                   로그인
                 </Link>

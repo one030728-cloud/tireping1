@@ -3,11 +3,14 @@
 import RequireAuth from "@/components/RequireAuth";
 import { useOrders } from "@/lib/orders";
 
-function StatCard({ label, value }: { label: string; value: number }) {
+function StatCard({ label, value, delay }: { label: string; value: number; delay: number }) {
   return (
-    <div className="bg-surface border border-border rounded-xl p-4 text-center">
+    <div
+      className="card card-hover p-4 text-center animate-[fade-slide-up_400ms_ease-out_both]"
+      style={{ animationDelay: `${delay}ms` }}
+    >
       <p className="text-xs text-muted mb-1">{label}</p>
-      <p className="text-lg font-extrabold">{value}건</p>
+      <p className="text-lg font-extrabold tabular-nums">{value}건</p>
     </div>
   );
 }
@@ -20,15 +23,15 @@ function StatusContent() {
 
       <h2 className="font-bold mb-3">타이어 주문 현황</h2>
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-6">
-        {Object.entries(orderStatusCounts).map(([label, value]) => (
-          <StatCard key={label} label={label} value={value} />
+        {Object.entries(orderStatusCounts).map(([label, value], i) => (
+          <StatCard key={label} label={label} value={value} delay={i * 30} />
         ))}
       </div>
 
       <h2 className="font-bold mb-3">타이어 취소/교환/반품 현황</h2>
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-6">
-        {Object.entries(cancelStatusCounts).map(([label, value]) => (
-          <StatCard key={label} label={label} value={value} />
+        {Object.entries(cancelStatusCounts).map(([label, value], i) => (
+          <StatCard key={label} label={label} value={value} delay={i * 30} />
         ))}
       </div>
     </div>

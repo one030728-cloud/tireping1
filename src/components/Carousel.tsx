@@ -115,7 +115,7 @@ export default function Carousel({
         type="button"
         onClick={() => slide(-1)}
         aria-label="이전"
-        className="hidden lg:flex absolute -left-3 top-1/2 -translate-y-1/2 items-center justify-center w-8 h-8 rounded-full bg-white border border-border shadow-sm opacity-0 group-hover/carousel:opacity-100 transition-opacity"
+        className="hidden lg:flex absolute -left-3 top-1/2 -translate-y-1/2 items-center justify-center w-9 h-9 rounded-full bg-surface border border-border shadow-[var(--shadow-md)] opacity-0 group-hover/carousel:opacity-100 hover:border-brand/40 hover:text-brand transition-all"
       >
         <ChevronLeft size={18} />
       </button>
@@ -123,7 +123,7 @@ export default function Carousel({
         type="button"
         onClick={() => slide(1)}
         aria-label="다음"
-        className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 items-center justify-center w-8 h-8 rounded-full bg-white border border-border shadow-sm opacity-0 group-hover/carousel:opacity-100 transition-opacity"
+        className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 items-center justify-center w-9 h-9 rounded-full bg-surface border border-border shadow-[var(--shadow-md)] opacity-0 group-hover/carousel:opacity-100 hover:border-brand/40 hover:text-brand transition-all"
       >
         <ChevronRight size={18} />
       </button>

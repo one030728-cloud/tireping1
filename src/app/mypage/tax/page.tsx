@@ -22,8 +22,10 @@ function TaxContent() {
           <button
             key={y}
             onClick={() => setYear(y)}
-            className={`px-3 py-1.5 rounded-full text-sm font-semibold shrink-0 ${
-              year === y ? "bg-brand text-white" : "bg-surface border border-border text-muted"
+            className={`px-3 py-1.5 rounded-full text-sm font-semibold shrink-0 active:scale-95 transition-all ${
+              year === y
+                ? "bg-gradient-to-r from-brand-light to-brand text-white shadow-[0_4px_14px_-4px_rgba(29,93,240,0.5)]"
+                : "bg-surface border border-border text-muted hover:text-brand hover:border-brand/50"
             }`}
           >
             {y}년
@@ -31,7 +33,7 @@ function TaxContent() {
         ))}
       </div>
 
-      <div className="overflow-x-auto -mx-4 px-4">
+      <div className="card p-4 overflow-x-auto">
         <table className="min-w-[480px] w-full text-sm border-collapse">
           <thead>
             <tr className="text-left text-muted border-b border-border">
@@ -43,7 +45,7 @@ function TaxContent() {
           </thead>
           <tbody>
             {records.map((r) => (
-              <tr key={r.month} className="border-b border-border">
+              <tr key={r.month} className="border-b border-border hover:bg-background">
                 <td className="py-3 pr-3">{r.month}</td>
                 <td className="py-3 pr-3">{r.supplyAmount.toLocaleString()}원</td>
                 <td className="py-3 pr-3">{r.vat.toLocaleString()}원</td>

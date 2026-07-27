@@ -10,7 +10,7 @@ function ExtraFeesContent() {
       <p className="text-sm font-semibold mb-5">
         추가비용 합계 : <span className="text-brand">0원</span>
       </p>
-      <div className="bg-surface border border-border rounded-xl p-10 text-center text-muted text-sm">
+      <div className="card p-10 text-center text-muted text-sm">
         조회된 추가비용 내역이 없습니다.
       </div>
     </div>

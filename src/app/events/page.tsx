@@ -45,13 +45,24 @@ function EventsContent() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="text-center text-muted py-16 text-sm">해당하는 이벤트가 없습니다.</p>
+        <div className="text-center text-muted py-16 text-sm animate-[fade-slide-up_400ms_ease-out_both]">
+          <Bell size={32} className="mx-auto mb-3 text-border" strokeWidth={1.5} />
+          해당하는 이벤트가 없습니다.
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
-          {filtered.map((e) => (
-            <Link key={e.id} href={`/events/${e.id}`} className="block">
-              <div className="h-32 rounded-xl mb-2" style={{ background: e.bannerGradient }} />
-              <p className="text-sm font-semibold">{e.title}</p>
+          {filtered.map((e, i) => (
+            <Link
+              key={e.id}
+              href={`/events/${e.id}`}
+              className="block group animate-[fade-slide-up_400ms_ease-out_both]"
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <div
+                className="h-32 rounded-xl mb-2 transition-transform group-hover:-translate-y-1 group-hover:shadow-lg"
+                style={{ background: e.bannerGradient }}
+              />
+              <p className="text-sm font-semibold group-hover:text-brand">{e.title}</p>
               <p className="text-xs text-muted mt-0.5">{e.period}</p>
             </Link>
           ))}

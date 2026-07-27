@@ -49,9 +49,12 @@ export default function Sidebar() {
         })}
       </div>
 
-      <div className="mt-6 rounded-xl overflow-hidden bg-gradient-to-br from-accent to-brand text-white p-4 text-sm font-bold transition-transform hover:-translate-y-0.5 hover:shadow-lg">
-        타이어존 GRAND EVENT
-        <p className="text-xs font-normal mt-1 opacity-90">지금 바로 이벤트를 확인해보세요</p>
+      <div className="mt-6 rounded-2xl overflow-hidden relative bg-gradient-to-br from-accent via-accent to-brand text-white p-4 text-sm font-bold shadow-[var(--shadow-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-8px_rgba(255,77,115,0.45)]">
+        <div className="absolute -right-4 -top-6 w-20 h-20 rounded-full bg-white/15 blur-sm" />
+        <div className="relative">
+          타이어존 GRAND EVENT
+          <p className="text-xs font-normal mt-1 opacity-90">지금 바로 이벤트를 확인해보세요</p>
+        </div>
       </div>
     </aside>
   );

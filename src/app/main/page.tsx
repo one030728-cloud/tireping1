@@ -39,7 +39,7 @@ function MainContent() {
   const banner = ongoingEvent && (
     <Link
       href={`/events/${ongoingEvent.id}`}
-      className="relative block rounded-2xl overflow-hidden h-32 lg:h-56"
+      className="relative block rounded-2xl overflow-hidden h-32 lg:h-56 shadow-[var(--shadow-lg)] transition-transform hover:-translate-y-0.5"
     >
       {bannerImage ? (
         <Image
@@ -69,14 +69,11 @@ function MainContent() {
       <h2 className="font-bold mb-3 flex items-center gap-1.5">
         <Search size={16} className="text-brand" /> 타이어 검색
       </h2>
-      <form
-        onSubmit={handleSearch}
-        className="bg-surface border border-border rounded-xl p-4 flex flex-col gap-3"
-      >
+      <form onSubmit={handleSearch} className="card p-4 flex flex-col gap-3">
         <select
           value={manufacturer}
           onChange={(e) => setManufacturer(e.target.value)}
-          className="h-11 px-3 rounded-lg border border-border"
+          className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
         >
           <option value="">제조사</option>
           {MANUFACTURERS.map((m) => (
@@ -89,9 +86,9 @@ function MainContent() {
           value={size}
           onChange={(e) => setSize(e.target.value)}
           placeholder="사이즈 검색 245 45 18"
-          className="h-11 px-3 rounded-lg border border-border"
+          className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
         />
-        <button type="submit" className="h-11 rounded-lg bg-brand text-white font-semibold">
+        <button type="submit" className="btn-primary h-11">
           검색하기
         </button>
       </form>
@@ -108,7 +105,7 @@ function MainContent() {
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <div className="bg-surface border border-border rounded-xl divide-y divide-border">
+      <div className="card divide-y divide-border">
         {recentOrders.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted text-center">최근 주문 내역이 없습니다.</p>
         ) : (
@@ -130,9 +127,12 @@ function MainContent() {
   );
 
   const eventGrid = (
-    <section className="lg:bg-surface lg:border lg:border-border lg:rounded-xl lg:p-4">
+    <section className="lg:card lg:p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-bold">이벤트 진행 중 타이어</h2>
+        <h2 className="font-bold flex items-center gap-2">
+          <span className="w-1 h-4 rounded-full bg-gradient-to-b from-accent-light to-accent" />
+          이벤트 진행 중 타이어
+        </h2>
         <Link href="/products" className="text-xs text-muted flex items-center">
           전체보기 <ChevronRight size={14} />
         </Link>
@@ -146,9 +146,12 @@ function MainContent() {
   );
 
   const bestGrid = (
-    <section className="lg:bg-surface lg:border lg:border-border lg:rounded-xl lg:p-4">
+    <section className="lg:card lg:p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-bold">판매 인기 타이어</h2>
+        <h2 className="font-bold flex items-center gap-2">
+          <span className="w-1 h-4 rounded-full bg-gradient-to-b from-brand-light to-brand" />
+          판매 인기 타이어
+        </h2>
         <Link href="/products" className="text-xs text-muted flex items-center">
           전체보기 <ChevronRight size={14} />
         </Link>
@@ -166,7 +169,7 @@ function MainContent() {
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-bold">공지사항</h2>
       </div>
-      <div className="bg-surface border border-border rounded-xl divide-y divide-border">
+      <div className="card divide-y divide-border">
         {NOTICES.map((n) => (
           <div
             key={n.id}

@@ -22,7 +22,7 @@ export default function ImagePlaceholder({
   if (logo) {
     return (
       <div
-        className={`flex items-center justify-center bg-white border border-border rounded-lg p-2 ${className}`}
+        className={`flex items-center justify-center bg-gradient-to-b from-white to-surface-2 border border-border rounded-lg p-2 ${className}`}
       >
         <div className="relative w-full h-full">
           <Image src={logo} alt={manufacturer!} fill className="object-contain" sizes="200px" />
@@ -33,7 +33,7 @@ export default function ImagePlaceholder({
 
   return (
     <div
-      className={`flex items-center justify-center bg-background border border-dashed border-border text-muted rounded-lg ${className}`}
+      className={`flex items-center justify-center bg-surface-2 border border-dashed border-border-strong text-muted/70 rounded-lg ${className}`}
     >
       <ImageOff size={22} strokeWidth={1.6} />
     </div>

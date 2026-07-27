@@ -31,8 +31,10 @@ function EventDetailContent() {
         style={{ background: event.bannerGradient }}
       >
         <span
-          className={`text-xs font-bold px-2 py-1 rounded ${
-            event.status === "ongoing" ? "bg-brand text-white" : "bg-black/40 text-white"
+          className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+            event.status === "ongoing"
+              ? "bg-gradient-to-r from-brand-light to-brand text-white shadow-[0_2px_8px_-2px_rgba(29,93,240,0.5)]"
+              : "bg-black/40 text-white"
           }`}
         >
           {event.status === "ongoing" ? "진행중" : "종료"}
@@ -40,9 +42,7 @@ function EventDetailContent() {
       </div>
       <h1 className="text-xl font-extrabold mb-1">{event.title}</h1>
       <p className="text-sm text-muted mb-5">{event.period}</p>
-      <div className="bg-surface border border-border rounded-xl p-5 text-sm leading-relaxed">
-        {event.description}
-      </div>
+      <div className="card p-5 text-sm leading-relaxed">{event.description}</div>
     </div>
   );
 }

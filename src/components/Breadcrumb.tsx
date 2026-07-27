@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
@@ -31,9 +32,13 @@ export default function Breadcrumb() {
 
   return (
     <nav className="hidden lg:flex items-center gap-1.5 text-xs text-muted px-4 pt-4">
-      <span>HOME</span>
+      <Link href="/main" className="hover:text-brand hover:underline underline-offset-2">
+        HOME
+      </Link>
       <ChevronRight size={12} />
-      <span>타이어 구매</span>
+      <Link href="/products" className="hover:text-brand hover:underline underline-offset-2">
+        타이어 구매
+      </Link>
       <ChevronRight size={12} />
       <span className="text-foreground font-medium">{label}</span>
     </nav>

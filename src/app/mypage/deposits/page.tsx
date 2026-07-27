@@ -14,7 +14,7 @@ function DepositsContent() {
         합계 : <span className="text-brand">{total.toLocaleString()}원</span>
       </p>
 
-      <div className="overflow-x-auto -mx-4 px-4">
+      <div className="card p-4 overflow-x-auto">
         <table className="min-w-[600px] w-full text-xs border-collapse">
           <thead>
             <tr className="text-left text-muted border-b border-border">
@@ -27,7 +27,10 @@ function DepositsContent() {
           </thead>
           <tbody>
             {DEPOSITS.map((d) => (
-              <tr key={`${d.orderId}-${d.date}`} className="border-b border-border">
+              <tr
+                key={`${d.orderId}-${d.date}`}
+                className="border-b border-border hover:bg-background"
+              >
                 <td className="py-3 pr-3 text-brand font-semibold">{d.orderId}</td>
                 <td className="py-3 pr-3">{d.itemLabel}</td>
                 <td className="py-3 pr-3">

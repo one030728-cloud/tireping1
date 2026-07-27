@@ -10,7 +10,7 @@ function OrdersDetailContent() {
       <h1 className="text-xl font-extrabold mb-1">주문내역 / 배송조회</h1>
       <p className="text-sm text-muted mb-5">총 {orders.length}건</p>
 
-      <div className="overflow-x-auto -mx-4 px-4">
+      <div className="card p-4 overflow-x-auto">
         <table className="min-w-[820px] w-full text-xs border-collapse">
           <thead>
             <tr className="text-left text-muted border-b border-border">
@@ -29,11 +29,11 @@ function OrdersDetailContent() {
           </thead>
           <tbody>
             {orders.map((o) => (
-              <tr key={o.id} className="border-b border-border">
+              <tr key={o.id} className="border-b border-border hover:bg-background">
                 <td className="py-3 pr-3 text-brand font-semibold">{o.id}</td>
                 <td className="py-3 pr-3">
                   <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
                       o.status === "구매확정" ? "bg-brand/10 text-brand" : "bg-muted/10 text-muted"
                     }`}
                   >
