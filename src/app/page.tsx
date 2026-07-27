@@ -21,7 +21,7 @@ function GuestHome() {
   return (
     <div className="px-4 py-5 flex flex-col gap-8">
       {ongoingEvent && (
-        <div className="relative rounded-2xl overflow-hidden h-32 lg:h-56 shadow-[var(--shadow-lg)]">
+        <div className="relative rounded-2xl overflow-hidden h-32 lg:h-56 shadow-[var(--shadow-lg)] animate-[fade-slide-up_400ms_ease-out_both]">
           {bannerImage ? (
             <>
               <Image
@@ -67,7 +67,10 @@ function GuestHome() {
       )}
 
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div
+          className="flex items-center justify-between mb-3 animate-[fade-slide-up_400ms_ease-out_both]"
+          style={{ animationDelay: "60ms" }}
+        >
           <h2 className="font-bold flex items-center gap-2">
             <span className="w-1 h-4 rounded-full bg-gradient-to-b from-accent-light to-accent" />
             이벤트 진행 중 타이어
@@ -87,7 +90,10 @@ function GuestHome() {
       </section>
 
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div
+          className="flex items-center justify-between mb-3 animate-[fade-slide-up_400ms_ease-out_both]"
+          style={{ animationDelay: "100ms" }}
+        >
           <h2 className="font-bold flex items-center gap-2">
             <span className="w-1 h-4 rounded-full bg-gradient-to-b from-brand-light to-brand" />
             판매 인기 타이어
@@ -106,7 +112,10 @@ function GuestHome() {
         </div>
       </section>
 
-      <div className="card rounded-2xl p-8 text-center flex flex-col items-center gap-3 relative overflow-hidden">
+      <div
+        className="card rounded-2xl p-8 text-center flex flex-col items-center gap-3 relative overflow-hidden animate-[fade-slide-up_400ms_ease-out_both]"
+        style={{ animationDelay: "300ms" }}
+      >
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-brand/5 blur-2xl" />
         <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-accent/5 blur-2xl" />
         <p className="font-bold text-lg relative">사업자 로그인 후 실시간 판매가를 확인하세요</p>
