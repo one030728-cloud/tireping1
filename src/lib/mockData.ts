@@ -3,6 +3,7 @@ import type {
   EventItem,
   FactoryTireGroup,
   FullOrder,
+  MyListing,
   Notice,
   Order,
   Seller,
@@ -782,3 +783,45 @@ export const TAX_RECORDS: Record<
 };
 
 export const WISH_SELLERS: WishSeller[] = [];
+
+export const MY_LISTINGS: MyListing[] = [
+  {
+    id: "ml1",
+    manufacturer: "한국",
+    model: "Dynapro HPX (RA43)",
+    width: 235,
+    ratio: 55,
+    rim: 19,
+    dot: "2025",
+    price: 189000,
+    stock: 8,
+    status: "판매중",
+    registeredAt: "2026-06-02",
+  },
+  {
+    id: "ml2",
+    manufacturer: "금호",
+    model: "MARSHAL MC55",
+    width: 145,
+    ratio: 80,
+    rim: 13,
+    dot: "2026",
+    price: 64000,
+    stock: 0,
+    status: "품절",
+    registeredAt: "2026-05-18",
+  },
+  {
+    id: "ml3",
+    manufacturer: "넥센",
+    model: "N'Fera SU1",
+    width: 205,
+    ratio: 55,
+    rim: 16,
+    dot: "2025",
+    price: 98000,
+    stock: 15,
+    status: "판매중",
+    registeredAt: "2026-04-30",
+  },
+];

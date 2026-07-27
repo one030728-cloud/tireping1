@@ -137,6 +137,20 @@ export interface WishSeller {
   wishedAt: string;
 }
 
+export interface MyListing {
+  id: string;
+  manufacturer: Manufacturer;
+  model: string;
+  width: number;
+  ratio: number;
+  rim: number;
+  dot: string;
+  price: number;
+  stock: number;
+  status: "판매중" | "품절";
+  registeredAt: string;
+}
+
 export interface OrderStatusCounts {
   입금대기: number;
   입금완료: number;

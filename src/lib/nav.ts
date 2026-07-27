@@ -1,4 +1,5 @@
 export const SIDEBAR_LINKS = [
+  { href: "/sell", label: "타이어판매" },
   { href: "/events?tab=ongoing", label: "진행중인 이벤트" },
   { href: "/factory-price", label: "공장도가 확인" },
   { href: "/products", label: "이벤트 상품 목록" },

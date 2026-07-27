@@ -15,6 +15,7 @@ import { NOTICES } from "@/lib/mockData";
 const GUEST_NAV_LINKS = [
   { href: "/factory-price", label: "공장도가 확인" },
   { href: "/main", label: "타이어 구매" },
+  { href: "/sell", label: "타이어판매" },
   { href: "/events?tab=ongoing", label: "이벤트" },
 ];
 
@@ -73,6 +74,16 @@ export default function Header() {
                 className="px-4 h-9 flex items-center rounded-full text-white text-sm font-semibold bg-gradient-to-br from-brand-light to-brand shadow-[0_4px_14px_-4px_rgba(29,93,240,0.5)] hover:brightness-105 transition-[filter]"
               >
                 타이어 구매
+              </Link>
+              <Link
+                href="/sell"
+                className={`px-4 h-9 flex items-center rounded-full text-sm font-semibold border transition-colors ${
+                  pathname === "/sell"
+                    ? "border-brand text-brand bg-brand/5"
+                    : "border-border text-foreground/70 hover:text-brand hover:border-brand/40"
+                }`}
+              >
+                타이어판매
               </Link>
             </nav>
           ) : (

@@ -3,6 +3,7 @@ import "pretendard/dist/web/variable/pretendardvariable.css";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart";
+import { ListingsProvider } from "@/lib/listings";
 import { OrdersProvider } from "@/lib/orders";
 import { WishlistProvider } from "@/lib/wishlist";
 import Header from "@/components/Header";
@@ -25,8 +26,10 @@ export default function RootLayout({
           <OrdersProvider>
             <WishlistProvider>
               <CartProvider>
-                <Header />
-                <AppShell>{children}</AppShell>
+                <ListingsProvider>
+                  <Header />
+                  <AppShell>{children}</AppShell>
+                </ListingsProvider>
               </CartProvider>
             </WishlistProvider>
           </OrdersProvider>

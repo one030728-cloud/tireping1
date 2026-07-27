@@ -9,6 +9,7 @@ const LABELS: Record<string, string> = {
   "/events": "이벤트",
   "/factory-price": "공장도가 확인",
   "/products": "타이어 구매",
+  "/sell": "타이어판매",
   "/wishlist": "찜한 판매업체",
   "/cart": "타이어 장바구니",
   "/orders": "주문내역",
@@ -29,6 +30,7 @@ function resolveLabel(pathname: string): string {
 export default function Breadcrumb() {
   const pathname = usePathname();
   const label = resolveLabel(pathname);
+  const isSell = pathname === "/sell";
 
   return (
     <nav className="hidden lg:flex items-center gap-1.5 text-xs text-muted px-4 pt-4">
@@ -36,11 +38,17 @@ export default function Breadcrumb() {
         HOME
       </Link>
       <ChevronRight size={12} />
-      <Link href="/products" className="hover:text-brand hover:underline underline-offset-2">
-        타이어 구매
-      </Link>
-      <ChevronRight size={12} />
-      <span className="text-foreground font-medium">{label}</span>
+      {isSell ? (
+        <span className="text-foreground font-medium">{label}</span>
+      ) : (
+        <>
+          <Link href="/products" className="hover:text-brand hover:underline underline-offset-2">
+            타이어 구매
+          </Link>
+          <ChevronRight size={12} />
+          <span className="text-foreground font-medium">{label}</span>
+        </>
+      )}
     </nav>
   );
 }
