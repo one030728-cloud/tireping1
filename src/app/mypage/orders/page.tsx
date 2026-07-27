@@ -29,7 +29,7 @@ function OrdersDetailContent() {
           </thead>
           <tbody>
             {orders.map((o) => (
-              <tr key={o.id} className="border-b border-border hover:bg-background">
+              <tr key={o.id} className="border-b border-border hover:bg-surface-2">
                 <td className="py-3 pr-3 text-brand font-semibold">{o.id}</td>
                 <td className="py-3 pr-3">
                   <span

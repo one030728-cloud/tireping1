@@ -41,7 +41,7 @@ function GuestHome() {
                 </div>
                 <Link
                   href="/login"
-                  className="text-xs font-semibold bg-white text-foreground px-3 py-1.5 rounded-full hover:shadow-md hover:-translate-y-0.5 active:scale-95"
+                  className="text-xs font-semibold bg-white text-zinc-900 px-3 py-1.5 rounded-full hover:shadow-md hover:-translate-y-0.5 active:scale-95"
                 >
                   로그인하고 가격 확인하기
                 </Link>
@@ -67,39 +67,41 @@ function GuestHome() {
         </div>
       )}
 
-      <section>
-        <div
-          className="flex items-center justify-between mb-3 animate-[fade-slide-up_400ms_ease-out_both]"
-          style={{ animationDelay: "60ms" }}
-        >
-          <h2 className="font-bold flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-gradient-to-b from-accent-light to-accent" />
-            이벤트 진행 중 타이어
-          </h2>
-        </div>
-        <Carousel autoPlayInterval={3000} className="max-w-none">
-          {eventTires.map((t) => (
-            <GuestTireCard key={t.id} tire={t} />
-          ))}
-        </Carousel>
-      </section>
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+        <section className="lg:card lg:p-4">
+          <div
+            className="flex items-center justify-between mb-3 animate-[fade-slide-up_400ms_ease-out_both]"
+            style={{ animationDelay: "60ms" }}
+          >
+            <h2 className="font-bold flex items-center gap-2">
+              <span className="w-1 h-4 rounded-full bg-gradient-to-b from-accent-light to-accent" />
+              이벤트 진행 중 타이어
+            </h2>
+          </div>
+          <Carousel autoPlayInterval={3000}>
+            {eventTires.map((t) => (
+              <GuestTireCard key={t.id} tire={t} />
+            ))}
+          </Carousel>
+        </section>
 
-      <section>
-        <div
-          className="flex items-center justify-between mb-3 animate-[fade-slide-up_400ms_ease-out_both]"
-          style={{ animationDelay: "100ms" }}
-        >
-          <h2 className="font-bold flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-gradient-to-b from-brand-light to-brand" />
-            판매 인기 타이어
-          </h2>
-        </div>
-        <Carousel className="max-w-none">
-          {bestTires.map((t) => (
-            <GuestTireCard key={t.id} tire={t} />
-          ))}
-        </Carousel>
-      </section>
+        <section className="lg:card lg:p-4">
+          <div
+            className="flex items-center justify-between mb-3 animate-[fade-slide-up_400ms_ease-out_both]"
+            style={{ animationDelay: "100ms" }}
+          >
+            <h2 className="font-bold flex items-center gap-2">
+              <span className="w-1 h-4 rounded-full bg-gradient-to-b from-brand-light to-brand" />
+              판매 인기 타이어
+            </h2>
+          </div>
+          <Carousel autoPlayInterval={3000}>
+            {bestTires.map((t) => (
+              <GuestTireCard key={t.id} tire={t} />
+            ))}
+          </Carousel>
+        </section>
+      </div>
 
       <div
         className="card rounded-2xl p-8 text-center flex flex-col items-center gap-3 relative overflow-hidden animate-[fade-slide-up_400ms_ease-out_both]"

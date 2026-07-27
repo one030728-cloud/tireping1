@@ -29,7 +29,7 @@ function DepositsContent() {
             {DEPOSITS.map((d) => (
               <tr
                 key={`${d.orderId}-${d.date}`}
-                className="border-b border-border hover:bg-background"
+                className="border-b border-border hover:bg-surface-2"
               >
                 <td className="py-3 pr-3 text-brand font-semibold">{d.orderId}</td>
                 <td className="py-3 pr-3">{d.itemLabel}</td>

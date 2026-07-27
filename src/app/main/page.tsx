@@ -112,7 +112,7 @@ function MainContent() {
           recentOrders.map((o) => (
             <div
               key={o.id}
-              className="flex items-center justify-between px-4 py-3 text-sm hover:bg-background"
+              className="flex items-center justify-between px-4 py-3 text-sm hover:bg-surface-2"
             >
               <div className="flex items-center gap-3">
                 <span className="text-muted">{o.id}</span>
@@ -156,7 +156,7 @@ function MainContent() {
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <Carousel>
+      <Carousel autoPlayInterval={3000}>
         {bestTires.map((t) => (
           <TireCard key={t.id} tire={t} />
         ))}
@@ -173,7 +173,7 @@ function MainContent() {
         {NOTICES.map((n) => (
           <div
             key={n.id}
-            className="flex items-center justify-between px-4 py-3 text-sm hover:bg-background"
+            className="flex items-center justify-between px-4 py-3 text-sm hover:bg-surface-2"
           >
             <span>{n.title}</span>
             <span className="text-muted text-xs shrink-0 ml-3">{n.date}</span>

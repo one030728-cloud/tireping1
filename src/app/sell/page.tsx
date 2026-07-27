@@ -212,7 +212,7 @@ function SellContent() {
                 {listings.map((l) => (
                   <tr
                     key={l.id}
-                    className="border-b border-border last:border-0 hover:bg-background"
+                    className="border-b border-border last:border-0 hover:bg-surface-2"
                   >
                     <td className="py-3 px-4">{l.manufacturer}</td>
                     <td className="py-3 px-4 font-medium">{l.model}</td>

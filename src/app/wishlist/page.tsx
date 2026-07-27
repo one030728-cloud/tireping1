@@ -35,7 +35,7 @@ function WishlistContent() {
                 {sellers.map((s) => (
                   <tr
                     key={s.id}
-                    className="border-b border-border last:border-0 hover:bg-background"
+                    className="border-b border-border last:border-0 hover:bg-surface-2"
                   >
                     <td className="py-3 px-4">{s.type}</td>
                     <td className="py-3 px-4 font-medium">{s.code}</td>

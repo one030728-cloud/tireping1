@@ -50,7 +50,7 @@ function CartContent() {
                 {items.map((item) => (
                   <tr
                     key={item.id}
-                    className="border-b border-border last:border-0 hover:bg-background"
+                    className="border-b border-border last:border-0 hover:bg-surface-2"
                   >
                     <td className="py-3 px-4">{item.manufacturer}</td>
                     <td className="py-3 px-4 font-medium">{item.model}</td>
@@ -63,7 +63,7 @@ function CartContent() {
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="w-7 h-7 rounded border border-border hover:bg-background active:scale-90"
+                          className="w-7 h-7 rounded border border-border hover:bg-surface-2 active:scale-90"
                         >
                           -
                         </button>
@@ -75,7 +75,7 @@ function CartContent() {
                         </span>
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="w-7 h-7 rounded border border-border hover:bg-background active:scale-90"
+                          className="w-7 h-7 rounded border border-border hover:bg-surface-2 active:scale-90"
                         >
                           +
                         </button>
@@ -127,7 +127,7 @@ function CartContent() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="w-8 h-8 rounded-lg border border-border hover:bg-background active:scale-90"
+                      className="w-8 h-8 rounded-lg border border-border hover:bg-surface-2 active:scale-90"
                     >
                       -
                     </button>
@@ -139,7 +139,7 @@ function CartContent() {
                     </span>
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-8 h-8 rounded-lg border border-border hover:bg-background active:scale-90"
+                      className="w-8 h-8 rounded-lg border border-border hover:bg-surface-2 active:scale-90"
                     >
                       +
                     </button>

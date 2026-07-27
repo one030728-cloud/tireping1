@@ -71,7 +71,7 @@ export default function Header() {
             <nav className="hidden lg:flex items-center gap-2">
               <Link
                 href="/main"
-                className="px-4 h-9 flex items-center rounded-full text-white text-sm font-semibold bg-gradient-to-br from-brand-light to-brand shadow-[0_4px_14px_-4px_rgba(29,93,240,0.5)] hover:brightness-105 transition-[filter]"
+                className="px-4 h-9 flex items-center rounded-full text-white text-sm font-semibold bg-gradient-to-br from-brand-light to-brand shadow-[0_4px_14px_-4px_rgba(99,102,241,0.55)] hover:brightness-105 transition-[filter]"
               >
                 타이어 구매
               </Link>
@@ -174,7 +174,7 @@ export default function Header() {
                     NOTICES.map((n) => (
                       <DropdownMenu.Item
                         key={n.id}
-                        className="px-3 py-2 hover:bg-background outline-none cursor-default"
+                        className="px-3 py-2 hover:bg-surface-2 outline-none cursor-default"
                       >
                         <p className="text-xs text-foreground/90 leading-snug">{n.title}</p>
                         <p className="text-[10px] text-muted mt-0.5">{n.date}</p>
@@ -198,7 +198,7 @@ export default function Header() {
                     href="/mypage/status"
                     className="flex items-center gap-2 pl-3 border-l border-border hover:opacity-80"
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-light to-brand-dark text-white flex items-center justify-center text-xs font-bold shadow-[0_2px_8px_-2px_rgba(29,93,240,0.5)]">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-light to-brand-dark text-white flex items-center justify-center text-xs font-bold shadow-[0_2px_8px_-2px_rgba(99,102,241,0.55)]">
                       {user.businessName.slice(0, 1)}
                     </div>
                     <div className="leading-tight text-left">
@@ -219,7 +219,7 @@ export default function Header() {
                       <DropdownMenu.Item key={link.href} asChild>
                         <Link
                           href={link.href}
-                          className="block px-3 py-2 text-xs text-foreground/80 hover:bg-background hover:text-brand outline-none"
+                          className="block px-3 py-2 text-xs text-foreground/80 hover:bg-surface-2 hover:text-brand outline-none"
                         >
                           {link.label}
                         </Link>
@@ -287,7 +287,7 @@ export default function Header() {
                   href="/main"
                   onClick={() => setMenuOpen(false)}
                   className={`px-3 py-3 rounded-lg text-sm font-medium ${
-                    pathname === "/main" ? "bg-brand/10 text-brand" : "hover:bg-background"
+                    pathname === "/main" ? "bg-brand/10 text-brand" : "hover:bg-surface-2"
                   }`}
                 >
                   홈
@@ -301,7 +301,7 @@ export default function Header() {
                       href={link.href}
                       onClick={() => setMenuOpen(false)}
                       className={`px-3 py-3 rounded-lg text-sm font-medium ${
-                        active ? "bg-brand/10 text-brand" : "hover:bg-background"
+                        active ? "bg-brand/10 text-brand" : "hover:bg-surface-2"
                       }`}
                     >
                       {link.label}
@@ -311,7 +311,7 @@ export default function Header() {
 
                 <button
                   onClick={() => setMypageOpen((v) => !v)}
-                  className="px-3 py-3 rounded-lg text-sm font-medium hover:bg-background flex items-center justify-between"
+                  className="px-3 py-3 rounded-lg text-sm font-medium hover:bg-surface-2 flex items-center justify-between"
                 >
                   마이페이지
                   <ChevronRight
@@ -331,7 +331,7 @@ export default function Header() {
                           key={link.href}
                           href={link.href}
                           onClick={() => setMenuOpen(false)}
-                          className="px-3 py-2.5 rounded-lg text-sm text-muted hover:bg-background hover:text-foreground"
+                          className="px-3 py-2.5 rounded-lg text-sm text-muted hover:bg-surface-2 hover:text-foreground"
                         >
                           {link.label}
                         </Link>
@@ -347,7 +347,7 @@ export default function Header() {
                     key={link.href}
                     href={link.href}
                     onClick={() => setMenuOpen(false)}
-                    className="px-3 py-3 rounded-lg text-sm font-medium hover:bg-background"
+                    className="px-3 py-3 rounded-lg text-sm font-medium hover:bg-surface-2"
                   >
                     {link.label}
                   </Link>
