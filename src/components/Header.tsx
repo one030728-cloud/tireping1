@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Bell, ChevronRight, LogOut, Megaphone, Menu, ShoppingCart, X } from "lucide-react";
@@ -26,6 +26,7 @@ export default function Header() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const cartCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
@@ -62,15 +63,18 @@ export default function Header() {
             </nav>
           ) : (
             <nav className="hidden lg:flex items-center gap-5">
-              {GUEST_NAV_LINKS.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="text-sm font-medium text-foreground/70 hover:text-brand"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {GUEST_NAV_LINKS.map((link) => {
+                const active = pathname === link.href.split("?")[0];
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`text-sm font-medium ${active ? "text-brand" : "text-foreground/70 hover:text-brand"}`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
           )}
         </div>
@@ -104,7 +108,10 @@ export default function Header() {
             >
               <ShoppingCart size={20} />
               {cartCount > 0 && (
-                <span className="absolute top-1 right-1 bg-accent text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
+                <span
+                  key={cartCount}
+                  className="absolute top-1 right-1 bg-accent text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center animate-[pop_320ms_ease-out]"
+                >
                   {cartCount}
                 </span>
               )}
@@ -120,7 +127,10 @@ export default function Header() {
                 >
                   <Bell size={20} />
                   {NOTICES.length > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-accent" />
+                    <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+                    </span>
                   )}
                 </button>
               </DropdownMenu.Trigger>
@@ -249,21 +259,28 @@ export default function Header() {
                 <Link
                   href="/main"
                   onClick={() => setMenuOpen(false)}
-                  className="px-3 py-3 rounded-lg text-sm font-medium hover:bg-background"
+                  className={`px-3 py-3 rounded-lg text-sm font-medium ${
+                    pathname === "/main" ? "bg-brand/10 text-brand" : "hover:bg-background"
+                  }`}
                 >
                   홈
                 </Link>
 
-                {SIDEBAR_LINKS.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMenuOpen(false)}
-                    className="px-3 py-3 rounded-lg text-sm font-medium hover:bg-background"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {SIDEBAR_LINKS.map((link) => {
+                  const active = pathname === link.href.split("?")[0];
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMenuOpen(false)}
+                      className={`px-3 py-3 rounded-lg text-sm font-medium ${
+                        active ? "bg-brand/10 text-brand" : "hover:bg-background"
+                      }`}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
 
                 <button
                   onClick={() => setMypageOpen((v) => !v)}

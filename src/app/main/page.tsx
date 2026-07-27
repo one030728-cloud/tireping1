@@ -113,7 +113,10 @@ function MainContent() {
           <p className="px-4 py-6 text-sm text-muted text-center">최근 주문 내역이 없습니다.</p>
         ) : (
           recentOrders.map((o) => (
-            <div key={o.id} className="flex items-center justify-between px-4 py-3 text-sm">
+            <div
+              key={o.id}
+              className="flex items-center justify-between px-4 py-3 text-sm hover:bg-background"
+            >
               <div className="flex items-center gap-3">
                 <span className="text-muted">{o.id}</span>
                 <span className="font-medium">{o.model}</span>
@@ -165,7 +168,10 @@ function MainContent() {
       </div>
       <div className="bg-surface border border-border rounded-xl divide-y divide-border">
         {NOTICES.map((n) => (
-          <div key={n.id} className="flex items-center justify-between px-4 py-3 text-sm">
+          <div
+            key={n.id}
+            className="flex items-center justify-between px-4 py-3 text-sm hover:bg-background"
+          >
             <span>{n.title}</span>
             <span className="text-muted text-xs shrink-0 ml-3">{n.date}</span>
           </div>

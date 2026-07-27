@@ -4,14 +4,16 @@ import ImagePlaceholder from "./ImagePlaceholder";
 
 export default function GuestTireCard({ tire }: { tire: Tire }) {
   return (
-    <div className="min-w-[160px] w-40 shrink-0 bg-surface border border-border rounded-xl p-3 flex flex-col gap-1">
+    <div className="min-w-[160px] w-40 shrink-0 bg-surface border border-border rounded-xl p-3 flex flex-col gap-1 transition-shadow hover:shadow-lg hover:-translate-y-1">
       <ImagePlaceholder className="w-full h-16 mb-1" manufacturer={tire.manufacturer} />
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted">{tire.manufacturer}</span>
         {tire.tag && (
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-              tire.tag === "EVENT" ? "bg-accent/10 text-accent" : "bg-brand/10 text-brand"
+              tire.tag === "EVENT"
+                ? "bg-accent/10 text-accent animate-pulse"
+                : "bg-brand/10 text-brand"
             }`}
           >
             {tire.tag}

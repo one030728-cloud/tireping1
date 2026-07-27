@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ShoppingCart } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import { useCart } from "@/lib/cart";
 import { useOrders } from "@/lib/orders";
@@ -21,7 +22,8 @@ function CartContent() {
       </p>
 
       {items.length === 0 ? (
-        <div className="text-center py-16">
+        <div className="text-center py-16 animate-[fade-slide-up_400ms_ease-out_both]">
+          <ShoppingCart size={32} className="mx-auto mb-3 text-border" strokeWidth={1.5} />
           <p className="text-muted mb-4">장바구니에 담은 상품이 없습니다.</p>
           <Link href="/products" className="text-brand font-semibold">
             타이어 검색하러 가기
@@ -46,32 +48,40 @@ function CartContent() {
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} className="border-b border-border last:border-0">
+                  <tr
+                    key={item.id}
+                    className="border-b border-border last:border-0 hover:bg-background"
+                  >
                     <td className="py-3 px-4">{item.manufacturer}</td>
                     <td className="py-3 px-4 font-medium">{item.model}</td>
                     <td className="py-3 px-4">
                       {item.width}/{item.ratio}R{item.rim}
                     </td>
                     <td className="py-3 px-4">{item.dot}</td>
-                    <td className="py-3 px-4">{item.price.toLocaleString()}원</td>
+                    <td className="py-3 px-4 tabular-nums">{item.price.toLocaleString()}원</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          className="w-7 h-7 rounded border border-border"
+                          className="w-7 h-7 rounded border border-border hover:bg-background active:scale-90"
                         >
                           -
                         </button>
-                        <span className="w-6 text-center">{item.quantity}</span>
+                        <span
+                          key={item.quantity}
+                          className="w-6 text-center tabular-nums animate-[pop_250ms_ease-out]"
+                        >
+                          {item.quantity}
+                        </span>
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="w-7 h-7 rounded border border-border"
+                          className="w-7 h-7 rounded border border-border hover:bg-background active:scale-90"
                         >
                           +
                         </button>
                       </div>
                     </td>
-                    <td className="py-3 px-4 font-semibold">
+                    <td className="py-3 px-4 font-semibold tabular-nums">
                       {(item.price * item.quantity).toLocaleString()}원
                     </td>
                     <td className="py-3 px-4">{item.sellerCode}</td>
@@ -90,8 +100,12 @@ function CartContent() {
           </div>
 
           <div className="lg:hidden flex flex-col gap-3">
-            {items.map((item) => (
-              <div key={item.id} className="bg-surface border border-border rounded-xl p-4">
+            {items.map((item, i) => (
+              <div
+                key={item.id}
+                className="bg-surface border border-border rounded-xl p-4 hover:shadow-md animate-[fade-slide-up_400ms_ease-out_both]"
+                style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
+              >
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <p className="text-xs text-muted mb-0.5">
@@ -113,19 +127,24 @@ function CartContent() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="w-8 h-8 rounded-lg border border-border"
+                      className="w-8 h-8 rounded-lg border border-border hover:bg-background active:scale-90"
                     >
                       -
                     </button>
-                    <span className="w-8 text-center">{item.quantity}</span>
+                    <span
+                      key={item.quantity}
+                      className="w-8 text-center tabular-nums animate-[pop_250ms_ease-out]"
+                    >
+                      {item.quantity}
+                    </span>
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="w-8 h-8 rounded-lg border border-border"
+                      className="w-8 h-8 rounded-lg border border-border hover:bg-background active:scale-90"
                     >
                       +
                     </button>
                   </div>
-                  <span className="font-bold">
+                  <span className="font-bold tabular-nums">
                     {(item.price * item.quantity).toLocaleString()}원
                   </span>
                 </div>
@@ -135,13 +154,18 @@ function CartContent() {
 
           <div className="bg-surface border border-border rounded-xl p-4 mt-5 flex items-center justify-between">
             <span className="font-semibold">합계금액</span>
-            <span className="text-xl font-extrabold text-brand">{total.toLocaleString()}원</span>
+            <span
+              key={total}
+              className="text-xl font-extrabold text-brand tabular-nums animate-[pop_280ms_ease-out]"
+            >
+              {total.toLocaleString()}원
+            </span>
           </div>
 
           <div className="flex gap-2 mt-4 pb-8">
             <button
               onClick={clear}
-              className="h-12 px-5 rounded-lg border border-border text-sm font-semibold"
+              className="h-12 px-5 rounded-lg border border-border text-sm font-semibold hover:bg-background active:scale-95"
             >
               전체삭제
             </button>
@@ -151,7 +175,7 @@ function CartContent() {
                 clear();
                 router.push("/orders?justOrdered=1");
               }}
-              className="flex-1 h-12 rounded-lg bg-brand text-white font-semibold"
+              className="flex-1 h-12 rounded-lg bg-brand text-white font-semibold hover:bg-brand-dark active:scale-95"
             >
               주문하기
             </button>

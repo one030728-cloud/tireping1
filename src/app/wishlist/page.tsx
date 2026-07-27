@@ -1,5 +1,6 @@
 "use client";
 
+import { Star } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import { useWishlist } from "@/lib/wishlist";
 
@@ -12,7 +13,8 @@ function WishlistContent() {
       <p className="text-sm text-muted mb-5">총 {sellers.length} 업체</p>
 
       {sellers.length === 0 ? (
-        <div className="bg-surface border border-border rounded-xl py-16 text-center text-muted">
+        <div className="bg-surface border border-border rounded-xl py-16 text-center text-muted animate-[fade-slide-up_400ms_ease-out_both]">
+          <Star size={32} className="mx-auto mb-3 text-border" strokeWidth={1.5} />
           찜한 판매업체가 없습니다.
         </div>
       ) : (
@@ -31,7 +33,10 @@ function WishlistContent() {
               </thead>
               <tbody>
                 {sellers.map((s) => (
-                  <tr key={s.id} className="border-b border-border last:border-0">
+                  <tr
+                    key={s.id}
+                    className="border-b border-border last:border-0 hover:bg-background"
+                  >
                     <td className="py-3 px-4">{s.type}</td>
                     <td className="py-3 px-4 font-medium">{s.code}</td>
                     <td className="py-3 px-4">{s.location}</td>
@@ -52,8 +57,12 @@ function WishlistContent() {
           </div>
 
           <div className="lg:hidden flex flex-col gap-3">
-            {sellers.map((s) => (
-              <div key={s.id} className="bg-surface border border-border rounded-xl p-4">
+            {sellers.map((s, i) => (
+              <div
+                key={s.id}
+                className="bg-surface border border-border rounded-xl p-4 hover:shadow-md animate-[fade-slide-up_400ms_ease-out_both]"
+                style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
+              >
                 <div className="flex items-start justify-between mb-1.5">
                   <div>
                     <p className="text-xs text-muted mb-0.5">{s.type}</p>

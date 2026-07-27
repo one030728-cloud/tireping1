@@ -211,19 +211,31 @@ function ProductDetailContent() {
           </thead>
           <tbody>
             {product.sellers.map((seller) => (
-              <tr key={seller.code} className="border-b border-border last:border-0">
+              <tr
+                key={seller.code}
+                className="border-b border-border last:border-0 hover:bg-background"
+              >
                 <td className="py-3 px-4 font-semibold">
                   <button
                     onClick={() => handleWish(seller)}
                     aria-label="판매점 찜하기"
-                    className={`mr-1.5 align-middle inline-flex ${isWished(seller.code) ? "text-accent" : "text-border hover:text-accent"}`}
+                    className={`mr-1.5 align-middle inline-flex active:scale-90 ${isWished(seller.code) ? "text-accent" : "text-border hover:text-accent"}`}
                   >
-                    <Star size={14} fill={isWished(seller.code) ? "currentColor" : "none"} />
+                    <Star
+                      key={String(isWished(seller.code))}
+                      size={14}
+                      fill={isWished(seller.code) ? "currentColor" : "none"}
+                      className="animate-[pop_320ms_ease-out]"
+                    />
                   </button>
                   {seller.code}
                 </td>
-                <td className="py-3 px-4 text-brand font-bold">{seller.discountRate}%</td>
-                <td className="py-3 px-4 font-bold">{seller.price.toLocaleString()}원</td>
+                <td className="py-3 px-4 text-brand font-bold tabular-nums">
+                  {seller.discountRate}%
+                </td>
+                <td className="py-3 px-4 font-bold tabular-nums">
+                  {seller.price.toLocaleString()}원
+                </td>
                 <td className="py-3 px-4">{seller.stock.toLocaleString()}</td>
                 <td className="py-3 px-4">{seller.minOrder}</td>
                 <td className="py-3 px-4 text-muted text-xs">
@@ -246,13 +258,13 @@ function ProductDetailContent() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleAdd(seller, false)}
-                      className="h-9 px-3 rounded-lg border border-brand text-brand font-semibold text-xs whitespace-nowrap"
+                      className="h-9 px-3 rounded-lg border border-brand text-brand font-semibold text-xs whitespace-nowrap hover:bg-brand/5 active:scale-95"
                     >
                       장바구니
                     </button>
                     <button
                       onClick={() => handleAdd(seller, true)}
-                      className="h-9 px-3 rounded-lg bg-brand text-white font-semibold text-xs whitespace-nowrap"
+                      className="h-9 px-3 rounded-lg bg-brand text-white font-semibold text-xs whitespace-nowrap hover:bg-brand-dark active:scale-95"
                     >
                       바로구매
                     </button>
@@ -265,22 +277,31 @@ function ProductDetailContent() {
       </div>
 
       <div className="lg:hidden flex flex-col gap-3">
-        {product.sellers.map((seller) => (
-          <div key={seller.code} className="bg-surface border border-border rounded-xl p-4">
+        {product.sellers.map((seller, i) => (
+          <div
+            key={seller.code}
+            className="bg-surface border border-border rounded-xl p-4 hover:shadow-md animate-[fade-slide-up_400ms_ease-out_both]"
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold flex items-center">
                 <button
                   onClick={() => handleWish(seller)}
                   aria-label="판매점 찜하기"
-                  className={`flex items-center p-2 -m-2 mr-0.5 ${isWished(seller.code) ? "text-accent" : "text-border hover:text-accent"}`}
+                  className={`flex items-center p-2 -m-2 mr-0.5 active:scale-90 ${isWished(seller.code) ? "text-accent" : "text-border hover:text-accent"}`}
                 >
-                  <Star size={18} fill={isWished(seller.code) ? "currentColor" : "none"} />
+                  <Star
+                    key={String(isWished(seller.code))}
+                    size={18}
+                    fill={isWished(seller.code) ? "currentColor" : "none"}
+                    className="animate-[pop_320ms_ease-out]"
+                  />
                 </button>
                 {seller.code}
               </span>
               <span className="text-xs text-muted">{seller.courier}</span>
             </div>
-            <div className="flex items-baseline gap-2 mb-1">
+            <div className="flex items-baseline gap-2 mb-1 tabular-nums">
               <span className="text-brand font-bold">{seller.discountRate}%</span>
               <span className="text-lg font-extrabold">{seller.price.toLocaleString()}원</span>
             </div>
@@ -300,13 +321,13 @@ function ProductDetailContent() {
               />
               <button
                 onClick={() => handleAdd(seller, false)}
-                className="flex-1 h-10 rounded-lg border border-brand text-brand font-semibold text-sm"
+                className="flex-1 h-10 rounded-lg border border-brand text-brand font-semibold text-sm hover:bg-brand/5 active:scale-95"
               >
                 장바구니 담기
               </button>
               <button
                 onClick={() => handleAdd(seller, true)}
-                className="flex-1 h-10 rounded-lg bg-brand text-white font-semibold text-sm"
+                className="flex-1 h-10 rounded-lg bg-brand text-white font-semibold text-sm hover:bg-brand-dark active:scale-95"
               >
                 바로 구매
               </button>

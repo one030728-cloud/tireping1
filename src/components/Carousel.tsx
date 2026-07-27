@@ -18,11 +18,22 @@ function animateScrollTo(
   const change = to - from;
   if (change === 0) return;
   const start = performance.now();
+  // CSS scroll-snap fights a JS-driven scrollLeft animation: the browser
+  // snaps straight to the nearest snap point on every write instead of
+  // honoring the eased intermediate values, so the slide appears to jump
+  // in a couple of big steps instead of gliding. Suspend snapping for the
+  // duration of the animation and restore it once it settles.
+  const previousSnapType = el.style.scrollSnapType;
+  el.style.scrollSnapType = "none";
   function step(now: number) {
     if (tokenRef.current !== token) return;
     const progress = Math.min((now - start) / duration, 1);
     el.scrollLeft = from + change * easeInOutQuad(progress);
-    if (progress < 1) requestAnimationFrame(step);
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    } else {
+      el.style.scrollSnapType = previousSnapType;
+    }
   }
   requestAnimationFrame(step);
 }
@@ -91,7 +102,11 @@ export default function Carousel({
         className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {children.map((child, i) => (
-          <div key={i} className="snap-start shrink-0">
+          <div
+            key={i}
+            className="snap-start shrink-0 animate-[fade-slide-up_400ms_ease-out_both]"
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
             {child}
           </div>
         ))}

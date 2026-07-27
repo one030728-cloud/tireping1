@@ -56,8 +56,14 @@ function ProductsContent() {
         <p className="text-center text-muted py-16 text-sm">조건에 맞는 타이어가 없습니다.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {results.map((t) => (
-            <TireCard key={t.id} tire={t} fixedWidth={false} />
+          {results.map((t, i) => (
+            <div
+              key={t.id}
+              className="animate-[fade-slide-up_400ms_ease-out_both]"
+              style={{ animationDelay: `${Math.min(i, 12) * 35}ms` }}
+            >
+              <TireCard tire={t} fixedWidth={false} />
+            </div>
           ))}
         </div>
       )}

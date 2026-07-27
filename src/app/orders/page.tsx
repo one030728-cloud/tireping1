@@ -37,17 +37,20 @@ function OrdersContent() {
         <p className="text-center text-muted py-16">주문 내역이 없습니다.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {orders.map((o) => (
+          {orders.map((o, i) => (
             <div
               key={o.id}
-              className="bg-surface border border-border rounded-xl p-4 flex items-center justify-between"
+              className="bg-surface border border-border rounded-xl p-4 flex items-center justify-between hover:shadow-md hover:-translate-y-0.5 animate-[fade-slide-up_400ms_ease-out_both]"
+              style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}
             >
               <div>
                 <p className="text-xs text-muted mb-1">
                   주문번호 {o.id} · {o.orderedAt}
                 </p>
                 <p className="font-semibold">{o.model}</p>
-                <p className="text-sm text-muted mt-1">{o.total.toLocaleString()}원</p>
+                <p className="text-sm text-muted mt-1 tabular-nums">
+                  {o.total.toLocaleString()}원
+                </p>
               </div>
               <span
                 className={`text-xs font-semibold px-2.5 py-1.5 rounded-full ${STATUS_STYLE[o.status] ?? "bg-muted/10 text-muted"}`}
