@@ -27,6 +27,7 @@ export default function Header() {
   const [hasUnread, setHasUnread] = useState(false);
   const [searchManufacturer, setSearchManufacturer] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const isMainDashboard = user && pathname === "/main";
@@ -47,6 +48,14 @@ export default function Header() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage read after mount, required to avoid SSR/client markup mismatch
     setHasUnread(lastSeen !== NOTICES[0].id);
   }, []);
+
+  useEffect(() => {
+    if (!isMainDashboard) return;
+    const handleScroll = () => setIsScrolled(window.scrollY > 18);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isMainDashboard]);
 
   function handleNotifOpenChange(open: boolean) {
     setNotifOpen(open);
@@ -72,10 +81,18 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-40 header-glass">
+    <header
+      className={`sticky top-0 z-40 header-glass transition-[background-color,box-shadow] duration-300 ${
+        isMainDashboard && isScrolled
+          ? "!bg-white/90 shadow-[0_8px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl"
+          : ""
+      }`}
+    >
       <div
         className={`mx-auto flex items-center justify-between gap-6 ${
-          isMainDashboard ? "max-w-none h-[70px] px-5" : "max-w-[1680px] h-20 px-4"
+          isMainDashboard
+            ? `${isScrolled ? "h-14" : "h-16"} max-w-none px-4 transition-[height] duration-300 lg:h-[70px] lg:px-5`
+            : "h-16 max-w-[1680px] px-4 lg:h-20"
         }`}
       >
         <div className="flex items-center gap-6">
@@ -89,14 +106,18 @@ export default function Header() {
 
           <Link
             href={user ? "/main" : "/"}
-            className={`flex items-center shrink-0 py-2 ${isMainDashboard ? "w-[234px]" : ""}`}
+            className={`flex items-center shrink-0 py-2 ${isMainDashboard ? "lg:w-[234px]" : ""}`}
           >
             <Image
               src="/logo.svg"
               alt="타이어존"
               width={220}
               height={64}
-              className={isMainDashboard ? "h-12 w-auto" : "h-14 w-auto"}
+              className={
+                isMainDashboard
+                  ? `${isScrolled ? "h-9" : "h-10"} w-auto transition-[height] duration-300 lg:h-12`
+                  : "h-10 w-auto lg:h-14"
+              }
               priority
             />
           </Link>
@@ -292,7 +313,7 @@ export default function Header() {
                 logout();
                 router.push("/");
               }}
-              className="p-2.5 -m-2.5 text-foreground/70 hover:text-accent"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f6f8] text-foreground/70 hover:text-accent lg:-m-2.5 lg:bg-transparent"
               title="로그아웃"
             >
               <LogOut size={20} />

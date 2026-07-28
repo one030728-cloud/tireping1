@@ -3,12 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Bell, ChevronRight, CircleDot, Clock, Search, ThumbsUp } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Bell,
+  ChevronRight,
+  CircleDot,
+  Clock,
+  Factory,
+  Home,
+  PackageSearch,
+  Search,
+  ShoppingCart,
+  ThumbsUp,
+  UserRound,
+} from "lucide-react";
 import HeroCarousel from "@/components/HeroCarousel";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import RequireAuth from "@/components/RequireAuth";
-import TireCard from "@/components/TireCard";
 import type { Tire } from "@/lib/types";
 import {
   DIRECT_NOTICE,
@@ -21,13 +32,12 @@ import {
   UPDATE_LOGS,
 } from "@/lib/mockData";
 import { useOrders } from "@/lib/orders";
-import { getStatusStyle } from "@/lib/status";
 
 function DashboardTireCard({ tire }: { tire: Tire }) {
   return (
     <Link
       href={`/products/${tire.id}`}
-      className="w-[145px] shrink-0 flex flex-col text-[#333] hover:text-brand"
+      className="w-[145px] shrink-0 flex flex-col rounded-xl text-[#333] transition-[transform,filter] duration-200 active:scale-[0.975] active:brightness-[0.98] hover:text-brand"
     >
       <ImagePlaceholder
         manufacturer={tire.manufacturer}
@@ -98,10 +108,110 @@ function DesktopProductSection({
   );
 }
 
+function MobileProductSection({
+  title,
+  href,
+  tires,
+  kind,
+}: {
+  title: string;
+  href: string;
+  tires: Tire[];
+  kind: "event" | "best";
+}) {
+  const Icon = kind === "event" ? Bell : ThumbsUp;
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white py-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+      <div className="mb-4 flex items-center justify-between px-4">
+        <h2 className="flex items-center gap-2 text-[17px] font-bold">
+          <span
+            className={`flex h-8 w-8 items-center justify-center rounded-full ${
+              kind === "event" ? "bg-rose-50 text-rose-500" : "bg-blue-50 text-brand"
+            }`}
+          >
+            <Icon size={17} strokeWidth={1.8} />
+          </span>
+          {title}
+        </h2>
+        <Link href={href} className="flex items-center text-xs text-[#777]">
+          전체보기 <ChevronRight size={14} />
+        </Link>
+      </div>
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-4 pb-2 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
+        {tires.map((tire) => (
+          <div key={tire.id} className="snap-start">
+            <DashboardTireCard tire={tire} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MobileBottomNav() {
+  const items = [
+    { href: "/main", label: "홈", Icon: Home, active: true },
+    { href: "/factory-price", label: "공장도가", Icon: Factory },
+    { href: "/products", label: "상품목록", Icon: PackageSearch },
+    { href: "/cart", label: "장바구니", Icon: ShoppingCart },
+    { href: "/mypage/status", label: "마이", Icon: UserRound },
+  ];
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[66px] grid-cols-5 border-t border-white/70 bg-white/85 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl lg:hidden">
+      {items.map(({ href, label, Icon, active }) => (
+        <Link
+          key={href}
+          href={href}
+          className={`relative flex flex-col items-center justify-center gap-0.5 text-[11px] transition-transform duration-200 active:scale-95 ${
+            active ? "font-bold text-brand" : "text-[#727780]"
+          }`}
+        >
+          {active && <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-brand" />}
+          <span
+            className={`flex h-8 w-10 items-center justify-center rounded-2xl transition-all duration-300 ${
+              active ? "bg-blue-50 shadow-[0_4px_12px_rgba(37,99,235,0.14)]" : ""
+            }`}
+          >
+            <Icon size={20} strokeWidth={active ? 2.3 : 1.8} />
+          </span>
+          {label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 function MainContent() {
   const router = useRouter();
   const [manufacturer, setManufacturer] = useState("");
   const [size, setSize] = useState("");
+  const mobileFeedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const feed = mobileFeedRef.current;
+    if (!feed) return;
+
+    const elements = Array.from(feed.querySelectorAll<HTMLElement>(".mobile-reveal"));
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -24px" },
+    );
+
+    elements.forEach((element, index) => {
+      element.style.transitionDelay = `${Math.min(index * 45, 180)}ms`;
+      observer.observe(element);
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const { orders } = useOrders();
   const eventTires = TIRES.filter((t) => t.tag === "EVENT");
@@ -222,110 +332,6 @@ function MainContent() {
     />
   );
 
-  const searchBox = (
-    <section>
-      <h2 className="font-bold mb-3 flex items-center gap-1.5">
-        <Search size={16} className="text-brand" /> 타이어 검색
-      </h2>
-      <form onSubmit={handleSearch} className="card p-4 flex flex-col gap-3">
-        <select
-          value={manufacturer}
-          onChange={(e) => setManufacturer(e.target.value)}
-          className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-        >
-          <option value="">제조사</option>
-          {MANUFACTURERS.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-        <input
-          value={size}
-          onChange={(e) => setSize(e.target.value)}
-          placeholder="사이즈 검색 245 45 18"
-          className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-        />
-        <button type="submit" className="btn-primary h-11">
-          검색하기
-        </button>
-      </form>
-    </section>
-  );
-
-  const ordersBox = (
-    <section>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-bold flex items-center gap-1.5">
-          <Clock size={16} className="text-brand" /> 최근 주문 내역
-        </h2>
-        <Link href="/orders" className="text-xs text-muted flex items-center">
-          전체보기 <ChevronRight size={14} />
-        </Link>
-      </div>
-      <div className="card divide-y divide-border">
-        {recentOrders.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted text-center">최근 주문 내역이 없습니다.</p>
-        ) : (
-          recentOrders.map((o) => (
-            <div
-              key={o.id}
-              className="flex items-center justify-between px-4 py-3 text-sm hover:bg-surface-2"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-muted">{o.id}</span>
-                <span className="font-medium">{o.model}</span>
-              </div>
-              <span
-                className={`text-xs font-semibold px-2 py-1 rounded-full ${getStatusStyle(o.status)}`}
-              >
-                {o.status}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-    </section>
-  );
-
-  const eventGrid = (
-    <section className="lg:card lg:p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-bold flex items-center gap-2">
-          <span className="w-1 h-4 rounded-full bg-gradient-to-b from-accent-light to-accent" />
-          이벤트 진행 중 타이어
-        </h2>
-        <Link href="/products?tag=EVENT" className="text-xs text-muted flex items-center">
-          전체보기 <ChevronRight size={14} />
-        </Link>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
-        {eventTires.map((t) => (
-          <TireCard key={t.id} tire={t} fixedWidth={false} />
-        ))}
-      </div>
-    </section>
-  );
-
-  const bestGrid = (
-    <section className="lg:card lg:p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-bold flex items-center gap-2">
-          <span className="w-1 h-4 rounded-full bg-gradient-to-b from-brand-light to-brand" />
-          판매 인기 타이어
-        </h2>
-        <Link href="/products" className="text-xs text-muted flex items-center">
-          전체보기 <ChevronRight size={14} />
-        </Link>
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
-        {bestTires.map((t) => (
-          <TireCard key={t.id} tire={t} fixedWidth={false} />
-        ))}
-      </div>
-    </section>
-  );
-
   const directBanner = (
     <Link href="/direct" className="card p-5 text-center block card-hover">
       <p className="text-sm text-muted mb-1">{DIRECT_NOTICE}</p>
@@ -404,17 +410,109 @@ function MainContent() {
   return (
     <>
       {/* Mobile / tablet: single stacked column */}
-      <div className="lg:hidden px-4 py-5 flex flex-col gap-8">
-        {banner}
-        {searchBox}
-        {ordersBox}
-        {eventGrid}
-        {bestGrid}
-        {directBanner}
-        {noticesBox}
-        {faqBox}
-        {updateBox}
+      <div ref={mobileFeedRef} className="flex flex-col gap-5 px-4 pt-4 pb-24 lg:hidden">
+        <div className="mobile-reveal [&>div]:h-[170px] [&>div]:rounded-2xl [&>div]:shadow-[0_10px_30px_rgba(225,29,72,0.16)]">
+          {banner}
+        </div>
+
+        <section className="mobile-reveal rounded-2xl border border-white/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+          <h2 className="mb-3 flex items-center gap-2 text-[17px] font-bold">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-brand">
+              <CircleDot size={17} />
+            </span>
+            타이어 검색
+          </h2>
+          <form onSubmit={handleSearch}>
+            <div className="mb-3 flex h-11 overflow-hidden rounded-xl border border-[#d9dee7] bg-white">
+              <select
+                value={manufacturer}
+                onChange={(e) => setManufacturer(e.target.value)}
+                aria-label="제조사"
+                className="w-[108px] shrink-0 border-0 border-r border-[#d9dee7] px-3 text-sm focus:outline-none"
+              >
+                <option value="">제조사</option>
+                {MANUFACTURERS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={size}
+                onChange={(e) => setSize(e.target.value)}
+                aria-label="타이어 사이즈"
+                placeholder="사이즈 245 45 18"
+                className="min-w-0 flex-1 border-0 px-3 text-sm focus:outline-none"
+              />
+            </div>
+            <button type="submit" className="btn-primary h-11 w-full rounded-xl text-[15px]">
+              <Search size={17} className="mr-1.5" /> 검색하기
+            </button>
+          </form>
+        </section>
+
+        <section className="mobile-reveal overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center justify-between border-b border-[#edf0f4] px-4 py-3.5">
+            <h2 className="flex items-center gap-2 text-[16px] font-bold">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-brand">
+                <Clock size={17} />
+              </span>
+              최근 주문 내역
+            </h2>
+            <Link href="/orders" className="flex items-center text-xs text-[#777]">
+              전체보기 <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className="divide-y divide-[#edf0f4]">
+            {recentOrders.map((order, index) => (
+              <Link
+                key={order.id}
+                href="/orders"
+                className="grid min-h-[48px] grid-cols-[56px_1fr_auto] items-center gap-2 px-4 text-[13px] active:bg-[#f7f9fc]"
+              >
+                <span className="text-[#777]">{order.id}</span>
+                <span className="truncate font-semibold text-[#075bea]">{order.model}</span>
+                <span
+                  className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                    index === 1
+                      ? "bg-slate-100 text-slate-500"
+                      : index === 2
+                        ? "bg-rose-50 text-rose-500"
+                        : "bg-emerald-50 text-emerald-500"
+                  }`}
+                >
+                  {order.status}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <div className="mobile-reveal">
+          <MobileProductSection
+          title="이벤트 진행 중 타이어"
+          href="/products?tag=EVENT"
+          tires={desktopEventTires}
+            kind="event"
+          />
+        </div>
+        <div className="mobile-reveal">
+          <MobileProductSection
+          title="판매 인기 타이어"
+          href="/products"
+          tires={desktopBestTires}
+            kind="best"
+          />
+        </div>
+
+        <div className="mobile-reveal [&_.card]:rounded-2xl">{directBanner}</div>
+        <div className="mobile-reveal flex flex-col gap-5">
+          {noticesBox}
+          {faqBox}
+          {updateBox}
+        </div>
       </div>
+      <MobileBottomNav />
 
       {/* Desktop: tireping-style full-width dashboard */}
       <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_392px] gap-x-[26px] gap-y-[30px] pl-[50px] pr-[20px] pt-[35px] pb-10">

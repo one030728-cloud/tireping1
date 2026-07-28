@@ -28,7 +28,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {showBreadcrumb && !isMainDashboard && <Breadcrumb />}
           <div
             key={`${pathname}-${loading}`}
-            className="animate-[fade-slide-up_320ms_ease-out_both]"
+            className={isMainDashboard ? "" : "animate-[fade-slide-up_320ms_ease-out_both]"}
           >
             {children}
           </div>

@@ -15,7 +15,12 @@ export default function HeroCarousel({
   showControls?: boolean;
 }) {
   const [index, setIndex] = useState(0);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const pausedRef = useRef(false);
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+  const didSwipeRef = useRef(false);
   const count = slides.length;
 
   function go(next: number) {
@@ -34,17 +39,76 @@ export default function HeroCarousel({
 
   return (
     <div
-      className={`relative rounded-2xl overflow-hidden h-40 md:h-60 lg:h-80 ${className}`}
+      className={`relative rounded-2xl overflow-hidden h-40 touch-pan-y select-none md:h-60 lg:h-80 ${className}`}
       onMouseEnter={() => {
         pausedRef.current = true;
       }}
       onMouseLeave={() => {
         pausedRef.current = false;
       }}
+      onTouchStart={(event) => {
+        const touch = event.touches[0];
+        touchStartXRef.current = touch.clientX;
+        touchStartYRef.current = touch.clientY;
+        didSwipeRef.current = false;
+        pausedRef.current = true;
+        setIsDragging(true);
+        setDragOffset(0);
+      }}
+      onTouchMove={(event) => {
+        const startX = touchStartXRef.current;
+        const startY = touchStartYRef.current;
+        if (startX === null || startY === null) return;
+
+        const touch = event.touches[0];
+        const deltaX = touch.clientX - startX;
+        const deltaY = touch.clientY - startY;
+
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          const resistance =
+            (index === 0 && deltaX > 0) || (index === count - 1 && deltaX < 0) ? 0.28 : 1;
+          setDragOffset(deltaX * resistance);
+        }
+      }}
+      onTouchEnd={(event) => {
+        const startX = touchStartXRef.current;
+        const startY = touchStartYRef.current;
+        const touch = event.changedTouches[0];
+
+        if (startX !== null && startY !== null) {
+          const deltaX = touch.clientX - startX;
+          const deltaY = touch.clientY - startY;
+
+          if (Math.abs(deltaX) >= 45 && Math.abs(deltaX) > Math.abs(deltaY)) {
+            didSwipeRef.current = true;
+            go(deltaX < 0 ? index + 1 : index - 1);
+          }
+        }
+
+        touchStartXRef.current = null;
+        touchStartYRef.current = null;
+        pausedRef.current = false;
+        setIsDragging(false);
+        setDragOffset(0);
+      }}
+      onTouchCancel={() => {
+        touchStartXRef.current = null;
+        touchStartYRef.current = null;
+        pausedRef.current = false;
+        setIsDragging(false);
+        setDragOffset(0);
+      }}
+      onClickCapture={(event) => {
+        if (didSwipeRef.current) {
+          event.preventDefault();
+          event.stopPropagation();
+          didSwipeRef.current = false;
+        }
+      }}
     >
       <div
-        className="flex h-full transition-transform duration-500 ease-out"
-        style={{ transform: `translateX(-${index * 100}%)` }}
+        className={`flex h-full ${isDragging ? "" : "transition-transform duration-500 ease-out"}`}
+        style={{ transform: `translateX(calc(-${index * 100}% + ${dragOffset}px))` }}
       >
         {slides.map((s) => (
           <div key={s.key} className="w-full h-full shrink-0">
