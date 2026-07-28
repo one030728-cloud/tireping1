@@ -14,13 +14,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const showBreadcrumb = user && pathname !== "/login" && pathname !== "/";
   const showSidebar = showBreadcrumb && !hasOwnSidebar;
   const showFooter = pathname !== "/login";
+  const isMainDashboard = pathname === "/main";
 
   return (
-    <div className="flex-1 w-full max-w-[1680px] mx-auto flex flex-col">
+    <div
+      className={`flex-1 w-full flex flex-col ${
+        isMainDashboard ? "max-w-none" : "max-w-[1680px] mx-auto"
+      }`}
+    >
       <div className="flex-1 flex">
         {showSidebar && <Sidebar />}
         <main className="flex-1 min-w-0">
-          {showBreadcrumb && <Breadcrumb />}
+          {showBreadcrumb && !isMainDashboard && <Breadcrumb />}
           <div
             key={`${pathname}-${loading}`}
             className="animate-[fade-slide-up_320ms_ease-out_both]"

@@ -29,6 +29,7 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
   const pathname = usePathname();
+  const isMainDashboard = user && pathname === "/main";
 
   function handleGuestSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -72,7 +73,11 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 header-glass">
-      <div className="max-w-[1680px] mx-auto flex items-center justify-between px-4 h-20 gap-6">
+      <div
+        className={`mx-auto flex items-center justify-between gap-6 ${
+          isMainDashboard ? "max-w-none h-[70px] px-5" : "max-w-[1680px] h-20 px-4"
+        }`}
+      >
         <div className="flex items-center gap-6">
           <button
             aria-label="메뉴 열기"
@@ -82,13 +87,16 @@ export default function Header() {
             <Menu size={22} />
           </button>
 
-          <Link href={user ? "/main" : "/"} className="flex items-center shrink-0 py-2">
+          <Link
+            href={user ? "/main" : "/"}
+            className={`flex items-center shrink-0 py-2 ${isMainDashboard ? "w-[234px]" : ""}`}
+          >
             <Image
               src="/logo.svg"
               alt="타이어존"
               width={220}
               height={64}
-              className="h-14 w-auto"
+              className={isMainDashboard ? "h-12 w-auto" : "h-14 w-auto"}
               priority
             />
           </Link>
@@ -203,8 +211,16 @@ export default function Header() {
           >
             <Megaphone size={14} className="shrink-0" />
             <div className="relative flex-1 min-w-0 h-4 overflow-hidden">
-              <div className="absolute whitespace-nowrap text-xs animate-[ticker_18s_linear_infinite]">
-                {NOTICES[0].title}
+              <div
+                className={`whitespace-nowrap text-xs ${
+                  isMainDashboard
+                    ? "w-full text-center"
+                    : "absolute animate-[ticker_18s_linear_infinite]"
+                }`}
+              >
+                {isMainDashboard
+                  ? "(NEW) 타이어 구매를 편하게! 공장도가 계산 서비스 오픈!"
+                  : NOTICES[0].title}
               </div>
             </div>
           </div>

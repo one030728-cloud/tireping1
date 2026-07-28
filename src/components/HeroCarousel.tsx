@@ -7,10 +7,12 @@ export default function HeroCarousel({
   slides,
   autoPlayInterval = 4000,
   className = "",
+  showControls = true,
 }: {
   slides: { key: string; content: ReactNode }[];
   autoPlayInterval?: number;
   className?: string;
+  showControls?: boolean;
 }) {
   const [index, setIndex] = useState(0);
   const pausedRef = useRef(false);
@@ -51,7 +53,7 @@ export default function HeroCarousel({
         ))}
       </div>
 
-      {count > 1 && (
+      {count > 1 && showControls && (
         <>
           <button
             type="button"
