@@ -297,11 +297,6 @@ function MainContent() {
                     className="object-cover"
                     sizes="(min-width: 1024px) 700px, 100vw"
                   />
-                  {ev.id === "e2" && (
-                    <div className="absolute top-[40px] left-1/2 hidden h-[70px] w-[780px] -translate-x-1/2 items-center justify-center bg-[#efb5e5]/95 text-[47px] font-light italic tracking-[-0.02em] text-black lg:flex">
-                      * TIREPING GRAND EVENT *
-                    </div>
-                  )}
                   {ev.id !== "e2" && (
                     <>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/5 to-transparent" />

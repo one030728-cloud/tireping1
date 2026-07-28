@@ -254,7 +254,7 @@ export const EVENTS: EventItem[] = [
 
 export const EVENT_BANNER_IMAGES: Partial<Record<string, string>> = {
   e1: "/banners/rainy-season-ad.jpg",
-  e2: "/banners/tireping-grand-event.png",
+  e2: "/banners/continental-big-sale.jpg",
 };
 
 export const ORDERS: Order[] = [
