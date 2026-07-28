@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import HeroCarousel from "@/components/HeroCarousel";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
-import RequireAuth from "@/components/RequireAuth";
 import Carousel from "@/components/Carousel";
 import type { Tire } from "@/lib/types";
 import {
@@ -28,8 +27,12 @@ import {
   UPDATE_LOGS,
 } from "@/lib/mockData";
 import { useOrders } from "@/lib/orders";
+import { formatTireSize, parseTireSize } from "@/lib/tireSearch";
+import { useAuth } from "@/lib/auth";
 
 function DashboardTireCard({ tire, mobile = false }: { tire: Tire; mobile?: boolean }) {
+  const { user } = useAuth();
+
   return (
     <Link
       href={`/products/${tire.id}`}
@@ -61,10 +64,14 @@ function DashboardTireCard({ tire, mobile = false }: { tire: Tire; mobile?: bool
               {tire.tag}
             </span>
           )}
-          <strong className="text-[17px] leading-[20px] text-[#444]">
-            {tire.price.toLocaleString()}
-            <span className="text-[12px] ml-0.5">원</span>
-          </strong>
+          {user ? (
+            <strong className="text-[17px] leading-[20px] text-[#444]">
+              {tire.price.toLocaleString()}
+              <span className="text-[12px] ml-0.5">원</span>
+            </strong>
+          ) : (
+            <span className="text-[12px] font-bold text-brand">로그인 후 가격 확인</span>
+          )}
         </div>
       </div>
     </Link>
@@ -239,7 +246,9 @@ function MainContent() {
     e.preventDefault();
     const params = new URLSearchParams();
     if (manufacturer) params.set("manufacturer", manufacturer);
-    if (size) params.set("size", size);
+    const parsedSize = parseTireSize(size);
+    if (parsedSize) params.set("size", formatTireSize(parsedSize));
+    else if (size.trim()) params.set("size", size.trim());
     router.push(`/products?${params.toString()}`);
   }
 
@@ -587,9 +596,5 @@ function MainContent() {
 }
 
 export default function MainPage() {
-  return (
-    <RequireAuth>
-      <MainContent />
-    </RequireAuth>
-  );
+  return <MainContent />;
 }

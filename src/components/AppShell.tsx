@@ -9,11 +9,12 @@ import ScrollToTopButton from "./ScrollToTopButton";
 import MobileBottomNav from "./MobileBottomNav";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   const pathname = usePathname();
   const hasOwnSidebar = pathname.startsWith("/goods") || pathname.startsWith("/customer");
-  const showBreadcrumb = user && pathname !== "/login" && pathname !== "/";
-  const showSidebar = showBreadcrumb && !hasOwnSidebar;
+  const showAppShell = pathname !== "/login" && pathname !== "/";
+  const showBreadcrumb = showAppShell;
+  const showSidebar = showAppShell && !hasOwnSidebar;
   const showFooter = pathname !== "/login";
   const isMainDashboard = pathname === "/main";
 
@@ -21,7 +22,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div
       className={`flex-1 w-full flex flex-col ${
         isMainDashboard ? "max-w-none" : "max-w-[1680px] mx-auto"
-      } ${user ? "pb-[80px] lg:pb-0" : ""}`}
+      } ${showAppShell ? "pb-[80px] lg:pb-0" : ""}`}
     >
       <div className="flex-1 flex">
         {showSidebar && <Sidebar />}
@@ -37,7 +38,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       {showFooter && <Footer />}
       <ScrollToTopButton />
-      {user && pathname !== "/login" && pathname !== "/" && <MobileBottomNav />}
+      {showAppShell && <MobileBottomNav />}
     </div>
   );
 }

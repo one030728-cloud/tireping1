@@ -5,13 +5,13 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ChevronLeft, Star } from "lucide-react";
-import RequireAuth from "@/components/RequireAuth";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import LoadingState from "@/components/LoadingState";
 import { FACTORY_TIRES, TIRES, TIRE_SPECS, getSellersForTire } from "@/lib/mockData";
 import { useCart } from "@/lib/cart";
 import { useOrders } from "@/lib/orders";
 import { useWishlist } from "@/lib/wishlist";
+import { useAuth } from "@/lib/auth";
 import type { Manufacturer, Seller } from "@/lib/types";
 
 interface ProductView {
@@ -98,6 +98,7 @@ function ProductDetailContent() {
   const { addItem } = useCart();
   const { addOrders } = useOrders();
   const { isWished, toggleWish } = useWishlist();
+  const { user } = useAuth();
   const dot = searchParams.get("dot");
   const product = useMemo(() => resolveProduct(params.id, dot), [params.id, dot]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -115,6 +116,11 @@ function ProductDetailContent() {
   }
 
   function handleAdd(seller: Seller, buyNow: boolean) {
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+
     const qty = quantities[seller.code] || seller.minOrder;
     const item = {
       tireId: product!.id,
@@ -172,7 +178,10 @@ function ProductDetailContent() {
           </p>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <SpecRow label="생산년도" value={product.dot} />
-            <SpecRow label="공장도가" value={`${product.factoryPrice.toLocaleString()}원`} />
+            <SpecRow
+              label="공장도가"
+              value={user ? `${product.factoryPrice.toLocaleString()}원` : "로그인 후 공개"}
+            />
             <SpecRow label="하중지수" value={product.spec.loadIndex} />
             <SpecRow label="속도지수" value={product.spec.speedIndex} />
             <SpecRow label="타이어겹수" value={product.spec.ply} />
@@ -191,7 +200,9 @@ function ProductDetailContent() {
         </div>
         <div>
           <h3 className="text-foreground font-bold mb-2 mt-3 md:mt-0">반품/교환 안내</h3>
-          <p>1. 반품 배송비 : 편도 9,500원 (왕복비용 발생)</p>
+          <p>
+            1. 반품 배송비 : {user ? "편도 9,500원 (왕복비용 발생)" : "로그인 후 공개"}
+          </p>
           <p>2. 구매자 단순변심은 상품도착 후 7일 이내 (구매자 반품배송비 부담)</p>
         </div>
       </div>
@@ -242,7 +253,7 @@ function ProductDetailContent() {
                   {seller.discountRate}%
                 </td>
                 <td className="py-3 px-4 font-bold tabular-nums">
-                  {seller.price.toLocaleString()}원
+                  {user ? `${seller.price.toLocaleString()}원` : "로그인 후 공개"}
                 </td>
                 <td className="py-3 px-4">{seller.stock.toLocaleString()}</td>
                 <td className="py-3 px-4">{seller.minOrder}</td>
@@ -318,7 +329,9 @@ function ProductDetailContent() {
             </div>
             <div className="flex items-baseline gap-2 mb-1 tabular-nums">
               <span className="text-brand font-bold">{seller.discountRate}%</span>
-              <span className="text-lg font-extrabold">{seller.price.toLocaleString()}원</span>
+              <span className="text-lg font-extrabold">
+                {user ? `${seller.price.toLocaleString()}원` : "로그인 후 가격 확인"}
+              </span>
             </div>
             <p className="text-xs text-muted mb-3">
               재고 {seller.stock.toLocaleString()} · 최소주문수량 {seller.minOrder} ·{" "}
@@ -367,10 +380,8 @@ function SpecRow({ label, value }: { label: string; value: string }) {
 
 export default function ProductDetailPage() {
   return (
-    <RequireAuth>
-      <Suspense fallback={<LoadingState />}>
-        <ProductDetailContent />
-      </Suspense>
-    </RequireAuth>
+    <Suspense fallback={<LoadingState />}>
+      <ProductDetailContent />
+    </Suspense>
   );
 }

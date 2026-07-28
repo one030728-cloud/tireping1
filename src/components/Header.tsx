@@ -30,7 +30,8 @@ export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const isMainDashboard = user && pathname === "/main";
+  const isAppScreen = pathname !== "/" && pathname !== "/login";
+  const isMainDashboard = pathname === "/main";
 
   function handleGuestSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -105,7 +106,7 @@ export default function Header() {
           </button>
 
           <Link
-            href={user ? "/main" : "/"}
+            href={isAppScreen ? "/main" : "/"}
             className={`absolute left-1/2 flex -translate-x-1/2 items-center py-1 lg:static lg:translate-x-0 lg:py-2 ${
               isMainDashboard ? "lg:w-[234px]" : ""
             }`}
@@ -124,7 +125,7 @@ export default function Header() {
             />
           </Link>
 
-          {user ? (
+          {user || isAppScreen ? (
             <nav className="hidden lg:flex items-center gap-5">
               {GNB_LINKS.map((link) => {
                 const isMain = link.href === "/main";
@@ -227,7 +228,7 @@ export default function Header() {
           )}
         </div>
 
-        {user && NOTICES[0] && (
+        {isAppScreen && NOTICES[0] && (
           <div
             className="hidden lg:flex items-center gap-1.5 flex-1 min-w-0 text-muted"
             aria-hidden="true"
@@ -333,7 +334,7 @@ export default function Header() {
         </div>
       </div>
 
-      {!user && (
+      {!user && !isAppScreen && (
         <div className="hidden lg:block border-t border-border">
           <div className="max-w-[1680px] mx-auto flex items-center justify-between px-4 h-11">
             <nav className="flex items-center gap-5">

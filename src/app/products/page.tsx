@@ -4,10 +4,11 @@ import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SearchX } from "lucide-react";
-import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
 import { CATALOG, MANUFACTURERS } from "@/lib/mockData";
 import type { CatalogRow } from "@/lib/types";
+import { parseTireSize } from "@/lib/tireSearch";
+import { useAuth } from "@/lib/auth";
 
 type SortKey = "registered" | "popular" | "lowest" | "highest" | "discount";
 
@@ -38,6 +39,7 @@ function sortRows(rows: CatalogRow[], sort: SortKey): CatalogRow[] {
 const PAGE_SIZE = 12;
 
 function ProductsContent() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const tag = searchParams.get("tag");
 
@@ -53,8 +55,10 @@ function ProductsContent() {
   const [page, setPage] = useState(1);
 
   const results = useMemo(() => {
-    const sizeParts = size.trim().split(/\s+/).filter(Boolean).map(Number);
+    const parsedSize = parseTireSize(size);
+    const hasInvalidSize = size.trim().length > 0 && !parsedSize;
     const filtered = CATALOG.filter((r) => {
+      if (hasInvalidSize) return false;
       if (tag && r.tag !== tag) return false;
       if (manufacturer && r.manufacturer !== manufacturer) return false;
       if (model && !r.model.toLowerCase().includes(model.toLowerCase())) return false;
@@ -64,12 +68,9 @@ function ProductsContent() {
       if (ratio && r.ratio !== Number(ratio)) return false;
       if (rim && r.rim !== Number(rim)) return false;
       if (dot && r.dot !== dot) return false;
-      if (sizeParts.length >= 1 && !Number.isNaN(sizeParts[0]) && r.width !== sizeParts[0])
-        return false;
-      if (sizeParts.length >= 2 && !Number.isNaN(sizeParts[1]) && r.ratio !== sizeParts[1])
-        return false;
-      if (sizeParts.length >= 3 && !Number.isNaN(sizeParts[2]) && r.rim !== sizeParts[2])
-        return false;
+      if (parsedSize && r.width !== parsedSize.width) return false;
+      if (parsedSize && r.ratio !== parsedSize.ratio) return false;
+      if (parsedSize && r.rim !== parsedSize.rim) return false;
       return true;
     });
     return sortRows(filtered, sort);
@@ -238,12 +239,14 @@ function ProductsContent() {
                     <td className="py-3 px-4 text-muted">{r.productCode}</td>
                     <td className="py-3 px-4 text-muted">{r.dot}</td>
                     <td className="py-3 px-4 tabular-nums text-muted">
-                      {r.factoryPrice.toLocaleString()}원
+                      {user ? `${r.factoryPrice.toLocaleString()}원` : "로그인 후 공개"}
                     </td>
                     <td className="py-3 px-4 tabular-nums font-bold text-brand">
-                      {r.lowPrice.toLocaleString()}원
+                      {user ? `${r.lowPrice.toLocaleString()}원` : "로그인 후 공개"}
                     </td>
-                    <td className="py-3 px-4 tabular-nums">{r.highPrice.toLocaleString()}원</td>
+                    <td className="py-3 px-4 tabular-nums">
+                      {user ? `${r.highPrice.toLocaleString()}원` : "로그인 후 공개"}
+                    </td>
                     <td className="py-3 px-4 tabular-nums">{r.stock.toLocaleString()}</td>
                   </tr>
                 ))}
@@ -266,7 +269,7 @@ function ProductsContent() {
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-muted">재고 {r.stock}</span>
                   <span className="font-extrabold text-brand tabular-nums">
-                    {r.lowPrice.toLocaleString()}원
+                    {user ? `${r.lowPrice.toLocaleString()}원` : "로그인 후 가격 확인"}
                   </span>
                 </div>
               </Link>
@@ -296,10 +299,8 @@ function ProductsContent() {
 
 export default function ProductsPage() {
   return (
-    <RequireAuth>
-      <Suspense fallback={<LoadingState />}>
-        <ProductsContent />
-      </Suspense>
-    </RequireAuth>
+    <Suspense fallback={<LoadingState />}>
+      <ProductsContent />
+    </Suspense>
   );
 }
