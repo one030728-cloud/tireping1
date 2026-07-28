@@ -12,6 +12,7 @@ const LABELS: Record<string, string> = {
   "/direct": "당일직배송 상품목록",
   "/sell": "타이어판매",
   "/goods": "정비용품 구매",
+  "/exhibition": "기획전",
   "/customer": "고객센터",
   "/wishlist": "찜한 판매업체",
   "/cart": "타이어 장바구니",
@@ -24,7 +25,7 @@ const LABELS: Record<string, string> = {
   "/mypage/settings": "회원정보수정",
 };
 
-const TOP_LEVEL = new Set(["/sell", "/goods", "/customer"]);
+const TOP_LEVEL = new Set(["/sell", "/goods", "/customer", "/exhibition"]);
 
 function resolveLabel(pathname: string): string {
   if (LABELS[pathname]) return LABELS[pathname];

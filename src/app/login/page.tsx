@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
@@ -38,9 +39,9 @@ export default function LoginPage() {
   return (
     <div className="flex justify-center px-4 py-16">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8 animate-[fade-slide-up_400ms_ease-out_both]">
-          <h1 className="text-2xl font-extrabold text-gradient-brand">타이어존</h1>
-          <p className="text-sm text-muted mt-1">사업자전용 타이어거래소</p>
+        <div className="flex flex-col items-center text-center mb-8 animate-[fade-slide-up_400ms_ease-out_both]">
+          <Image src="/logo.svg" alt="타이어존" width={220} height={64} className="h-16 w-auto mb-2" priority />
+          <p className="text-sm text-muted">사업자전용 타이어거래소</p>
         </div>
 
         <form

@@ -9,13 +9,18 @@ import Carousel from "@/components/Carousel";
 import HeroCarousel from "@/components/HeroCarousel";
 import RequireAuth from "@/components/RequireAuth";
 import TireCard from "@/components/TireCard";
-import { DIRECT_NOTICE, EVENTS, FAQ_CATEGORIES, MANUFACTURERS, NOTICES, TIRES, UPDATE_LOGS } from "@/lib/mockData";
+import {
+  DIRECT_NOTICE,
+  EVENTS,
+  EVENT_BANNER_IMAGES,
+  FAQ_CATEGORIES,
+  MANUFACTURERS,
+  NOTICES,
+  TIRES,
+  UPDATE_LOGS,
+} from "@/lib/mockData";
 import { useOrders } from "@/lib/orders";
 import { getStatusStyle } from "@/lib/status";
-
-const BANNER_IMAGES: Partial<Record<string, string>> = {
-  e1: "/banners/rainy-season-ad.jpg",
-};
 
 function MainContent() {
   const router = useRouter();
@@ -41,7 +46,7 @@ function MainContent() {
       className="shadow-[var(--shadow-lg)]"
       autoPlayInterval={4000}
       slides={ongoingEvents.map((ev) => {
-        const bannerImage = BANNER_IMAGES[ev.id];
+        const bannerImage = EVENT_BANNER_IMAGES[ev.id];
         return {
           key: ev.id,
           content: (

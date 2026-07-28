@@ -1,12 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Bell } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
-import { EVENTS } from "@/lib/mockData";
+import { EVENTS, EVENT_BANNER_IMAGES } from "@/lib/mockData";
 
 type Tab = "all" | "ongoing" | "ended";
 
@@ -54,21 +55,36 @@ function EventsContent() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
-          {filtered.map((e, i) => (
-            <Link
-              key={e.id}
-              href={`/events/${e.id}`}
-              className="block group animate-[fade-slide-up_400ms_ease-out_both]"
-              style={{ animationDelay: `${i * 50}ms` }}
-            >
-              <div
-                className="aspect-[16/9] rounded-xl mb-2 border border-border transition-transform group-hover:-translate-y-1 group-hover:shadow-lg"
-                style={{ background: e.bannerGradient }}
-              />
-              <p className="text-sm font-semibold line-clamp-2 group-hover:text-brand">{e.title}</p>
-              <p className="text-xs text-muted mt-0.5">{e.period}</p>
-            </Link>
-          ))}
+          {filtered.map((e, i) => {
+            const bannerImage = EVENT_BANNER_IMAGES[e.id];
+            return (
+              <Link
+                key={e.id}
+                href={`/events/${e.id}`}
+                className="block group animate-[fade-slide-up_400ms_ease-out_both]"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <div
+                  className="relative aspect-[16/9] rounded-xl mb-2 border border-border overflow-hidden transition-transform group-hover:-translate-y-1 group-hover:shadow-lg"
+                  style={bannerImage ? undefined : { background: e.bannerGradient }}
+                >
+                  {bannerImage && (
+                    <Image
+                      src={bannerImage}
+                      alt={e.title}
+                      fill
+                      className="object-cover"
+                      sizes="(min-width: 1024px) 280px, 45vw"
+                    />
+                  )}
+                </div>
+                <p className="text-sm font-semibold line-clamp-2 group-hover:text-brand">
+                  {e.title}
+                </p>
+                <p className="text-xs text-muted mt-0.5">{e.period}</p>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

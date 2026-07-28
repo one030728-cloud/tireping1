@@ -1,14 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
-import { EVENTS } from "@/lib/mockData";
+import { EVENTS, EVENT_BANNER_IMAGES } from "@/lib/mockData";
 
 function EventDetailContent() {
   const params = useParams<{ id: string }>();
   const event = EVENTS.find((e) => e.id === params.id);
+  const bannerImage = event && EVENT_BANNER_IMAGES[event.id];
 
   if (!event) {
     return (
@@ -27,9 +29,12 @@ function EventDetailContent() {
         <ChevronLeft size={16} /> 이벤트 목록
       </Link>
       <div
-        className="h-32 md:h-44 lg:h-56 rounded-2xl mb-5 flex items-end p-5"
-        style={{ background: event.bannerGradient }}
+        className="relative h-32 md:h-44 lg:h-56 rounded-2xl mb-5 flex items-end p-5 overflow-hidden"
+        style={bannerImage ? undefined : { background: event.bannerGradient }}
       >
+        {bannerImage && (
+          <Image src={bannerImage} alt={event.title} fill priority className="object-cover" sizes="100vw" />
+        )}
         <span
           className={`text-xs font-bold px-2.5 py-1.5 rounded-full ${
             event.status === "ongoing"

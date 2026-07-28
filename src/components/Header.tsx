@@ -6,16 +6,18 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronRight, LogOut, Megaphone, Menu, MessageCircle, X } from "lucide-react";
+import { ChevronRight, LogOut, Megaphone, Menu, MessageCircle, Search, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { GNB_LINKS, GOODS_CATEGORIES, MYPAGE_LINKS, SIDEBAR_LINKS } from "@/lib/nav";
-import { NOTICES } from "@/lib/mockData";
+import { MANUFACTURERS, NOTICES } from "@/lib/mockData";
 
 const GUEST_NAV_LINKS = [
   { href: "/factory-price", label: "공장도가 확인" },
   { href: "/main", label: "타이어 구매" },
   { href: "/sell", label: "타이어판매" },
+  { href: "/goods", label: "정비용품 구매" },
   { href: "/events?tab=ongoing", label: "이벤트" },
+  { href: "/exhibition", label: "기획전" },
 ];
 
 export default function Header() {
@@ -23,8 +25,18 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
+  const [searchManufacturer, setSearchManufacturer] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
   const pathname = usePathname();
+
+  function handleGuestSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (searchManufacturer) params.set("manufacturer", searchManufacturer);
+    if (searchQuery) params.set("size", searchQuery);
+    router.push(`/login?redirect=/products${params.toString() ? `?${params.toString()}` : ""}`);
+  }
 
   const LAST_SEEN_NOTICE_KEY = "tirezone_last_seen_notice";
 
@@ -60,7 +72,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 header-glass">
-      <div className="max-w-[1240px] mx-auto flex items-center justify-between px-4 h-16 gap-6">
+      <div className="max-w-[1240px] mx-auto flex items-center justify-between px-4 h-20 gap-6">
         <div className="flex items-center gap-6">
           <button
             aria-label="메뉴 열기"
@@ -70,13 +82,13 @@ export default function Header() {
             <Menu size={22} />
           </button>
 
-          <Link href={user ? "/main" : "/"} className="flex items-center shrink-0">
+          <Link href={user ? "/main" : "/"} className="flex items-center shrink-0 py-2">
             <Image
               src="/logo.svg"
               alt="타이어존"
-              width={176}
-              height={51}
-              className="h-9 w-auto"
+              width={220}
+              height={64}
+              className="h-14 w-auto"
               priority
             />
           </Link>
@@ -151,20 +163,36 @@ export default function Header() {
               })}
             </nav>
           ) : (
-            <nav className="hidden lg:flex items-center gap-5">
-              {GUEST_NAV_LINKS.map((link) => {
-                const active = pathname === link.href.split("?")[0];
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`text-sm font-medium ${active ? "text-brand" : "text-foreground/70 hover:text-brand"}`}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </nav>
+            <form
+              onSubmit={handleGuestSearch}
+              className="hidden md:flex items-center border border-border rounded-lg overflow-hidden h-10"
+            >
+              <select
+                value={searchManufacturer}
+                onChange={(e) => setSearchManufacturer(e.target.value)}
+                className="h-full px-2.5 text-sm border-0 border-r border-border bg-surface focus:outline-none"
+              >
+                <option value="">통합검색</option>
+                {MANUFACTURERS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="타이어 사이즈 또는 상품명 입력"
+                className="h-full px-3 text-sm border-0 focus:outline-none w-64"
+              />
+              <button
+                type="submit"
+                aria-label="검색"
+                className="h-full px-3 bg-brand text-white flex items-center justify-center hover:bg-[var(--brand-dark)]"
+              >
+                <Search size={16} />
+              </button>
+            </form>
           )}
         </div>
 
@@ -179,17 +207,6 @@ export default function Header() {
                 {NOTICES[0].title}
               </div>
             </div>
-          </div>
-        )}
-
-        {!user && (
-          <div className="hidden lg:flex items-center gap-4 text-xs text-muted">
-            <span>
-              등록 업체수 <b className="text-foreground">4,612</b>
-            </span>
-            <span>
-              누적 거래수량 <b className="text-foreground">716,642</b>
-            </span>
           </div>
         )}
 
@@ -276,6 +293,35 @@ export default function Header() {
           )}
         </div>
       </div>
+
+      {!user && (
+        <div className="hidden lg:block border-t border-border">
+          <div className="max-w-[1240px] mx-auto flex items-center justify-between px-4 h-11">
+            <nav className="flex items-center gap-5">
+              {GUEST_NAV_LINKS.map((link) => {
+                const active = pathname === link.href.split("?")[0];
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`text-sm font-medium ${active ? "text-brand" : "text-foreground/70 hover:text-brand"}`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="flex items-center gap-4 text-xs text-muted">
+              <span>
+                등록 업체수 <b className="text-foreground">4,612</b>
+              </span>
+              <span>
+                누적 거래수량 <b className="text-foreground">716,642</b>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}>
         <Dialog.Portal>
