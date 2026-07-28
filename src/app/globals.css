@@ -259,6 +259,14 @@ body {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+
+  .hero-carousel-motion {
+    transition-duration: 320ms !important;
+  }
+
+  .hero-carousel-progress {
+    animation-duration: var(--carousel-progress-duration, 4s) !important;
+  }
 }
 
 @keyframes ticker {
@@ -267,6 +275,15 @@ body {
   }
   to {
     left: -100%;
+  }
+}
+
+@keyframes carousel-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }
 

@@ -124,6 +124,12 @@ export default function Carousel({
       onTouchStart={() => {
         pausedRef.current = true;
       }}
+      onTouchEnd={() => {
+        pausedRef.current = false;
+      }}
+      onTouchCancel={() => {
+        pausedRef.current = false;
+      }}
     >
       <div
         ref={trackRef}
@@ -141,7 +147,9 @@ export default function Carousel({
         {children.map((child, i) => (
           <div
             key={i}
-            className="snap-start shrink-0 animate-[fade-slide-up_400ms_ease-out_both]"
+            className={`snap-start shrink-0 animate-[fade-slide-up_400ms_ease-out_both] transition-[opacity,transform] duration-300 lg:scale-100 lg:opacity-100 ${
+              i === activeIndex ? "scale-100 opacity-100" : "scale-[0.985] opacity-65"
+            }`}
             style={{ animationDelay: `${i * 60}ms` }}
           >
             {child}
@@ -154,7 +162,7 @@ export default function Carousel({
             <span
               key={i}
               className={`h-1.5 rounded-full transition-all ${
-                i === activeIndex ? "w-4 bg-brand" : "w-1.5 bg-border-strong"
+                i === activeIndex ? "w-6 bg-brand" : "w-1.5 bg-border-strong/80"
               }`}
             />
           ))}

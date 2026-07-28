@@ -8,11 +8,13 @@ export default function HeroCarousel({
   autoPlayInterval = 4000,
   className = "",
   showControls = true,
+  showIndicators = true,
 }: {
   slides: { key: string; content: ReactNode }[];
   autoPlayInterval?: number;
   className?: string;
   showControls?: boolean;
+  showIndicators?: boolean;
 }) {
   const [index, setIndex] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
@@ -107,11 +109,20 @@ export default function HeroCarousel({
       }}
     >
       <div
-        className={`flex h-full ${isDragging ? "" : "transition-transform duration-500 ease-out"}`}
+        className={`hero-carousel-motion flex h-full will-change-transform ${
+          isDragging
+            ? ""
+            : "transition-transform duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        }`}
         style={{ transform: `translateX(calc(-${index * 100}% + ${dragOffset}px))` }}
       >
-        {slides.map((s) => (
-          <div key={s.key} className="w-full h-full shrink-0">
+        {slides.map((s, slideIndex) => (
+          <div
+            key={s.key}
+            className={`hero-carousel-motion h-full w-full shrink-0 transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              slideIndex === index ? "scale-100 opacity-100" : "scale-[0.985] opacity-80"
+            }`}
+          >
             {s.content}
           </div>
         ))}
@@ -136,20 +147,31 @@ export default function HeroCarousel({
             <ChevronRight size={22} strokeWidth={2.5} />
           </button>
 
-          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-            {slides.map((s, i) => (
-              <button
-                key={s.key}
-                type="button"
-                onClick={() => go(i)}
-                aria-label={`Go to slide ${i + 1}`}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === index ? "w-5 bg-white" : "w-1.5 bg-white/50 hover:bg-white/75"
-                }`}
-              />
-            ))}
-          </div>
         </>
+      )}
+
+      {count > 1 && showIndicators && (
+        <div className="absolute bottom-2.5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/15 px-2 py-1 backdrop-blur-sm">
+          {slides.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => go(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              className={`h-1.5 overflow-hidden rounded-full shadow-sm transition-all duration-500 ${
+                i === index ? "w-9 bg-white/35" : "w-1.5 bg-white/55 hover:bg-white/80"
+              }`}
+            >
+              {i === index && (
+                <span
+                  key={`${s.key}-${index}`}
+                  className="hero-carousel-progress block h-full w-full origin-left animate-[carousel-progress_linear_forwards] rounded-full bg-white"
+                  style={{ animationDuration: `${autoPlayInterval}ms` }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

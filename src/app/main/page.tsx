@@ -9,17 +9,13 @@ import {
   ChevronRight,
   CircleDot,
   Clock,
-  Factory,
-  Home,
-  PackageSearch,
   Search,
-  ShoppingCart,
   ThumbsUp,
-  UserRound,
 } from "lucide-react";
 import HeroCarousel from "@/components/HeroCarousel";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import RequireAuth from "@/components/RequireAuth";
+import Carousel from "@/components/Carousel";
 import type { Tire } from "@/lib/types";
 import {
   DIRECT_NOTICE,
@@ -33,15 +29,19 @@ import {
 } from "@/lib/mockData";
 import { useOrders } from "@/lib/orders";
 
-function DashboardTireCard({ tire }: { tire: Tire }) {
+function DashboardTireCard({ tire, mobile = false }: { tire: Tire; mobile?: boolean }) {
   return (
     <Link
       href={`/products/${tire.id}`}
-      className="w-[145px] shrink-0 flex flex-col rounded-xl text-[#333] transition-[transform,filter] duration-200 active:scale-[0.975] active:brightness-[0.98] hover:text-brand"
+      className={`shrink-0 flex flex-col rounded-2xl text-[#333] transition-[transform,filter] duration-200 active:scale-[0.975] active:brightness-[0.98] hover:text-brand ${
+        mobile ? "w-[174px]" : "w-[145px]"
+      }`}
     >
       <ImagePlaceholder
         manufacturer={tire.manufacturer}
-        className="h-[86px] w-[145px] mb-2.5 !rounded-[8px] !border-0 !bg-[#f6f6f6] p-3"
+        className={`mb-3 !border-0 bg-gradient-to-b from-white via-[#fafafa] to-[#f0f3f7] p-4 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.03)] ${
+          mobile ? "h-[106px] w-[174px] !rounded-2xl" : "h-[86px] w-[145px] !rounded-[8px]"
+        }`}
       />
       <span className="text-[13px] text-[#555] text-center mb-2">{tire.manufacturer}</span>
       <p className="h-[37px] text-[16px] font-semibold leading-[18px] line-clamp-2">{tire.model}</p>
@@ -138,48 +138,15 @@ function MobileProductSection({
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain px-4 pb-2 [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
+      <Carousel
+        autoPlayInterval={kind === "event" ? 3200 : 3600}
+        className="max-w-none px-4"
+      >
         {tires.map((tire) => (
-          <div key={tire.id} className="snap-start">
-            <DashboardTireCard tire={tire} />
-          </div>
+          <DashboardTireCard key={tire.id} tire={tire} mobile />
         ))}
-      </div>
+      </Carousel>
     </section>
-  );
-}
-
-function MobileBottomNav() {
-  const items = [
-    { href: "/main", label: "홈", Icon: Home, active: true },
-    { href: "/factory-price", label: "공장도가", Icon: Factory },
-    { href: "/products", label: "상품목록", Icon: PackageSearch },
-    { href: "/cart", label: "장바구니", Icon: ShoppingCart },
-    { href: "/mypage/status", label: "마이", Icon: UserRound },
-  ];
-
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid h-[66px] grid-cols-5 border-t border-white/70 bg-white/85 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl lg:hidden">
-      {items.map(({ href, label, Icon, active }) => (
-        <Link
-          key={href}
-          href={href}
-          className={`relative flex flex-col items-center justify-center gap-0.5 text-[11px] transition-transform duration-200 active:scale-95 ${
-            active ? "font-bold text-brand" : "text-[#727780]"
-          }`}
-        >
-          {active && <span className="absolute top-0 h-[3px] w-8 rounded-b-full bg-brand" />}
-          <span
-            className={`flex h-8 w-10 items-center justify-center rounded-2xl transition-all duration-300 ${
-              active ? "bg-blue-50 shadow-[0_4px_12px_rgba(37,99,235,0.14)]" : ""
-            }`}
-          >
-            <Icon size={20} strokeWidth={active ? 2.3 : 1.8} />
-          </span>
-          {label}
-        </Link>
-      ))}
-    </nav>
   );
 }
 
@@ -446,7 +413,7 @@ function MainContent() {
           </form>
         </section>
 
-        <section className="mobile-reveal overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+        <section className="mobile-reveal order-3 overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between border-b border-[#edf0f4] px-4 py-3.5">
             <h2 className="flex items-center gap-2 text-[16px] font-bold">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-brand">
@@ -483,7 +450,7 @@ function MainContent() {
           </div>
         </section>
 
-        <div className="mobile-reveal">
+        <div className="mobile-reveal order-1">
           <MobileProductSection
           title="이벤트 진행 중 타이어"
           href="/products?tag=EVENT"
@@ -491,7 +458,7 @@ function MainContent() {
             kind="event"
           />
         </div>
-        <div className="mobile-reveal">
+        <div className="mobile-reveal order-2">
           <MobileProductSection
           title="판매 인기 타이어"
           href="/products"
@@ -500,15 +467,13 @@ function MainContent() {
           />
         </div>
 
-        <div className="mobile-reveal [&_.card]:rounded-2xl">{directBanner}</div>
-        <div className="mobile-reveal flex flex-col gap-5">
+        <div className="mobile-reveal order-4 [&_.card]:rounded-2xl">{directBanner}</div>
+        <div className="mobile-reveal order-5 flex flex-col gap-5">
           {noticesBox}
           {faqBox}
           {updateBox}
         </div>
       </div>
-      <MobileBottomNav />
-
       {/* Desktop: tireping-style full-width dashboard */}
       <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_392px] gap-x-[26px] gap-y-[30px] pl-[50px] pr-[20px] pt-[35px] pb-10">
         <div className="[&>div]:h-[388px] [&>div]:rounded-[16px] [&>div]:shadow-none">{banner}</div>

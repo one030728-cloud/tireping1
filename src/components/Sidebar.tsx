@@ -93,7 +93,7 @@ export default function Sidebar() {
         className="relative mt-auto mx-5 mb-2 block h-[110px] overflow-hidden"
       >
         <Image
-          src="/banners/tireping-grand-event.png"
+          src="/banners/continental-big-sale.jpg"
           alt="진행중 이벤트"
           fill
           sizes="200px"

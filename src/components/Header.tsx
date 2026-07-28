@@ -89,7 +89,7 @@ export default function Header() {
       }`}
     >
       <div
-        className={`mx-auto flex items-center justify-between gap-6 ${
+        className={`relative mx-auto flex items-center justify-between gap-6 ${
           isMainDashboard
             ? `${isScrolled ? "h-14" : "h-16"} max-w-none px-4 transition-[height] duration-300 lg:h-[70px] lg:px-5`
             : "h-16 max-w-[1680px] px-4 lg:h-20"
@@ -106,7 +106,9 @@ export default function Header() {
 
           <Link
             href={user ? "/main" : "/"}
-            className={`flex items-center shrink-0 py-2 ${isMainDashboard ? "lg:w-[234px]" : ""}`}
+            className={`absolute left-1/2 flex -translate-x-1/2 items-center py-1 lg:static lg:translate-x-0 lg:py-2 ${
+              isMainDashboard ? "lg:w-[234px]" : ""
+            }`}
           >
             <Image
               src="/logo.svg"
@@ -115,8 +117,8 @@ export default function Header() {
               height={64}
               className={
                 isMainDashboard
-                  ? `${isScrolled ? "h-9" : "h-10"} w-auto transition-[height] duration-300 lg:h-12`
-                  : "h-10 w-auto lg:h-14"
+                  ? `${isScrolled ? "h-10" : "h-12"} w-auto transition-[height] duration-300 lg:h-12`
+                  : "h-12 w-auto lg:h-14"
               }
               priority
             />
