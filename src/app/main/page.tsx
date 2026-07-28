@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronRight, Clock, Search } from "lucide-react";
-import Carousel from "@/components/Carousel";
 import HeroCarousel from "@/components/HeroCarousel";
 import RequireAuth from "@/components/RequireAuth";
 import TireCard from "@/components/TireCard";
@@ -160,15 +159,15 @@ function MainContent() {
           <span className="w-1 h-4 rounded-full bg-gradient-to-b from-accent-light to-accent" />
           이벤트 진행 중 타이어
         </h2>
-        <Link href="/products" className="text-xs text-muted flex items-center">
+        <Link href="/products?tag=EVENT" className="text-xs text-muted flex items-center">
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <Carousel autoPlayInterval={3000}>
+      <div className="grid grid-cols-2 gap-3">
         {eventTires.map((t) => (
-          <TireCard key={t.id} tire={t} />
+          <TireCard key={t.id} tire={t} fixedWidth={false} />
         ))}
-      </Carousel>
+      </div>
     </section>
   );
 
@@ -183,11 +182,11 @@ function MainContent() {
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <Carousel autoPlayInterval={3000}>
+      <div className="grid grid-cols-2 gap-3">
         {bestTires.map((t) => (
-          <TireCard key={t.id} tire={t} />
+          <TireCard key={t.id} tire={t} fixedWidth={false} />
         ))}
-      </Carousel>
+      </div>
     </section>
   );
 

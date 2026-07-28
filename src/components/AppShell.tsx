@@ -16,7 +16,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const showFooter = pathname !== "/login";
 
   return (
-    <div className="flex-1 w-full max-w-[1240px] mx-auto flex flex-col">
+    <div className="flex-1 w-full max-w-[1440px] mx-auto flex flex-col">
       <div className="flex-1 flex">
         {showSidebar && <Sidebar />}
         <main className="flex-1 min-w-0">

@@ -6,7 +6,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { EVENTS, EVENT_BANNER_IMAGES, TIRES } from "@/lib/mockData";
-import Carousel from "@/components/Carousel";
 import GuestTireCard from "@/components/GuestTireCard";
 import HeroCarousel from "@/components/HeroCarousel";
 import LoadingState from "@/components/LoadingState";
@@ -74,11 +73,11 @@ function GuestHome() {
               이벤트 진행 중 타이어
             </h2>
           </div>
-          <Carousel autoPlayInterval={3000}>
+          <div className="grid grid-cols-2 gap-3">
             {eventTires.map((t) => (
-              <GuestTireCard key={t.id} tire={t} />
+              <GuestTireCard key={t.id} tire={t} fixedWidth={false} />
             ))}
-          </Carousel>
+          </div>
         </section>
 
         <section className="lg:card lg:p-4">
@@ -91,11 +90,11 @@ function GuestHome() {
               판매 인기 타이어
             </h2>
           </div>
-          <Carousel autoPlayInterval={3000}>
+          <div className="grid grid-cols-2 gap-3">
             {bestTires.map((t) => (
-              <GuestTireCard key={t.id} tire={t} />
+              <GuestTireCard key={t.id} tire={t} fixedWidth={false} />
             ))}
-          </Carousel>
+          </div>
         </section>
       </div>
 

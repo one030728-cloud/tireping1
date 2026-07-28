@@ -72,7 +72,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-40 header-glass">
-      <div className="max-w-[1240px] mx-auto flex items-center justify-between px-4 h-20 gap-6">
+      <div className="max-w-[1440px] mx-auto flex items-center justify-between px-4 h-20 gap-6">
         <div className="flex items-center gap-6">
           <button
             aria-label="메뉴 열기"
@@ -296,7 +296,7 @@ export default function Header() {
 
       {!user && (
         <div className="hidden lg:block border-t border-border">
-          <div className="max-w-[1240px] mx-auto flex items-center justify-between px-4 h-11">
+          <div className="max-w-[1440px] mx-auto flex items-center justify-between px-4 h-11">
             <nav className="flex items-center gap-5">
               {GUEST_NAV_LINKS.map((link) => {
                 const active = pathname === link.href.split("?")[0];

@@ -202,7 +202,7 @@ function CustomerContent() {
   const tab = searchParams.get("tab") ?? "notice";
 
   return (
-    <div className="px-4 py-5 max-w-[1240px] mx-auto flex gap-6">
+    <div className="px-4 py-5 max-w-[1440px] mx-auto flex gap-6">
       <aside className="hidden lg:flex w-48 shrink-0 flex-col gap-1 py-1">
         <p className="px-3 pb-2 text-xs font-semibold text-muted flex items-center gap-1.5">
           <Megaphone size={13} /> 고객센터
