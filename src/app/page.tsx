@@ -73,7 +73,7 @@ function GuestHome() {
               이벤트 진행 중 타이어
             </h2>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
             {eventTires.map((t) => (
               <GuestTireCard key={t.id} tire={t} fixedWidth={false} />
             ))}
@@ -90,7 +90,7 @@ function GuestHome() {
               판매 인기 타이어
             </h2>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
             {bestTires.map((t) => (
               <GuestTireCard key={t.id} tire={t} fixedWidth={false} />
             ))}

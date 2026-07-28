@@ -18,23 +18,19 @@ export default function TireCard({
         className="w-full aspect-[4/3] mb-2 transition-transform duration-300 group-hover:scale-[1.04]"
         manufacturer={tire.manufacturer}
       />
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted">{tire.manufacturer}</span>
-        {tire.tag && (
-          <span className="text-[11px] font-bold px-1.5 py-0.5 rounded border border-brand text-brand">
-            {tire.tag}
-          </span>
-        )}
-      </div>
-      <p className="text-sm font-semibold leading-snug line-clamp-2">{tire.model}</p>
+      <span className="text-xs text-muted">{tire.manufacturer}</span>
+      <p className="text-sm font-semibold leading-snug line-clamp-2 min-h-[2.5em] break-words">{tire.model}</p>
       <p className="text-xs text-muted">
         {tire.width} / {tire.ratio} R {tire.rim} · DOT {tire.dot}
       </p>
-      <div className="mt-auto pt-1.5 border-t border-border/70 flex items-center gap-1.5 tabular-nums">
-        <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent shrink-0">
-          {tire.discountRate}%
-        </span>
-        <span className="font-extrabold text-sm">{tire.price.toLocaleString()}원</span>
+      <div className="mt-auto pt-1.5 flex items-center gap-1.5 flex-wrap tabular-nums">
+        <span className="font-extrabold text-base text-brand shrink-0">{tire.discountRate}%</span>
+        {tire.tag && (
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border border-brand text-brand shrink-0">
+            {tire.tag}
+          </span>
+        )}
+        <span className="font-extrabold text-base">{tire.price.toLocaleString()}원</span>
       </div>
     </Link>
   );

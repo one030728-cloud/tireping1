@@ -32,7 +32,7 @@ export default function HeroCarousel({
 
   return (
     <div
-      className={`relative rounded-2xl overflow-hidden h-32 md:h-44 lg:h-56 ${className}`}
+      className={`relative rounded-2xl overflow-hidden h-40 md:h-60 lg:h-80 ${className}`}
       onMouseEnter={() => {
         pausedRef.current = true;
       }}

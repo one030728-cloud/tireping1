@@ -163,7 +163,7 @@ function MainContent() {
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
         {eventTires.map((t) => (
           <TireCard key={t.id} tire={t} fixedWidth={false} />
         ))}
@@ -182,7 +182,7 @@ function MainContent() {
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
         {bestTires.map((t) => (
           <TireCard key={t.id} tire={t} fixedWidth={false} />
         ))}
