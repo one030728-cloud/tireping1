@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import "pretendard/dist/web/variable/pretendardvariable.css";
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { CartProvider } from "@/lib/cart";

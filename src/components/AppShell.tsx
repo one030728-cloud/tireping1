@@ -22,7 +22,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <div
       className={`flex-1 w-full flex flex-col ${
         isMainDashboard ? "max-w-none" : "max-w-[1680px] mx-auto"
-      } ${showAppShell ? "pb-[80px] lg:pb-0" : ""}`}
+      } ${showAppShell ? "pb-[80px] lg:pb-0" : ""} ${isMainDashboard ? "dashboard-canvas" : ""}`}
     >
       <div className="flex-1 flex">
         {showSidebar && <Sidebar />}
