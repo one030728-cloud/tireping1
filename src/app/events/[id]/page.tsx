@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import RequireAuth from "@/components/RequireAuth";
 import { EVENTS, EVENT_BANNER_IMAGES } from "@/lib/mockData";
 
 function EventDetailContent() {
@@ -53,9 +52,5 @@ function EventDetailContent() {
 }
 
 export default function EventDetailPage() {
-  return (
-    <RequireAuth>
-      <EventDetailContent />
-    </RequireAuth>
-  );
+  return <EventDetailContent />;
 }

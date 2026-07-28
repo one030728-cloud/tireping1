@@ -16,8 +16,8 @@ import {
   Undo2,
   User,
 } from "lucide-react";
-import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
+import { useAuth } from "@/lib/auth";
 import { CUSTOMER_LINKS } from "@/lib/nav";
 import { FAQ_CATEGORIES, FAQ_ITEMS, NOTICES, UPDATE_LOGS } from "@/lib/mockData";
 
@@ -198,6 +198,7 @@ function UpdateLogBoard() {
 }
 
 function CustomerContent() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") ?? "notice";
 
@@ -244,7 +245,17 @@ function CustomerContent() {
         {tab === "faq" ? (
           <FaqBoard />
         ) : tab === "qna" ? (
-          <QnaBoard />
+          user ? (
+            <QnaBoard />
+          ) : (
+            <div className="card px-5 py-16 text-center">
+              <h1 className="text-xl font-extrabold">1:1 문의는 회원 전용입니다</h1>
+              <p className="mt-2 text-sm text-muted">로그인 후 문의 등록과 답변 내역을 확인할 수 있습니다.</p>
+              <Link href="/login?redirect=/customer?tab=qna" className="btn-primary mt-5 h-11 px-6 text-sm">
+                로그인
+              </Link>
+            </div>
+          )
         ) : tab === "update" ? (
           <UpdateLogBoard />
         ) : (
@@ -257,10 +268,8 @@ function CustomerContent() {
 
 export default function CustomerPage() {
   return (
-    <RequireAuth>
-      <Suspense fallback={<LoadingState />}>
-        <CustomerContent />
-      </Suspense>
-    </RequireAuth>
+    <Suspense fallback={<LoadingState />}>
+      <CustomerContent />
+    </Suspense>
   );
 }

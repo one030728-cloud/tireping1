@@ -23,8 +23,8 @@ export default function Sidebar() {
   const [mypageOpen, setMypageOpen] = useState(true);
 
   return (
-    <aside className="hidden lg:flex w-60 shrink-0 flex-col bg-white border-r border-border sticky top-[71px] self-start h-[calc(100vh-71px)] overflow-y-auto">
-      <div className="flex flex-col py-4">
+    <aside className="sticky top-[71px] hidden h-[calc(100vh-71px)] w-[224px] shrink-0 self-start flex-col overflow-y-auto border-r border-[#e7eaf0] bg-white lg:flex">
+      <div className="flex flex-col px-3 py-4">
         {SIDEBAR_LINKS.map((link, index) => {
           const active =
             pathname === "/main"
@@ -35,13 +35,13 @@ export default function Sidebar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`relative flex items-center gap-2.5 px-5 h-[46px] text-[15px] font-medium border-b border-border/70 ${
+              className={`relative flex h-[44px] items-center gap-2.5 rounded-xl px-3.5 text-[14px] font-medium ${
                 active
-                  ? "bg-[#eaf3ff] text-[#1671f9]"
-                  : "text-[#252525] hover:bg-[#f7f9fc] hover:text-brand"
+                  ? "bg-blue-50/80 font-semibold text-brand before:absolute before:left-0 before:h-5 before:w-[3px] before:rounded-r-full before:bg-brand"
+                  : "text-[#3c424a] hover:bg-[#f7f9fc] hover:text-brand"
               }`}
             >
-              <Icon size={19} strokeWidth={1.8} className={active ? "fill-current" : ""} />
+              <Icon size={18} strokeWidth={active ? 2 : 1.7} />
               {link.label}
             </Link>
           );
@@ -50,7 +50,7 @@ export default function Sidebar() {
         <button
           onClick={() => setMypageOpen((v) => !v)}
           aria-expanded={mypageOpen}
-          className="px-5 h-[48px] text-[15px] font-semibold text-foreground flex items-center justify-between hover:text-brand border-b border-border/70"
+          className="mt-1 flex h-[44px] items-center justify-between rounded-xl px-3.5 text-[14px] font-semibold text-foreground hover:bg-[#f7f9fc] hover:text-brand"
         >
           <span className="flex items-center gap-2.5">
             <UserRound size={19} strokeWidth={1.8} />
@@ -67,14 +67,14 @@ export default function Sidebar() {
           }`}
         >
           <div className="overflow-hidden">
-            <div className="ml-[27px] border-l border-[#cfd4dc] py-1">
+            <div className="ml-[22px] border-l border-[#d8dde5] py-1">
               {MYPAGE_LINKS.map((link) => {
                 const active = pathname === link.href;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`relative block px-5 py-2 text-[13px] ${
+                    className={`relative block rounded-r-lg px-4 py-2 text-[12px] ${
                       active ? "text-brand font-semibold" : "text-[#666] hover:text-brand"
                     }`}
                   >
@@ -90,7 +90,7 @@ export default function Sidebar() {
 
       <Link
         href="/events?tab=ongoing"
-        className="relative mt-auto mx-5 mb-2 block h-[110px] overflow-hidden"
+        className="relative mx-4 mb-4 mt-auto block h-[102px] overflow-hidden rounded-xl border border-[#eceff3] shadow-[0_8px_22px_-18px_rgba(15,23,42,0.5)]"
       >
         <Image
           src="/banners/continental-big-sale.jpg"

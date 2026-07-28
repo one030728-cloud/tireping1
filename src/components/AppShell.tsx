@@ -9,12 +9,12 @@ import ScrollToTopButton from "./ScrollToTopButton";
 import MobileBottomNav from "./MobileBottomNav";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { loading } = useAuth();
+  const { user, loading } = useAuth();
   const pathname = usePathname();
   const hasOwnSidebar = pathname.startsWith("/goods") || pathname.startsWith("/customer");
   const showAppShell = pathname !== "/login" && pathname !== "/";
   const showBreadcrumb = showAppShell;
-  const showSidebar = showAppShell && !hasOwnSidebar;
+  const showSidebar = showAppShell && !hasOwnSidebar && Boolean(user);
   const showFooter = pathname !== "/login";
   const isMainDashboard = pathname === "/main";
 

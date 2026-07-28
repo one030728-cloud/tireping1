@@ -9,6 +9,7 @@
   --brand: #2563eb;
   --brand-light: #3b82f6;
   --brand-dark: #1d4ed8;
+  --brand-warm: #f58220;
   --accent: #e11d48;
   --accent-light: #f43f5e;
   --success: #10b981;
@@ -32,6 +33,7 @@
   --color-brand: var(--brand);
   --color-brand-light: var(--brand-light);
   --color-brand-dark: var(--brand-dark);
+  --color-brand-warm: var(--brand-warm);
   --color-accent: var(--accent);
   --color-accent-light: var(--accent-light);
   --color-success: var(--success);
@@ -94,7 +96,7 @@ body {
     font-weight: 700;
     border-radius: 0.5rem;
     border: 1px solid transparent;
-    box-shadow: none;
+    box-shadow: 0 6px 16px -8px rgba(37, 99, 235, 0.7);
     transition:
       background-color 150ms ease,
       transform 150ms ease;
@@ -102,6 +104,7 @@ body {
 
   .btn-primary:hover {
     background: var(--brand-dark);
+    box-shadow: 0 8px 20px -9px rgba(29, 78, 216, 0.75);
   }
 
   .btn-primary:active {

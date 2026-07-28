@@ -125,7 +125,7 @@ export default function Header() {
             />
           </Link>
 
-          {user || isAppScreen ? (
+          {user ? (
             <nav className="hidden lg:flex items-center gap-5">
               {GNB_LINKS.map((link) => {
                 const isMain = link.href === "/main";

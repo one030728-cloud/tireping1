@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CircleDot,
   Clock,
+  LockKeyhole,
   Search,
   ThumbsUp,
 } from "lucide-react";
@@ -36,41 +37,53 @@ function DashboardTireCard({ tire, mobile = false }: { tire: Tire; mobile?: bool
   return (
     <Link
       href={`/products/${tire.id}`}
-      className={`shrink-0 flex flex-col rounded-2xl text-[#333] transition-[transform,filter] duration-200 active:scale-[0.975] active:brightness-[0.98] hover:text-brand ${
-        mobile ? "w-[174px]" : "w-[145px]"
+      className={`group shrink-0 flex flex-col rounded-2xl text-[#20242a] transition-[transform,filter] duration-200 active:scale-[0.975] active:brightness-[0.98] ${
+        mobile ? "w-[168px]" : "w-[145px]"
       }`}
     >
       <ImagePlaceholder
         manufacturer={tire.manufacturer}
-        className={`mb-3 !border-0 bg-gradient-to-b from-white via-[#fafafa] to-[#f0f3f7] p-4 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.03)] ${
-          mobile ? "h-[106px] w-[174px] !rounded-2xl" : "h-[86px] w-[145px] !rounded-[8px]"
+        className={`mb-3 !border-0 bg-gradient-to-b from-white via-[#fbfcfd] to-[#eef2f6] p-4 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.045)] transition-transform duration-300 group-hover:-translate-y-0.5 ${
+          mobile ? "h-[104px] w-[168px] !rounded-2xl" : "h-[92px] w-[145px] !rounded-xl"
         }`}
       />
-      <span className="text-[13px] text-[#555] text-center mb-2">{tire.manufacturer}</span>
-      <p className="h-[37px] text-[16px] font-semibold leading-[18px] line-clamp-2">{tire.model}</p>
-      <p className="mt-2 text-[13px] leading-[15px] text-[#666]">
-        {tire.width} / {tire.ratio} R {tire.rim}
-        <br />
-        DOT {tire.dot}
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="truncate text-[11px] font-semibold text-[#7a818c]">{tire.manufacturer}</span>
+        {tire.tag && (
+          <span
+            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide ${
+              tire.tag === "EVENT"
+                ? "bg-orange-50 text-[#e66f0e]"
+                : "bg-blue-50 text-brand"
+            }`}
+          >
+            {tire.tag}
+          </span>
+        )}
+      </div>
+      <p className="h-[38px] text-[15px] font-bold leading-[19px] tracking-[-0.02em] line-clamp-2 transition-colors group-hover:text-brand">
+        {tire.model}
       </p>
-      <div className="mt-2.5 pt-2 border-t border-[#e4e4e4] flex items-end gap-1.5 whitespace-nowrap">
-        <strong className="text-[35px] leading-none tracking-[-0.06em] text-[#1748c7]">
+      <p className="mt-1.5 text-[12px] leading-[17px] text-[#717782]">
+        {tire.width} / {tire.ratio} R {tire.rim} · DOT {tire.dot}
+      </p>
+      <div className="mt-2.5 flex min-h-[44px] items-end gap-2 border-t border-[#e7eaf0] pt-2.5 whitespace-nowrap">
+        <strong className="text-[28px] font-extrabold leading-none tracking-[-0.055em] text-[#1748c7]">
           {tire.discountRate}
-          <span className="text-[16px] ml-0.5">%</span>
+          <span className="ml-0.5 text-[13px]">%</span>
         </strong>
-        <div className="pb-0.5">
-          {tire.tag && (
-            <span className="block w-fit rounded-full border border-[#2780ff] px-1.5 text-[11px] leading-[16px] font-semibold text-[#1671f9]">
-              {tire.tag}
-            </span>
-          )}
+        <div className="min-w-0 pb-0.5">
           {user ? (
-            <strong className="text-[17px] leading-[20px] text-[#444]">
+            <strong className="block text-[16px] font-extrabold leading-[20px] text-[#252a31]">
               {tire.price.toLocaleString()}
-              <span className="text-[12px] ml-0.5">원</span>
+              <span className="ml-0.5 text-[11px] font-semibold">원</span>
             </strong>
           ) : (
-            <span className="text-[12px] font-bold text-brand">로그인 후 가격 확인</span>
+            <span className="block text-[11px] font-bold leading-[15px] text-brand">
+              로그인 후
+              <br />
+              회원가 확인
+            </span>
           )}
         </div>
       </div>
@@ -90,24 +103,23 @@ function DesktopProductSection({
   kind: "event" | "best";
 }) {
   const Icon = kind === "event" ? Bell : ThumbsUp;
+  const { user } = useAuth();
 
   return (
-    <section className="h-[330px] min-w-0 overflow-hidden rounded-[16px] border border-[#e5e7eb] bg-white px-7 pt-5 shadow-[0_2px_7px_rgba(0,0,0,0.03)]">
+    <section className="h-[350px] min-w-0 overflow-hidden rounded-[18px] border border-[#e3e7ed] bg-white px-6 pt-5 shadow-[0_8px_26px_-20px_rgba(15,23,42,0.32)]">
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="flex items-center gap-1.5 text-[20px] font-medium">
-          <Icon size={21} strokeWidth={1.6} />
+        <h2 className="flex items-center gap-2 text-[19px] font-bold tracking-[-0.025em]">
+          <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${kind === "event" ? "bg-orange-50 text-[#ee7b1a]" : "bg-blue-50 text-brand"}`}>
+            <Icon size={17} strokeWidth={1.8} />
+          </span>
           {title}
         </h2>
-        <Link href={href} className="flex items-center text-[13px] text-[#555] hover:text-brand">
+        <Link href={href} className="flex items-center text-[12px] font-medium text-[#777f8a] hover:text-brand">
           전체보기 <ChevronRight size={14} />
         </Link>
       </div>
-      <div
-        className={`flex gap-11 overflow-visible pl-6 ${
-          kind === "best" ? "-translate-x-[129px]" : ""
-        }`}
-      >
-        {tires.map((tire) => (
+      <div className={`grid gap-5 px-1 ${user ? "grid-cols-3" : "grid-cols-4"}`}>
+        {tires.slice(0, user ? 3 : 4).map((tire) => (
           <DashboardTireCard key={tire.id} tire={tire} />
         ))}
       </div>
@@ -129,12 +141,12 @@ function MobileProductSection({
   const Icon = kind === "event" ? Bell : ThumbsUp;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white py-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+    <section className="overflow-hidden rounded-[20px] border border-[#e3e7ed] bg-white py-4 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.35)]">
       <div className="mb-4 flex items-center justify-between px-4">
         <h2 className="flex items-center gap-2 text-[17px] font-bold">
           <span
             className={`flex h-8 w-8 items-center justify-center rounded-full ${
-              kind === "event" ? "bg-rose-50 text-rose-500" : "bg-blue-50 text-brand"
+              kind === "event" ? "bg-orange-50 text-[#ee7b1a]" : "bg-blue-50 text-brand"
             }`}
           >
             <Icon size={17} strokeWidth={1.8} />
@@ -159,6 +171,7 @@ function MobileProductSection({
 
 function MainContent() {
   const router = useRouter();
+  const { user } = useAuth();
   const [manufacturer, setManufacturer] = useState("");
   const [size, setSize] = useState("");
   const mobileFeedRef = useRef<HTMLDivElement>(null);
@@ -303,13 +316,23 @@ function MainContent() {
     />
   );
 
-  const directBanner = (
+  const directBanner = user ? (
     <Link href="/direct" className="card p-5 text-center block card-hover">
       <p className="text-sm text-muted mb-1">{DIRECT_NOTICE}</p>
       <h2 className="text-base font-extrabold">
         타이어 <span className="text-brand">당일 직배송</span> 주문으로~!
       </h2>
     </Link>
+  ) : (
+    <div className="card p-5 text-center">
+      <p className="text-sm text-muted mb-1">사업자 회원 전용 가격과 직배송 서비스를 이용해보세요.</p>
+      <h2 className="text-base font-extrabold">
+        로그인하면 <span className="text-brand">공장도가·재고·회원가</span>를 확인할 수 있습니다.
+      </h2>
+      <Link href="/login?redirect=/main" className="btn-primary mt-4 h-10 px-5 text-sm">
+        로그인하고 회원 혜택 보기
+      </Link>
+    </div>
   );
 
   const noticesBox = (
@@ -422,42 +445,70 @@ function MainContent() {
           </form>
         </section>
 
-        <section className="mobile-reveal order-3 overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-          <div className="flex items-center justify-between border-b border-[#edf0f4] px-4 py-3.5">
-            <h2 className="flex items-center gap-2 text-[16px] font-bold">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-brand">
-                <Clock size={17} />
-              </span>
-              최근 주문 내역
-            </h2>
-            <Link href="/orders" className="flex items-center text-xs text-[#777]">
-              전체보기 <ChevronRight size={14} />
-            </Link>
+        {!user && (
+          <div className="mobile-reveal grid grid-cols-3 divide-x divide-[#e7eaf0] rounded-2xl border border-[#e5e8ed] bg-white px-2 py-3 text-center shadow-[0_6px_20px_-18px_rgba(15,23,42,0.4)]">
+            <div>
+              <strong className="block text-[14px] text-[#20242a]">4,612</strong>
+              <span className="text-[10px] text-muted">등록 업체</span>
+            </div>
+            <div>
+              <strong className="block text-[14px] text-[#20242a]">716,642</strong>
+              <span className="text-[10px] text-muted">누적 거래</span>
+            </div>
+            <div>
+              <strong className="block text-[14px] text-[#20242a]">당일 가능</strong>
+              <span className="text-[10px] text-muted">직배송 서비스</span>
+            </div>
           </div>
-          <div className="divide-y divide-[#edf0f4]">
-            {recentOrders.map((order, index) => (
-              <Link
-                key={order.id}
-                href="/orders"
-                className="grid min-h-[48px] grid-cols-[56px_1fr_auto] items-center gap-2 px-4 text-[13px] active:bg-[#f7f9fc]"
-              >
-                <span className="text-[#777]">{order.id}</span>
-                <span className="truncate font-semibold text-[#075bea]">{order.model}</span>
-                <span
-                  className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
-                    index === 1
-                      ? "bg-slate-100 text-slate-500"
-                      : index === 2
-                        ? "bg-rose-50 text-rose-500"
-                        : "bg-emerald-50 text-emerald-500"
-                  }`}
-                >
-                  {order.status}
+        )}
+
+        {user ? (
+          <section className="mobile-reveal order-3 overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+            <div className="flex items-center justify-between border-b border-[#edf0f4] px-4 py-3.5">
+              <h2 className="flex items-center gap-2 text-[16px] font-bold">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-brand">
+                  <Clock size={17} />
                 </span>
+                최근 주문 내역
+              </h2>
+              <Link href="/orders" className="flex items-center text-xs text-[#777]">
+                전체보기 <ChevronRight size={14} />
               </Link>
-            ))}
-          </div>
-        </section>
+            </div>
+            <div className="divide-y divide-[#edf0f4]">
+              {recentOrders.map((order, index) => (
+                <Link
+                  key={order.id}
+                  href="/orders"
+                  className="grid min-h-[48px] grid-cols-[56px_1fr_auto] items-center gap-2 px-4 text-[13px] active:bg-[#f7f9fc]"
+                >
+                  <span className="text-[#777]">{order.id}</span>
+                  <span className="truncate font-semibold text-[#075bea]">{order.model}</span>
+                  <span
+                    className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+                      index === 1
+                        ? "bg-slate-100 text-slate-500"
+                        : index === 2
+                          ? "bg-rose-50 text-rose-500"
+                          : "bg-emerald-50 text-emerald-500"
+                    }`}
+                  >
+                    {order.status}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className="mobile-reveal order-3 rounded-2xl border border-blue-100 bg-gradient-to-br from-white to-blue-50 p-5 text-center shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+            <LockKeyhole size={24} className="mx-auto mb-2 text-brand" />
+            <h2 className="text-[16px] font-bold">주문 현황은 회원 전용입니다</h2>
+            <p className="mt-1 text-[13px] text-muted">로그인 후 주문·배송 현황을 안전하게 확인하세요.</p>
+            <Link href="/login?redirect=/main" className="btn-primary mt-4 h-10 w-full text-sm">
+              로그인
+            </Link>
+          </section>
+        )}
 
         <div className="mobile-reveal order-1">
           <MobileProductSection
@@ -484,7 +535,7 @@ function MainContent() {
         </div>
       </div>
       {/* Desktop: tireping-style full-width dashboard */}
-      <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_392px] gap-x-[26px] gap-y-[30px] pl-[50px] pr-[20px] pt-[35px] pb-10">
+      <div className="mx-auto hidden w-full max-w-[1480px] lg:grid grid-cols-[minmax(0,1fr)_380px] gap-x-6 gap-y-7 px-7 pt-8 pb-10">
         <div className="[&>div]:h-[388px] [&>div]:rounded-[16px] [&>div]:shadow-none">{banner}</div>
 
         <aside className="flex flex-col gap-[18px]">
@@ -523,6 +574,7 @@ function MainContent() {
             </form>
           </section>
 
+          {user ? (
           <section className="h-[202px] overflow-hidden rounded-[16px] border border-[#e5e7eb] bg-white px-7 pt-5 shadow-[0_2px_7px_rgba(0,0,0,0.03)]">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="flex items-center gap-1.5 text-[18px] font-medium">
@@ -556,9 +608,19 @@ function MainContent() {
               ))}
             </div>
           </section>
+          ) : (
+            <section className="flex h-[202px] flex-col items-center justify-center rounded-[16px] border border-blue-100 bg-gradient-to-br from-white to-blue-50 px-7 text-center shadow-[0_2px_7px_rgba(0,0,0,0.03)]">
+              <LockKeyhole size={25} className="mb-2 text-brand" />
+              <h2 className="text-[18px] font-semibold">회원 전용 주문 현황</h2>
+              <p className="mt-1 text-[13px] text-muted">로그인 후 최근 주문과 배송 상태를 확인하세요.</p>
+              <Link href="/login?redirect=/main" className="btn-primary mt-4 h-9 px-5 text-sm">
+                로그인
+              </Link>
+            </section>
+          )}
         </aside>
 
-        <div className="col-span-2 grid min-w-0 grid-cols-2 gap-6">
+        <div className="col-span-2 grid min-w-0 grid-cols-2 gap-5">
           <DesktopProductSection
             title="이벤트 진행 중 타이어"
             href="/products?tag=EVENT"

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Bell } from "lucide-react";
-import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
 import { EVENTS, EVENT_BANNER_IMAGES } from "@/lib/mockData";
 
@@ -93,10 +92,8 @@ function EventsContent() {
 
 export default function EventsPage() {
   return (
-    <RequireAuth>
-      <Suspense fallback={<LoadingState />}>
-        <EventsContent />
-      </Suspense>
-    </RequireAuth>
+    <Suspense fallback={<LoadingState />}>
+      <EventsContent />
+    </Suspense>
   );
 }
