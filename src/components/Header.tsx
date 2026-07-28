@@ -20,6 +20,14 @@ const GUEST_NAV_LINKS = [
   { href: "/exhibition", label: "기획전" },
 ];
 
+const MOBILE_GUEST_NAV_LINKS = [
+  { href: "/main", label: "홈" },
+  { href: "/products", label: "타이어 상품목록" },
+  { href: "/events?tab=ongoing", label: "이벤트" },
+  { href: "/exhibition", label: "기획전" },
+  { href: "/customer?tab=faq", label: "고객센터" },
+];
+
 export default function Header() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -454,7 +462,7 @@ export default function Header() {
               </>
             ) : (
               <>
-                {GUEST_NAV_LINKS.map((link) => (
+                {MOBILE_GUEST_NAV_LINKS.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}

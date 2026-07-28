@@ -148,6 +148,11 @@ function ProductDetailContent() {
   }
 
   function handleWish(seller: Seller) {
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+
     toggleWish({
       id: `${product!.id}-${seller.code}`,
       type: "타이어판매점",
@@ -230,18 +235,20 @@ function ProductDetailContent() {
                 className="border-b border-border last:border-0 hover:bg-surface-2"
               >
                 <td className="py-3 px-4 font-semibold">
-                  <button
-                    onClick={() => handleWish(seller)}
-                    aria-label="판매점 찜하기"
-                    className={`mr-1.5 align-middle inline-flex active:scale-90 ${isWished(seller.code) ? "text-accent" : "text-muted hover:text-accent"}`}
-                  >
-                    <Star
-                      key={String(isWished(seller.code))}
-                      size={14}
-                      fill={isWished(seller.code) ? "currentColor" : "none"}
-                      className="animate-[pop_320ms_ease-out]"
-                    />
-                  </button>
+                  {user && (
+                    <button
+                      onClick={() => handleWish(seller)}
+                      aria-label="판매점 찜하기"
+                      className={`mr-1.5 align-middle inline-flex active:scale-90 ${isWished(seller.code) ? "text-accent" : "text-muted hover:text-accent"}`}
+                    >
+                      <Star
+                        key={String(isWished(seller.code))}
+                        size={14}
+                        fill={isWished(seller.code) ? "currentColor" : "none"}
+                        className="animate-[pop_320ms_ease-out]"
+                      />
+                    </button>
+                  )}
                   {seller.code}
                   {seller.price === lowestPrice && (
                     <span className="ml-1.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent align-middle">
@@ -255,41 +262,56 @@ function ProductDetailContent() {
                 <td className="py-3 px-4 font-bold tabular-nums">
                   {user ? `${seller.price.toLocaleString()}원` : "로그인 후 공개"}
                 </td>
-                <td className="py-3 px-4">{seller.stock.toLocaleString()}</td>
-                <td className="py-3 px-4">{seller.minOrder}</td>
+                <td className="py-3 px-4">
+                  {user ? seller.stock.toLocaleString() : "로그인 후 공개"}
+                </td>
+                <td className="py-3 px-4">{user ? seller.minOrder : "로그인 후 공개"}</td>
                 <td className="py-3 px-4 text-muted text-xs">
                   {seller.shippingNote}
                   <br />
                   {seller.courier}
                 </td>
                 <td className="py-3 px-4">
-                  <input
-                    type="number"
-                    min={seller.minOrder}
-                    max={seller.stock}
-                    defaultValue={seller.minOrder}
-                    aria-label="주문 수량"
-                    onChange={(e) =>
-                      setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))
-                    }
-                    className="h-9 w-16 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-                  />
+                  {user ? (
+                    <input
+                      type="number"
+                      min={seller.minOrder}
+                      max={seller.stock}
+                      defaultValue={seller.minOrder}
+                      aria-label="주문 수량"
+                      onChange={(e) =>
+                        setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))
+                      }
+                      className="h-9 w-16 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                    />
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
                 </td>
                 <td className="py-3 px-4">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleAdd(seller, false)}
-                      className="btn-outline h-9 px-3 text-xs whitespace-nowrap"
-                    >
-                      장바구니
-                    </button>
-                    <button
-                      onClick={() => handleAdd(seller, true)}
+                  {user ? (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleAdd(seller, false)}
+                        className="btn-outline h-9 px-3 text-xs whitespace-nowrap"
+                      >
+                        장바구니
+                      </button>
+                      <button
+                        onClick={() => handleAdd(seller, true)}
+                        className="btn-primary h-9 px-3 text-xs whitespace-nowrap"
+                      >
+                        바로구매
+                      </button>
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/login?redirect=${encodeURIComponent(`/products/${product.id}${dot ? `?dot=${dot}` : ""}`)}`}
                       className="btn-primary h-9 px-3 text-xs whitespace-nowrap"
                     >
-                      바로구매
-                    </button>
-                  </div>
+                      로그인 후 구매
+                    </Link>
+                  )}
                 </td>
               </tr>
             ))}
@@ -306,18 +328,20 @@ function ProductDetailContent() {
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold flex items-center">
-                <button
-                  onClick={() => handleWish(seller)}
-                  aria-label="판매점 찜하기"
-                  className={`flex items-center p-2 -m-2 mr-0.5 active:scale-90 ${isWished(seller.code) ? "text-accent" : "text-muted hover:text-accent"}`}
-                >
-                  <Star
-                    key={String(isWished(seller.code))}
-                    size={18}
-                    fill={isWished(seller.code) ? "currentColor" : "none"}
-                    className="animate-[pop_320ms_ease-out]"
-                  />
-                </button>
+                {user && (
+                  <button
+                    onClick={() => handleWish(seller)}
+                    aria-label="판매점 찜하기"
+                    className={`flex items-center p-2 -m-2 mr-0.5 active:scale-90 ${isWished(seller.code) ? "text-accent" : "text-muted hover:text-accent"}`}
+                  >
+                    <Star
+                      key={String(isWished(seller.code))}
+                      size={18}
+                      fill={isWished(seller.code) ? "currentColor" : "none"}
+                      className="animate-[pop_320ms_ease-out]"
+                    />
+                  </button>
+                )}
                 {seller.code}
                 {seller.price === lowestPrice && (
                   <span className="ml-1.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
@@ -334,34 +358,44 @@ function ProductDetailContent() {
               </span>
             </div>
             <p className="text-xs text-muted mb-3">
-              재고 {seller.stock.toLocaleString()} · 최소주문수량 {seller.minOrder} ·{" "}
-              {seller.shippingNote}
+              {user
+                ? `재고 ${seller.stock.toLocaleString()} · 최소주문수량 ${seller.minOrder} · ${seller.shippingNote}`
+                : `재고·최소주문수량 로그인 후 공개 · ${seller.shippingNote}`}
             </p>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={seller.minOrder}
-                max={seller.stock}
-                defaultValue={seller.minOrder}
-                aria-label="주문 수량"
-                onChange={(e) =>
-                  setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))
-                }
-                className="h-10 w-20 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-              />
-              <button
-                onClick={() => handleAdd(seller, false)}
-                className="btn-outline flex-1 h-10 text-sm"
+            {user ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={seller.minOrder}
+                  max={seller.stock}
+                  defaultValue={seller.minOrder}
+                  aria-label="주문 수량"
+                  onChange={(e) =>
+                    setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))
+                  }
+                  className="h-10 w-20 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                />
+                <button
+                  onClick={() => handleAdd(seller, false)}
+                  className="btn-outline flex-1 h-10 text-sm"
+                >
+                  장바구니 담기
+                </button>
+                <button
+                  onClick={() => handleAdd(seller, true)}
+                  className="btn-primary flex-1 h-10 text-sm"
+                >
+                  바로 구매
+                </button>
+              </div>
+            ) : (
+              <Link
+                href={`/login?redirect=${encodeURIComponent(`/products/${product.id}${dot ? `?dot=${dot}` : ""}`)}`}
+                className="btn-primary h-11 w-full text-sm"
               >
-                장바구니 담기
-              </button>
-              <button
-                onClick={() => handleAdd(seller, true)}
-                className="btn-primary flex-1 h-10 text-sm"
-              >
-                바로 구매
-              </button>
-            </div>
+                로그인 후 가격 확인·구매
+              </Link>
+            )}
           </div>
         ))}
       </div>

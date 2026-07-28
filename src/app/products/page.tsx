@@ -247,7 +247,9 @@ function ProductsContent() {
                     <td className="py-3 px-4 tabular-nums">
                       {user ? `${r.highPrice.toLocaleString()}원` : "로그인 후 공개"}
                     </td>
-                    <td className="py-3 px-4 tabular-nums">{r.stock.toLocaleString()}</td>
+                    <td className="py-3 px-4 tabular-nums">
+                      {user ? r.stock.toLocaleString() : "로그인 후 공개"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -267,7 +269,9 @@ function ProductsContent() {
                   {r.width} / {r.ratio} R {r.rim} · DOT {r.dot}
                 </p>
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-muted">재고 {r.stock}</span>
+                  <span className="text-xs text-muted">
+                    {user ? `재고 ${r.stock}` : "재고 로그인 후 공개"}
+                  </span>
                   <span className="font-extrabold text-brand tabular-nums">
                     {user ? `${r.lowPrice.toLocaleString()}원` : "로그인 후 가격 확인"}
                   </span>
