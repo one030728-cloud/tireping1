@@ -2,6 +2,7 @@
 
 import RequireAuth from "@/components/RequireAuth";
 import { useOrders } from "@/lib/orders";
+import { getStatusStyle } from "@/lib/status";
 
 function OrdersDetailContent() {
   const { orders } = useOrders();
@@ -33,9 +34,7 @@ function OrdersDetailContent() {
                 <td className="py-3 pr-3 text-brand font-semibold">{o.id}</td>
                 <td className="py-3 pr-3">
                   <span
-                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                      o.status === "구매확정" ? "bg-brand/10 text-brand" : "bg-muted/10 text-muted"
-                    }`}
+                    className={`px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${getStatusStyle(o.status)}`}
                   >
                     {o.status}
                   </span>

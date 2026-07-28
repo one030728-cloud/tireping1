@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Package, Plus, Trash2, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import LoadingState from "@/components/LoadingState";
 import { useListings } from "@/lib/listings";
 import { MANUFACTURERS } from "@/lib/mockData";
 import type { Manufacturer } from "@/lib/types";
@@ -27,6 +28,28 @@ function GuestSell() {
           로그인하고 판매 시작하기
         </Link>
       </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  htmlFor,
+  required,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={htmlFor} className="text-xs font-medium text-foreground/70">
+        {label}
+        {required && <span className="text-accent ml-0.5">*</span>}
+      </label>
+      {children}
     </div>
   );
 }
@@ -109,75 +132,95 @@ function SellContent() {
               </Dialog.Close>
             </div>
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-              <select
-                value={form.manufacturer}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, manufacturer: e.target.value as Manufacturer }))
-                }
-                className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-              >
-                {MANUFACTURERS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              <input
-                required
-                value={form.model}
-                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-                placeholder="모델명"
-                className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-              />
-              <div className="grid grid-cols-3 gap-2">
+              <Field label="제조사" htmlFor="sell-manufacturer" required>
+                <select
+                  id="sell-manufacturer"
+                  value={form.manufacturer}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, manufacturer: e.target.value as Manufacturer }))
+                  }
+                  className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                >
+                  {MANUFACTURERS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="모델명" htmlFor="sell-model" required>
                 <input
+                  id="sell-model"
                   required
-                  type="number"
-                  value={form.width}
-                  onChange={(e) => setForm((f) => ({ ...f, width: e.target.value }))}
-                  placeholder="폭"
-                  className="h-11 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                  value={form.model}
+                  onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                  placeholder="모델명 입력"
+                  className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 />
+              </Field>
+              <Field label="규격 (폭 / 편평비 / 림)" htmlFor="sell-width" required>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    id="sell-width"
+                    required
+                    type="number"
+                    value={form.width}
+                    onChange={(e) => setForm((f) => ({ ...f, width: e.target.value }))}
+                    placeholder="폭"
+                    className="h-11 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                  />
+                  <input
+                    required
+                    type="number"
+                    value={form.ratio}
+                    onChange={(e) => setForm((f) => ({ ...f, ratio: e.target.value }))}
+                    placeholder="편평비"
+                    aria-label="편평비"
+                    className="h-11 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                  />
+                  <input
+                    required
+                    type="number"
+                    value={form.rim}
+                    onChange={(e) => setForm((f) => ({ ...f, rim: e.target.value }))}
+                    placeholder="림"
+                    aria-label="림"
+                    className="h-11 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                  />
+                </div>
+              </Field>
+              <Field label="생산년도 (DOT)" htmlFor="sell-dot">
                 <input
-                  required
-                  type="number"
-                  value={form.ratio}
-                  onChange={(e) => setForm((f) => ({ ...f, ratio: e.target.value }))}
-                  placeholder="편평비"
-                  className="h-11 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                  id="sell-dot"
+                  value={form.dot}
+                  onChange={(e) => setForm((f) => ({ ...f, dot: e.target.value }))}
+                  placeholder="예: 2025 (미입력 시 올해로 등록)"
+                  className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 />
-                <input
-                  required
-                  type="number"
-                  value={form.rim}
-                  onChange={(e) => setForm((f) => ({ ...f, rim: e.target.value }))}
-                  placeholder="림"
-                  className="h-11 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-                />
-              </div>
-              <input
-                value={form.dot}
-                onChange={(e) => setForm((f) => ({ ...f, dot: e.target.value }))}
-                placeholder="생산년도 (DOT), 예: 2025"
-                className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-              />
+              </Field>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  required
-                  type="number"
-                  value={form.price}
-                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                  placeholder="판매가"
-                  className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-                />
-                <input
-                  required
-                  type="number"
-                  value={form.stock}
-                  onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
-                  placeholder="재고수량"
-                  className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-                />
+                <Field label="판매가 (원)" htmlFor="sell-price" required>
+                  <input
+                    id="sell-price"
+                    required
+                    type="number"
+                    value={form.price}
+                    onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                    placeholder="판매가"
+                    className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                  />
+                </Field>
+                <Field label="재고수량" htmlFor="sell-stock" required>
+                  <input
+                    id="sell-stock"
+                    required
+                    type="number"
+                    value={form.stock}
+                    onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
+                    placeholder="재고수량"
+                    className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+                  />
+                </Field>
               </div>
               <button type="submit" className="btn-primary h-11 mt-2">
                 등록하기
@@ -239,10 +282,9 @@ function SellContent() {
                     <td className="py-3 px-4">
                       <button
                         onClick={() => removeListing(l.id)}
-                        aria-label="삭제"
-                        className="text-muted hover:text-accent"
+                        className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={13} /> 삭제
                       </button>
                     </td>
                   </tr>
@@ -270,10 +312,9 @@ function SellContent() {
                   </div>
                   <button
                     onClick={() => removeListing(l.id)}
-                    aria-label="삭제"
-                    className="text-muted hover:text-accent shrink-0"
+                    className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent shrink-0"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={13} /> 삭제
                   </button>
                 </div>
                 <div className="flex items-center justify-between mt-3">
@@ -303,7 +344,7 @@ export default function SellPage() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div className="p-10 text-center text-muted">불러오는 중...</div>;
+    return <LoadingState />;
   }
 
   if (!user) {

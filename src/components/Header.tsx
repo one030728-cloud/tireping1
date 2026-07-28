@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Bell, ChevronRight, LogOut, Megaphone, Menu, ShoppingCart, X } from "lucide-react";
+import { ChevronRight, LogOut, Megaphone, Menu, MessageCircle, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { useCart } from "@/lib/cart";
-import { MYPAGE_LINKS, SIDEBAR_LINKS } from "@/lib/nav";
+import { GNB_LINKS, GOODS_CATEGORIES, MYPAGE_LINKS, SIDEBAR_LINKS } from "@/lib/nav";
 import { NOTICES } from "@/lib/mockData";
 
 const GUEST_NAV_LINKS = [
@@ -21,32 +20,47 @@ const GUEST_NAV_LINKS = [
 
 export default function Header() {
   const { user, logout } = useAuth();
-  const { items } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [mypageOpen, setMypageOpen] = useState(false);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [hasUnread, setHasUnread] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const cartCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
-  const profileCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const LAST_SEEN_NOTICE_KEY = "tirezone_last_seen_notice";
 
-  function openProfileMenu() {
-    if (profileCloseTimeoutRef.current) {
-      clearTimeout(profileCloseTimeoutRef.current);
-      profileCloseTimeoutRef.current = null;
+  useEffect(() => {
+    if (NOTICES.length === 0) return;
+    const lastSeen = localStorage.getItem(LAST_SEEN_NOTICE_KEY);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage read after mount, required to avoid SSR/client markup mismatch
+    setHasUnread(lastSeen !== NOTICES[0].id);
+  }, []);
+
+  function handleNotifOpenChange(open: boolean) {
+    setNotifOpen(open);
+    if (open && NOTICES[0]) {
+      localStorage.setItem(LAST_SEEN_NOTICE_KEY, NOTICES[0].id);
+      setHasUnread(false);
     }
-    setProfileMenuOpen(true);
   }
 
-  function scheduleCloseProfileMenu() {
-    profileCloseTimeoutRef.current = setTimeout(() => setProfileMenuOpen(false), 150);
+  const goodsCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [goodsOpen, setGoodsOpen] = useState(false);
+
+  function openGoodsMenu() {
+    if (goodsCloseTimeoutRef.current) {
+      clearTimeout(goodsCloseTimeoutRef.current);
+      goodsCloseTimeoutRef.current = null;
+    }
+    setGoodsOpen(true);
+  }
+
+  function scheduleCloseGoodsMenu() {
+    goodsCloseTimeoutRef.current = setTimeout(() => setGoodsOpen(false), 150);
   }
 
   return (
-    <header className="sticky top-0 z-40 header-glass border-b border-border/70 shadow-[var(--shadow-xs)]">
-      <div className="max-w-[1240px] mx-auto flex items-center justify-between px-4 h-16">
+    <header className="sticky top-0 z-40 header-glass">
+      <div className="max-w-[1240px] mx-auto flex items-center justify-between px-4 h-16 gap-6">
         <div className="flex items-center gap-6">
           <button
             aria-label="메뉴 열기"
@@ -56,35 +70,85 @@ export default function Header() {
             <Menu size={22} />
           </button>
 
-          <Link href={user ? "/main" : "/"} className="flex items-center">
+          <Link href={user ? "/main" : "/"} className="flex items-center shrink-0">
             <Image
               src="/logo.svg"
               alt="타이어존"
               width={176}
               height={51}
-              className="h-10 w-auto"
+              className="h-9 w-auto"
               priority
             />
           </Link>
 
           {user ? (
-            <nav className="hidden lg:flex items-center gap-2">
-              <Link
-                href="/main"
-                className="px-4 h-9 flex items-center rounded-full text-white text-sm font-semibold bg-gradient-to-br from-brand-light to-brand shadow-[0_4px_14px_-4px_rgba(99,102,241,0.55)] hover:brightness-105 transition-[filter]"
-              >
-                타이어 구매
-              </Link>
-              <Link
-                href="/sell"
-                className={`px-4 h-9 flex items-center rounded-full text-sm font-semibold border transition-colors ${
-                  pathname === "/sell"
-                    ? "border-brand text-brand bg-brand/5"
-                    : "border-border text-foreground/70 hover:text-brand hover:border-brand/40"
-                }`}
-              >
-                타이어판매
-              </Link>
+            <nav className="hidden lg:flex items-center gap-5">
+              {GNB_LINKS.map((link) => {
+                const isMain = link.href === "/main";
+                const path = link.href.split("?")[0];
+                const active = pathname === path;
+                if (path === "/goods") {
+                  return (
+                    <div
+                      key={link.href}
+                      className="relative h-16 flex items-center"
+                      onMouseEnter={openGoodsMenu}
+                      onMouseLeave={scheduleCloseGoodsMenu}
+                    >
+                      <Link
+                        href={link.href}
+                        className={`flex items-center gap-1 text-sm font-medium h-16 ${
+                          active || pathname.startsWith("/goods")
+                            ? "text-brand"
+                            : "text-foreground/75 hover:text-brand"
+                        }`}
+                      >
+                        {link.label}
+                        {link.badge && (
+                          <span className="text-[10px] font-bold text-accent border border-accent rounded px-1 leading-4">
+                            {link.badge}
+                          </span>
+                        )}
+                      </Link>
+                      {goodsOpen && (
+                        <div className="absolute top-full left-0 w-40 py-2 bg-surface border border-border rounded-lg shadow-[var(--shadow-md)] z-50">
+                          {GOODS_CATEGORIES.map((c) => (
+                            <Link
+                              key={c.href}
+                              href={c.href}
+                              className="block px-4 py-2 text-sm text-foreground/80 hover:bg-surface-2 hover:text-brand"
+                            >
+                              {c.label}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                if (isMain) {
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className="px-4 h-9 flex items-center rounded-md text-white text-sm font-bold bg-brand hover:bg-[var(--brand-dark)]"
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                }
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`text-sm font-medium ${
+                      active ? "text-brand" : "text-foreground/75 hover:text-brand"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </nav>
           ) : (
             <nav className="hidden lg:flex items-center gap-5">
@@ -105,9 +169,12 @@ export default function Header() {
         </div>
 
         {user && NOTICES[0] && (
-          <div className="hidden lg:flex items-center gap-1.5 flex-1 mx-6 text-muted">
+          <div
+            className="hidden lg:flex items-center gap-1.5 flex-1 min-w-0 text-muted"
+            aria-hidden="true"
+          >
             <Megaphone size={14} className="shrink-0" />
-            <div className="relative flex-1 h-4 overflow-hidden">
+            <div className="relative flex-1 min-w-0 h-4 overflow-hidden">
               <div className="absolute whitespace-nowrap text-xs animate-[ticker_18s_linear_infinite]">
                 {NOTICES[0].title}
               </div>
@@ -126,35 +193,18 @@ export default function Header() {
           </div>
         )}
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           {user && (
-            <Link
-              href="/cart"
-              aria-label="장바구니"
-              className="relative flex flex-col items-center justify-center text-foreground/70 hover:text-brand p-2.5 -m-2.5"
-            >
-              <ShoppingCart size={20} />
-              {cartCount > 0 && (
-                <span
-                  key={cartCount}
-                  className="absolute top-1 right-1 bg-accent text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center animate-[pop_320ms_ease-out]"
-                >
-                  {cartCount}
-                </span>
-              )}
-            </Link>
-          )}
-
-          {user && (
-            <DropdownMenu.Root open={notifOpen} onOpenChange={setNotifOpen}>
+            <DropdownMenu.Root open={notifOpen} onOpenChange={handleNotifOpenChange}>
               <DropdownMenu.Trigger asChild>
                 <button
-                  aria-label="알림"
-                  className="relative flex flex-col items-center justify-center text-foreground/70 hover:text-brand p-2.5 -m-2.5"
+                  aria-label={hasUnread ? "알림 (읽지 않음)" : "알림"}
+                  className="relative hidden lg:flex flex-col items-center gap-0.5 text-foreground/70 hover:text-brand"
                 >
-                  <Bell size={20} />
-                  {NOTICES.length > 0 && (
-                    <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                  <MessageCircle size={19} />
+                  <span className="text-[10px] leading-none">알림</span>
+                  {hasUnread && (
+                    <span className="absolute top-0 right-0.5 flex h-2 w-2">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
                     </span>
@@ -165,7 +215,7 @@ export default function Header() {
                 <DropdownMenu.Content
                   align="end"
                   sideOffset={8}
-                  className="w-72 rounded-xl border border-border bg-surface shadow-[var(--shadow-lg)] py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
+                  className="w-72 rounded-lg border border-border bg-surface shadow-[var(--shadow-lg)] py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
                 >
                   <p className="px-3 py-2 text-xs font-semibold text-muted border-b border-border">
                     공지사항
@@ -179,7 +229,7 @@ export default function Header() {
                         className="px-3 py-2 hover:bg-surface-2 outline-none cursor-default"
                       >
                         <p className="text-xs text-foreground/90 leading-snug">{n.title}</p>
-                        <p className="text-[10px] text-muted mt-0.5">{n.date}</p>
+                        <p className="text-[11px] text-muted mt-0.5">{n.date}</p>
                       </DropdownMenu.Item>
                     ))
                   )}
@@ -189,48 +239,17 @@ export default function Header() {
           )}
 
           {user && (
-            <DropdownMenu.Root open={profileMenuOpen} onOpenChange={setProfileMenuOpen}>
-              <div
-                className="hidden lg:block"
-                onMouseEnter={openProfileMenu}
-                onMouseLeave={scheduleCloseProfileMenu}
+            <div className="hidden lg:flex flex-col items-start leading-tight pl-3 border-l border-border">
+              <Link
+                href="/mypage/status"
+                className="text-xs font-semibold text-foreground truncate max-w-[140px] hover:text-brand"
               >
-                <DropdownMenu.Trigger asChild>
-                  <Link
-                    href="/mypage/status"
-                    className="flex items-center gap-2 pl-3 border-l border-border hover:opacity-80"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-light to-brand-dark text-white flex items-center justify-center text-xs font-bold shadow-[0_2px_8px_-2px_rgba(99,102,241,0.55)]">
-                      {user.businessName.slice(0, 1)}
-                    </div>
-                    <div className="leading-tight text-left">
-                      <p className="text-xs font-semibold">{user.businessName}</p>
-                      <p className="text-[10px] text-muted">{user.ownerName} 사장님</p>
-                    </div>
-                  </Link>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content
-                    align="end"
-                    sideOffset={8}
-                    onMouseEnter={openProfileMenu}
-                    onMouseLeave={scheduleCloseProfileMenu}
-                    className="w-48 rounded-xl border border-border bg-surface shadow-[var(--shadow-lg)] py-1.5 z-50 data-[state=open]:animate-[slide-in-from-top_180ms_ease-out] data-[state=closed]:animate-[slide-out-to-top_150ms_ease-in]"
-                  >
-                    {MYPAGE_LINKS.map((link) => (
-                      <DropdownMenu.Item key={link.href} asChild>
-                        <Link
-                          href={link.href}
-                          className="block px-3 py-2 text-xs text-foreground/80 hover:bg-surface-2 hover:text-brand outline-none"
-                        >
-                          {link.label}
-                        </Link>
-                      </DropdownMenu.Item>
-                    ))}
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </div>
-            </DropdownMenu.Root>
+                {user.businessName}
+              </Link>
+              <Link href="/mypage/settings" className="text-[11px] text-brand hover:underline">
+                회원정보수정
+              </Link>
+            </div>
           )}
 
           {user ? (
@@ -276,24 +295,44 @@ export default function Header() {
 
             {user ? (
               <>
-                <Link
-                  href="/mypage/status"
-                  onClick={() => setMenuOpen(false)}
-                  className="mb-4 p-3 rounded-lg bg-background text-sm hover:bg-border/40"
-                >
-                  <p className="font-semibold">{user.businessName}</p>
-                  <p className="text-muted">{user.ownerName} 사장님</p>
-                </Link>
+                <div className="mb-4 p-3 rounded-lg bg-background text-sm flex items-center justify-between">
+                  <Link
+                    href="/mypage/status"
+                    onClick={() => setMenuOpen(false)}
+                    className="font-semibold hover:text-brand"
+                  >
+                    {user.businessName}
+                  </Link>
+                  <Link
+                    href="/mypage/settings"
+                    onClick={() => setMenuOpen(false)}
+                    className="text-xs text-brand hover:underline"
+                  >
+                    회원정보수정
+                  </Link>
+                </div>
 
-                <Link
-                  href="/main"
-                  onClick={() => setMenuOpen(false)}
-                  className={`px-3 py-3 rounded-lg text-sm font-medium ${
-                    pathname === "/main" ? "bg-brand/10 text-brand" : "hover:bg-surface-2"
-                  }`}
-                >
-                  홈
-                </Link>
+                {GNB_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={`px-3 py-3 rounded-lg text-sm font-medium flex items-center gap-1.5 ${
+                      pathname === link.href.split("?")[0]
+                        ? "bg-brand/10 text-brand"
+                        : "hover:bg-surface-2"
+                    }`}
+                  >
+                    {link.label}
+                    {link.badge && (
+                      <span className="text-[10px] font-bold text-accent border border-accent rounded px-1 leading-4">
+                        {link.badge}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+
+                <div className="my-2 border-t border-border" />
 
                 {SIDEBAR_LINKS.map((link) => {
                   const active = pathname === link.href.split("?")[0];
@@ -311,35 +350,20 @@ export default function Header() {
                   );
                 })}
 
-                <button
-                  onClick={() => setMypageOpen((v) => !v)}
-                  className="px-3 py-3 rounded-lg text-sm font-medium hover:bg-surface-2 flex items-center justify-between"
-                >
-                  마이페이지
-                  <ChevronRight
-                    size={16}
-                    className={`transition-transform ${mypageOpen ? "rotate-90" : ""}`}
-                  />
-                </button>
-                <div
-                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-                    mypageOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                  }`}
-                >
-                  <div className="overflow-hidden">
-                    <div className="pl-3 flex flex-col gap-1 border-l border-border ml-3">
-                      {MYPAGE_LINKS.map((link) => (
-                        <Link
-                          key={link.href}
-                          href={link.href}
-                          onClick={() => setMenuOpen(false)}
-                          className="px-3 py-2.5 rounded-lg text-sm text-muted hover:bg-surface-2 hover:text-foreground"
-                        >
-                          {link.label}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
+                <p className="px-3 pt-3 pb-1 text-sm font-semibold text-foreground flex items-center gap-1">
+                  마이페이지 <ChevronRight size={15} />
+                </p>
+                <div className="pl-3 flex flex-col gap-0.5 border-l border-border ml-3">
+                  {MYPAGE_LINKS.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMenuOpen(false)}
+                      className="px-3 py-2.5 rounded-lg text-sm text-muted hover:bg-surface-2 hover:text-foreground"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
                 </div>
               </>
             ) : (
@@ -361,6 +385,14 @@ export default function Header() {
                 >
                   로그인
                 </Link>
+                <div className="mt-4 pt-4 border-t border-border flex flex-col gap-1 text-xs text-muted">
+                  <span>
+                    등록 업체수 <b className="text-foreground">4,612</b>
+                  </span>
+                  <span>
+                    누적 거래수량 <b className="text-foreground">716,642</b>
+                  </span>
+                </div>
               </>
             )}
           </Dialog.Content>

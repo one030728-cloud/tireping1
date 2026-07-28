@@ -94,6 +94,7 @@ export interface CartItem {
   quantity: number;
   extraShipping: number;
   sellerCode: string;
+  stock?: number;
 }
 
 export interface FullOrder {
@@ -149,6 +150,38 @@ export interface MyListing {
   stock: number;
   status: "판매중" | "품절";
   registeredAt: string;
+}
+
+export interface CatalogRow {
+  id: string;
+  detailId: string;
+  detailDot: string | null;
+  manufacturer: Manufacturer;
+  model: string;
+  width: number;
+  ratio: number;
+  rim: number;
+  spec: string;
+  productCode: string;
+  dot: string;
+  factoryPrice: number;
+  lowPrice: number;
+  highPrice: number;
+  stock: number;
+  discountRate: number;
+  tag: "EVENT" | "BEST" | null;
+  registeredOrder: number;
+}
+
+export interface GoodsItem {
+  id: string;
+  category: "세차용품" | "자동차용품" | "오일" | "공구" | "장비" | "휠 액세서리";
+  brand: string;
+  name: string;
+  discountRate: number;
+  originalPrice: number;
+  price: number;
+  freeShipping: boolean;
 }
 
 export interface OrderStatusCounts {

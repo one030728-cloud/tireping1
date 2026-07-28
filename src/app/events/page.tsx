@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Bell } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
+import LoadingState from "@/components/LoadingState";
 import { EVENTS } from "@/lib/mockData";
 
 type Tab = "all" | "ongoing" | "ended";
@@ -30,12 +31,12 @@ function EventsContent() {
       </div>
       <p className="text-sm text-muted mb-5">타이어존의 다양한 이벤트를 확인해보세요!</p>
 
-      <div className="flex border-b border-border mb-5">
+      <div className="flex gap-6 border-b border-border mb-5">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => router.push(`/events?tab=${t.key}`)}
-            className={`flex-1 pb-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+            className={`pb-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${
               tab === t.key
                 ? "border-brand text-brand"
                 : "border-transparent text-muted hover:text-foreground hover:border-border"
@@ -52,7 +53,7 @@ function EventsContent() {
           해당하는 이벤트가 없습니다.
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-5">
           {filtered.map((e, i) => (
             <Link
               key={e.id}
@@ -77,7 +78,7 @@ function EventsContent() {
 export default function EventsPage() {
   return (
     <RequireAuth>
-      <Suspense fallback={<div className="p-10 text-center text-muted">불러오는 중...</div>}>
+      <Suspense fallback={<LoadingState />}>
         <EventsContent />
       </Suspense>
     </RequireAuth>

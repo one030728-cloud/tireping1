@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronRight, Clock, Search } from "lucide-react";
 import Carousel from "@/components/Carousel";
+import HeroCarousel from "@/components/HeroCarousel";
 import RequireAuth from "@/components/RequireAuth";
 import TireCard from "@/components/TireCard";
-import { EVENTS, MANUFACTURERS, NOTICES, TIRES } from "@/lib/mockData";
+import { DIRECT_NOTICE, EVENTS, FAQ_CATEGORIES, MANUFACTURERS, NOTICES, TIRES, UPDATE_LOGS } from "@/lib/mockData";
 import { useOrders } from "@/lib/orders";
+import { getStatusStyle } from "@/lib/status";
 
 const BANNER_IMAGES: Partial<Record<string, string>> = {
   e1: "/banners/rainy-season-ad.jpg",
@@ -24,7 +26,7 @@ function MainContent() {
   const eventTires = TIRES.filter((t) => t.tag === "EVENT");
   const bestTires = TIRES.filter((t) => t.tag === "BEST");
   const recentOrders = orders.slice(0, 3);
-  const ongoingEvent = EVENTS.find((e) => e.status === "ongoing");
+  const ongoingEvents = EVENTS.filter((e) => e.status === "ongoing");
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -34,34 +36,50 @@ function MainContent() {
     router.push(`/products?${params.toString()}`);
   }
 
-  const bannerImage = ongoingEvent && BANNER_IMAGES[ongoingEvent.id];
-
-  const banner = ongoingEvent && (
-    <Link
-      href={`/events/${ongoingEvent.id}`}
-      className="relative block rounded-2xl overflow-hidden h-32 md:h-44 lg:h-56 shadow-[var(--shadow-lg)] transition-transform hover:-translate-y-0.5"
-    >
-      {bannerImage ? (
-        <Image
-          src={bannerImage}
-          alt={ongoingEvent.title}
-          fill
-          priority
-          className="object-cover"
-          sizes="(min-width: 1024px) 700px, 100vw"
-        />
-      ) : (
-        <div
-          className="w-full h-full flex items-center px-6 text-left"
-          style={{ background: ongoingEvent.bannerGradient }}
-        >
-          <div>
-            <p className="text-xs font-bold text-black/60">진행중 이벤트</p>
-            <p className="text-xl font-extrabold text-black/80 mt-1">{ongoingEvent.title}</p>
-          </div>
-        </div>
-      )}
-    </Link>
+  const banner = (
+    <HeroCarousel
+      className="shadow-[var(--shadow-lg)]"
+      autoPlayInterval={4000}
+      slides={ongoingEvents.map((ev) => {
+        const bannerImage = BANNER_IMAGES[ev.id];
+        return {
+          key: ev.id,
+          content: (
+            <Link href={`/events/${ev.id}`} className="relative block w-full h-full">
+              {bannerImage ? (
+                <>
+                  <Image
+                    src={bannerImage}
+                    alt={ev.title}
+                    fill
+                    priority
+                    className="object-cover"
+                    sizes="(min-width: 1024px) 700px, 100vw"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/5 to-transparent" />
+                  <div className="absolute inset-0 flex items-end px-6 pb-6 text-left">
+                    <div>
+                      <p className="text-xs font-bold text-white/80">진행중 이벤트</p>
+                      <p className="text-xl font-extrabold text-white mt-1">{ev.title}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div
+                  className="w-full h-full flex items-center px-6 text-left"
+                  style={{ background: ev.bannerGradient }}
+                >
+                  <div>
+                    <p className="text-xs font-bold text-black/60">진행중 이벤트</p>
+                    <p className="text-xl font-extrabold text-black/80 mt-1">{ev.title}</p>
+                  </div>
+                </div>
+              )}
+            </Link>
+          ),
+        };
+      })}
+    />
   );
 
   const searchBox = (
@@ -118,7 +136,11 @@ function MainContent() {
                 <span className="text-muted">{o.id}</span>
                 <span className="font-medium">{o.model}</span>
               </div>
-              <span className="text-brand text-xs font-semibold">{o.status}</span>
+              <span
+                className={`text-xs font-semibold px-2 py-1 rounded-full ${getStatusStyle(o.status)}`}
+              >
+                {o.status}
+              </span>
             </div>
           ))
         )}
@@ -164,19 +186,78 @@ function MainContent() {
     </section>
   );
 
+  const directBanner = (
+    <Link
+      href="/direct"
+      className="card p-5 text-center block card-hover"
+    >
+      <p className="text-sm text-muted mb-1">{DIRECT_NOTICE}</p>
+      <h2 className="text-base font-extrabold">
+        타이어 <span className="text-brand">당일 직배송</span> 주문으로~!
+      </h2>
+    </Link>
+  );
+
   const noticesBox = (
-    <section className="pb-8">
+    <section>
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-bold">공지사항</h2>
+        <Link href="/customer?tab=notice" className="text-xs text-muted flex items-center">
+          전체보기 <ChevronRight size={14} />
+        </Link>
       </div>
       <div className="card divide-y divide-border">
-        {NOTICES.map((n) => (
+        {NOTICES.slice(0, 4).map((n) => (
           <div
             key={n.id}
             className="flex items-center justify-between px-4 py-3 text-sm hover:bg-surface-2"
           >
-            <span>{n.title}</span>
+            <span className="truncate">{n.title}</span>
             <span className="text-muted text-xs shrink-0 ml-3">{n.date}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+
+  const faqBox = (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-bold">자주묻는 질문</h2>
+        <Link href="/customer?tab=faq" className="text-xs text-muted flex items-center">
+          전체보기 <ChevronRight size={14} />
+        </Link>
+      </div>
+      <div className="card grid grid-cols-3 gap-1 p-3">
+        {FAQ_CATEGORIES.map((c) => (
+          <Link
+            key={c.id}
+            href="/customer?tab=faq"
+            className="flex flex-col items-center gap-1 py-2 rounded-lg hover:bg-surface-2 text-center"
+          >
+            <span className="text-xs font-medium">{c.label}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+
+  const updateBox = (
+    <section className="pb-8">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-bold">업데이트 내역</h2>
+        <Link href="/customer?tab=update" className="text-xs text-muted flex items-center">
+          전체보기 <ChevronRight size={14} />
+        </Link>
+      </div>
+      <div className="card divide-y divide-border">
+        {UPDATE_LOGS.slice(0, 4).map((u) => (
+          <div
+            key={u.id}
+            className="flex items-center justify-between px-4 py-3 text-sm hover:bg-surface-2"
+          >
+            <span className="truncate">{u.title}</span>
+            <span className="text-muted text-xs shrink-0 ml-3">{u.date}</span>
           </div>
         ))}
       </div>
@@ -192,7 +273,10 @@ function MainContent() {
         {ordersBox}
         {eventGrid}
         {bestGrid}
+        {directBanner}
         {noticesBox}
+        {faqBox}
+        {updateBox}
       </div>
 
       {/* Desktop: main content + search/orders side panel */}
@@ -203,7 +287,12 @@ function MainContent() {
             {eventGrid}
             {bestGrid}
           </div>
-          {noticesBox}
+          {directBanner}
+          <div className="grid grid-cols-3 gap-4">
+            {noticesBox}
+            {faqBox}
+            {updateBox}
+          </div>
         </div>
         <aside className="w-80 shrink-0 flex flex-col gap-8 sticky top-20 self-start">
           {searchBox}

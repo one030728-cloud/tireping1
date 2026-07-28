@@ -10,7 +10,9 @@ import ScrollToTopButton from "./ScrollToTopButton";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
-  const showSidebar = user && pathname !== "/login" && pathname !== "/";
+  const hasOwnSidebar = pathname.startsWith("/goods") || pathname.startsWith("/customer");
+  const showBreadcrumb = user && pathname !== "/login" && pathname !== "/";
+  const showSidebar = showBreadcrumb && !hasOwnSidebar;
   const showFooter = pathname !== "/login";
 
   return (
@@ -18,7 +20,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex">
         {showSidebar && <Sidebar />}
         <main className="flex-1 min-w-0">
-          {showSidebar && <Breadcrumb />}
+          {showBreadcrumb && <Breadcrumb />}
           <div
             key={`${pathname}-${loading}`}
             className="animate-[fade-slide-up_320ms_ease-out_both]"

@@ -39,9 +39,7 @@ export default function LoginPage() {
     <div className="flex justify-center px-4 py-16">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8 animate-[fade-slide-up_400ms_ease-out_both]">
-          <h1 className="text-2xl font-extrabold bg-gradient-to-r from-brand-light to-brand-dark bg-clip-text text-transparent">
-            타이어존
-          </h1>
+          <h1 className="text-2xl font-extrabold text-gradient-brand">타이어존</h1>
           <p className="text-sm text-muted mt-1">사업자전용 타이어거래소</p>
         </div>
 
@@ -51,26 +49,48 @@ export default function LoginPage() {
         >
           <h2 className="text-center font-bold mb-1">회원 로그인</h2>
 
-          <input
-            value={id}
-            onChange={(e) => setId(e.target.value)}
-            placeholder="아이디 입력"
-            autoComplete="username"
-            className="h-11 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-            required
-          />
-          <input
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            placeholder="비밀번호 입력"
-            autoComplete="current-password"
-            className="h-11 px-4 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-            required
-          />
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="login-id" className="text-xs font-medium text-foreground/70">
+              아이디
+            </label>
+            <input
+              id="login-id"
+              value={id}
+              onChange={(e) => setId(e.target.value)}
+              placeholder="아이디 입력"
+              autoComplete="username"
+              aria-invalid={!!error}
+              className={`h-11 px-4 rounded-lg border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand ${
+                error ? "border-accent" : "border-border"
+              }`}
+              required
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="login-password" className="text-xs font-medium text-foreground/70">
+              비밀번호
+            </label>
+            <input
+              id="login-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="비밀번호 입력"
+              autoComplete="current-password"
+              aria-invalid={!!error}
+              className={`h-11 px-4 rounded-lg border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand ${
+                error ? "border-accent" : "border-border"
+              }`}
+              required
+            />
+          </div>
 
           {error && (
-            <p key={error} className="text-sm text-accent animate-[shake_350ms_ease-out]">
+            <p
+              key={error}
+              role="alert"
+              className="text-sm text-accent animate-[shake_350ms_ease-out]"
+            >
               {error}
             </p>
           )}

@@ -33,9 +33,10 @@ export default function ImagePlaceholder({
 
   return (
     <div
-      className={`flex items-center justify-center bg-surface-2 border border-dashed border-border-strong text-muted/70 rounded-lg ${className}`}
+      className={`flex flex-col items-center justify-center gap-1 bg-surface-2 border border-dashed border-border-strong text-muted/70 rounded-lg ${className}`}
     >
       <ImageOff size={22} strokeWidth={1.6} />
+      {manufacturer && <span className="text-[11px] font-medium">{manufacturer}</span>}
     </div>
   );
 }

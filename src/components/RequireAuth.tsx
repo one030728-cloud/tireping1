@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import LoadingState from "./LoadingState";
 
 export default function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -15,7 +16,7 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
   }, [loading, user, router]);
 
   if (loading || !user) {
-    return <div className="p-10 text-center text-muted">불러오는 중...</div>;
+    return <LoadingState />;
   }
 
   return <>{children}</>;

@@ -1,6 +1,6 @@
 export default function Footer() {
   return (
-    <footer className="border-t border-border mt-10 py-7 px-4 text-xs text-muted leading-relaxed bg-surface-2/60">
+    <footer className="border-t border-border mt-10 py-7 px-4 text-xs text-muted leading-relaxed bg-surface">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
         <div>
           <p className="font-extrabold text-foreground/80 text-sm tracking-tight mb-1.5">
@@ -18,7 +18,7 @@ export default function Footer() {
           <p className="text-foreground/70 font-semibold">고객센터</p>
           <a
             href="tel:1588-0000"
-            className="font-extrabold text-lg bg-gradient-to-r from-brand to-brand-dark bg-clip-text text-transparent hover:opacity-80"
+            className="font-extrabold text-lg text-gradient-brand hover:opacity-80"
           >
             1588-0000
           </a>

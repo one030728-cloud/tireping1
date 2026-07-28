@@ -14,6 +14,12 @@ function CartContent() {
 
   const total = items.reduce((sum, i) => sum + i.price * i.quantity + i.extraShipping, 0);
 
+  function handleClear() {
+    if (window.confirm("장바구니에 담긴 모든 상품을 삭제할까요?")) {
+      clear();
+    }
+  }
+
   return (
     <div className="px-4 py-5">
       <h1 className="text-xl font-extrabold mb-1">타이어 장바구니</h1>
@@ -64,7 +70,8 @@ function CartContent() {
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           aria-label="수량 감소"
-                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90"
+                          disabled={item.quantity <= 1}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
                         >
                           <Minus size={13} />
                         </button>
@@ -77,7 +84,8 @@ function CartContent() {
                         <button
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           aria-label="수량 증가"
-                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90"
+                          disabled={item.stock !== undefined && item.quantity >= item.stock}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
                         >
                           <Plus size={13} />
                         </button>
@@ -130,7 +138,8 @@ function CartContent() {
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
                       aria-label="수량 감소"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90"
+                      disabled={item.quantity <= 1}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
                     >
                       <Minus size={14} />
                     </button>
@@ -143,7 +152,8 @@ function CartContent() {
                     <button
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
                       aria-label="수량 증가"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90"
+                      disabled={item.stock !== undefined && item.quantity >= item.stock}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
                     >
                       <Plus size={14} />
                     </button>
@@ -168,7 +178,7 @@ function CartContent() {
 
           <div className="flex gap-2 mt-4 pb-8">
             <button
-              onClick={clear}
+              onClick={handleClear}
               className="h-12 px-5 rounded-xl border border-border text-sm font-semibold hover:bg-surface-2 active:scale-95 transition-all"
             >
               전체삭제

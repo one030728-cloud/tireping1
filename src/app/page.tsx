@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { EVENTS, TIRES } from "@/lib/mockData";
 import Carousel from "@/components/Carousel";
 import GuestTireCard from "@/components/GuestTireCard";
+import LoadingState from "@/components/LoadingState";
 
 const BANNER_IMAGES: Partial<Record<string, string>> = {
   e1: "/banners/rainy-season-ad.jpg",
@@ -132,7 +133,7 @@ export default function Home() {
   }, [loading, user, router]);
 
   if (loading || user) {
-    return <div className="p-10 text-center text-muted">불러오는 중...</div>;
+    return <LoadingState />;
   }
 
   return <GuestHome />;

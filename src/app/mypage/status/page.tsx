@@ -2,15 +2,17 @@
 
 import RequireAuth from "@/components/RequireAuth";
 import { useOrders } from "@/lib/orders";
+import { getStatusStyle } from "@/lib/status";
 
 function StatCard({ label, value, delay }: { label: string; value: number; delay: number }) {
+  const valueStyle = value > 0 ? getStatusStyle(label).split(" ")[1] : "text-muted";
   return (
     <div
       className="card p-4 text-center animate-[fade-slide-up_400ms_ease-out_both]"
       style={{ animationDelay: `${delay}ms` }}
     >
       <p className="text-xs text-muted mb-1">{label}</p>
-      <p className="text-lg font-extrabold tabular-nums">{value}건</p>
+      <p className={`text-lg font-extrabold tabular-nums ${valueStyle}`}>{value}건</p>
     </div>
   );
 }

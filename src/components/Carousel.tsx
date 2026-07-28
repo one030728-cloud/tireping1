@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type MutableRefObject, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type ReactNode,
+} from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 function easeInOutQuad(t: number) {
@@ -57,6 +64,25 @@ export default function Carousel({
   const trackRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
   const animationTokenRef = useRef(0);
+  const [atStart, setAtStart] = useState(true);
+  const [atEnd, setAtEnd] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const updateScrollState = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    setAtStart(track.scrollLeft <= 1);
+    setAtEnd(track.scrollLeft >= maxScroll - 1);
+    const pitch = cardPitch(track);
+    if (pitch > 0) {
+      setActiveIndex(Math.round(track.scrollLeft / pitch));
+    }
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+  }, [updateScrollState, children.length]);
 
   const slide = useCallback((direction: -1 | 1) => {
     const track = trackRef.current;
@@ -101,7 +127,16 @@ export default function Carousel({
     >
       <div
         ref={trackRef}
-        className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={updateScrollState}
+        style={{
+          boxShadow: [
+            !atStart && "inset 16px 0 16px -16px rgba(15,23,42,0.16)",
+            !atEnd && "inset -16px 0 16px -16px rgba(15,23,42,0.16)",
+          ]
+            .filter(Boolean)
+            .join(", "),
+        }}
+        className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-[box-shadow] duration-200"
       >
         {children.map((child, i) => (
           <div
@@ -113,6 +148,18 @@ export default function Carousel({
           </div>
         ))}
       </div>
+      {children.length > 1 && (
+        <div className="flex lg:hidden items-center justify-center gap-1.5 mt-2">
+          {children.map((_, i) => (
+            <span
+              key={i}
+              className={`h-1.5 rounded-full transition-all ${
+                i === activeIndex ? "w-4 bg-brand" : "w-1.5 bg-border-strong"
+              }`}
+            />
+          ))}
+        </div>
+      )}
       <button
         type="button"
         onClick={() => slide(-1)}

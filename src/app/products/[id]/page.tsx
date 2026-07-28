@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { ChevronLeft, Star } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
+import LoadingState from "@/components/LoadingState";
 import { FACTORY_TIRES, TIRES, TIRE_SPECS, getSellersForTire } from "@/lib/mockData";
 import { useCart } from "@/lib/cart";
 import { useOrders } from "@/lib/orders";
@@ -127,6 +128,7 @@ function ProductDetailContent() {
       quantity: qty,
       extraShipping: 0,
       sellerCode: seller.code,
+      stock: seller.stock,
     };
 
     if (buyNow) {
@@ -231,7 +233,7 @@ function ProductDetailContent() {
                   </button>
                   {seller.code}
                   {seller.price === lowestPrice && (
-                    <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent align-middle">
+                    <span className="ml-1.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent align-middle">
                       최저가
                     </span>
                   )}
@@ -253,7 +255,9 @@ function ProductDetailContent() {
                   <input
                     type="number"
                     min={seller.minOrder}
+                    max={seller.stock}
                     defaultValue={seller.minOrder}
+                    aria-label="주문 수량"
                     onChange={(e) =>
                       setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))
                     }
@@ -305,7 +309,7 @@ function ProductDetailContent() {
                 </button>
                 {seller.code}
                 {seller.price === lowestPrice && (
-                  <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
+                  <span className="ml-1.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
                     최저가
                   </span>
                 )}
@@ -324,7 +328,9 @@ function ProductDetailContent() {
               <input
                 type="number"
                 min={seller.minOrder}
+                max={seller.stock}
                 defaultValue={seller.minOrder}
+                aria-label="주문 수량"
                 onChange={(e) =>
                   setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))
                 }
@@ -362,7 +368,7 @@ function SpecRow({ label, value }: { label: string; value: string }) {
 export default function ProductDetailPage() {
   return (
     <RequireAuth>
-      <Suspense fallback={<div className="p-10 text-center text-muted">불러오는 중...</div>}>
+      <Suspense fallback={<LoadingState />}>
         <ProductDetailContent />
       </Suspense>
     </RequireAuth>

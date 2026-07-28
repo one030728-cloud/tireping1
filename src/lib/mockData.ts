@@ -1,8 +1,10 @@
 import type {
+  CatalogRow,
   DepositRecord,
   EventItem,
   FactoryTireGroup,
   FullOrder,
+  GoodsItem,
   MyListing,
   Notice,
   Order,
@@ -285,6 +287,10 @@ export const NOTICES: Notice[] = [
   { id: "n1", title: "[공지] 타이어존 판매 수수료 변경 안내", date: "2026-06-30" },
   { id: "n2", title: "2026년 6월 1일 공장도가 변경 내역 (요코하마)", date: "2026-06-01" },
   { id: "n3", title: "2026년 6월 1일 공장도가 변경 내역 (피렐리)", date: "2026-06-01" },
+  { id: "n4", title: "2025년 7월 1일 공장도가 인상 내역 (미쉐린)", date: "2025-07-01" },
+  { id: "n5", title: "2025년 4월 15일 공장도가 인상 내역 (요코하마)", date: "2025-04-15" },
+  { id: "n6", title: "2025년 4월 1일 공장도가 인상 내역 (던롭 타이어)", date: "2025-04-01" },
+  { id: "n7", title: "2025년 4월 1일 공장도가 인상 내역 (콘티넨탈)", date: "2025-04-01" },
 ];
 
 export const TIRE_SPECS: Record<string, TireSpec> = {
@@ -621,6 +627,71 @@ export const FACTORY_TIRES: FactoryTireGroup[] = [
   },
 ];
 
+function specStringFor(tireId: string): string {
+  const s = TIRE_SPECS[tireId];
+  if (!s) return "-";
+  return `${s.loadIndex} ${s.speedIndex} ${s.ply} ${s.origin}`;
+}
+
+function buildCatalog(): CatalogRow[] {
+  const rows: CatalogRow[] = [];
+  let order = 0;
+
+  for (const t of TIRES) {
+    const sellers = getSellersForTire(t);
+    const prices = sellers.map((s) => s.price);
+    rows.push({
+      id: `row-${t.id}`,
+      detailId: t.id,
+      detailDot: null,
+      manufacturer: t.manufacturer,
+      model: t.model,
+      width: t.width,
+      ratio: t.ratio,
+      rim: t.rim,
+      spec: specStringFor(t.id),
+      productCode: TIRE_SPECS[t.id]?.productCode ?? "-",
+      dot: t.dot,
+      factoryPrice: Math.round(t.price / (1 - t.discountRate / 100) / 100) * 100,
+      lowPrice: Math.min(...prices),
+      highPrice: Math.max(...prices),
+      stock: t.stock,
+      discountRate: t.discountRate,
+      tag: t.tag,
+      registeredOrder: order++,
+    });
+  }
+
+  for (const g of FACTORY_TIRES) {
+    for (const r of g.rows) {
+      rows.push({
+        id: `row-${g.id}-${r.dot}`,
+        detailId: g.id,
+        detailDot: r.dot,
+        manufacturer: g.manufacturer,
+        model: g.model,
+        width: g.width,
+        ratio: g.ratio,
+        rim: g.rim,
+        spec: g.spec,
+        productCode: `${g.id}${r.dot}`.toUpperCase(),
+        dot: r.dot,
+        factoryPrice: g.factoryPrice,
+        lowPrice: r.price,
+        highPrice: r.price,
+        stock: r.stock,
+        discountRate: r.discountRate,
+        tag: null,
+        registeredOrder: order++,
+      });
+    }
+  }
+
+  return rows;
+}
+
+export const CATALOG: CatalogRow[] = buildCatalog();
+
 export const FULL_ORDERS: FullOrder[] = [
   {
     id: "247137",
@@ -781,6 +852,189 @@ export const TAX_RECORDS: Record<
     { month: "2025-02", supplyAmount: 129327, vat: 12933, total: 142260 },
   ],
 };
+
+export const GOODS: GoodsItem[] = [
+  {
+    id: "g1",
+    category: "오일",
+    brand: "REPSOL",
+    name: "GUARD LIQUIDO DE FRENOS DOT 4 브레이크오일 500ml",
+    discountRate: 57,
+    originalPrice: 15000,
+    price: 6400,
+    freeShipping: true,
+  },
+  {
+    id: "g2",
+    category: "오일",
+    brand: "엑스오일",
+    name: "SPECIAL SX SP C2 C3 5W-30 1L",
+    discountRate: 64,
+    originalPrice: 18000,
+    price: 6500,
+    freeShipping: true,
+  },
+  {
+    id: "g3",
+    category: "오일",
+    brand: "FALCON",
+    name: "[기획상품] REBOOT S API SQ ACEA C2/C3 6L",
+    discountRate: 58,
+    originalPrice: 69000,
+    price: 28900,
+    freeShipping: true,
+  },
+  {
+    id: "g4",
+    category: "오일",
+    brand: "MANNOL",
+    name: "마놀 MOS2 9991 엔진오일 첨가제 300ml",
+    discountRate: 16,
+    originalPrice: 10000,
+    price: 8400,
+    freeShipping: true,
+  },
+  {
+    id: "g5",
+    category: "세차용품",
+    brand: "불멸의세차",
+    name: "카샴푸 극광 슈퍼 물광 1L",
+    discountRate: 32,
+    originalPrice: 25000,
+    price: 17000,
+    freeShipping: true,
+  },
+  {
+    id: "g6",
+    category: "자동차용품",
+    brand: "3M",
+    name: "차량용 방향제 뉴카 향 2p",
+    discountRate: 20,
+    originalPrice: 12000,
+    price: 9600,
+    freeShipping: false,
+  },
+  {
+    id: "g7",
+    category: "공구",
+    brand: "KTC",
+    name: "에어 임팩트 렌치 1/2인치",
+    discountRate: 12,
+    originalPrice: 320000,
+    price: 281600,
+    freeShipping: false,
+  },
+  {
+    id: "g8",
+    category: "장비",
+    brand: "한국공기",
+    name: "2주식 리프트 4톤",
+    discountRate: 8,
+    originalPrice: 2800000,
+    price: 2576000,
+    freeShipping: false,
+  },
+  {
+    id: "g9",
+    category: "휠 액세서리",
+    brand: "타이어존",
+    name: "휠너트 세트 (20개입)",
+    discountRate: 25,
+    originalPrice: 40000,
+    price: 30000,
+    freeShipping: true,
+  },
+];
+
+export const FAQ_CATEGORIES = [
+  { id: "order", label: "주문/결제" },
+  { id: "delivery", label: "배송관련" },
+  { id: "cancel", label: "취소/반품/교환" },
+  { id: "sell", label: "판매관련" },
+  { id: "member", label: "회원관련" },
+  { id: "etc", label: "기타" },
+] as const;
+
+export const FAQ_ITEMS: { id: string; category: string; q: string; a: string }[] = [
+  {
+    id: "fq1",
+    category: "order",
+    q: "주문 후 입금은 언제까지 해야 하나요?",
+    a: "주문 후 24시간 이내 미입금 시 자동으로 주문이 취소됩니다. 출고시간 이전 입금 확인 시 당일 출고됩니다.",
+  },
+  {
+    id: "fq2",
+    category: "order",
+    q: "세금계산서는 어떻게 발급받나요?",
+    a: "마이페이지 > 세금계산서 내역에서 월별로 자동 집계되며, 익월 10일 이내 국세청 시스템으로 발행됩니다.",
+  },
+  {
+    id: "fq3",
+    category: "delivery",
+    q: "배송은 얼마나 걸리나요?",
+    a: "일반 배송은 입금 확인 후 1~2일, 당일직배송 지역은 당일 오후 도착이 가능합니다.",
+  },
+  {
+    id: "fq4",
+    category: "delivery",
+    q: "제주/도서산간 지역도 배송되나요?",
+    a: "가능하지만 추가 배송비가 발생할 수 있습니다. 결제 단계에서 자동 안내됩니다.",
+  },
+  {
+    id: "fq5",
+    category: "cancel",
+    q: "입금 후 취소는 어떻게 하나요?",
+    a: "주문내역/배송조회에서 출고 전 상태인 경우 직접 취소 신청이 가능합니다. 출고 후에는 반품 절차로 진행됩니다.",
+  },
+  {
+    id: "fq6",
+    category: "sell",
+    q: "타이어를 판매하려면 어떻게 하나요?",
+    a: "상단 GNB의 타이어판매 메뉴에서 재고를 등록하면 즉시 판매를 시작할 수 있습니다.",
+  },
+  {
+    id: "fq7",
+    category: "member",
+    q: "회원정보는 어디서 수정하나요?",
+    a: "우측 상단 프로필 영역의 회원정보수정 링크에서 이메일/연락처/정산계좌 등을 수정할 수 있습니다.",
+  },
+  {
+    id: "fq8",
+    category: "etc",
+    q: "공장도가는 실시간으로 반영되나요?",
+    a: "제조사 공급가 변경 시 공지사항에 안내 후 순차 반영됩니다.",
+  },
+];
+
+export const UPDATE_LOGS = [
+  { id: "u1", title: "2026.03.23 업데이트 (타이어 판매자 상품관리)", date: "2026-03-23" },
+  { id: "u2", title: "2025.12.22 업데이트 (제주도 추가 배송비 적용)", date: "2025-12-22" },
+  {
+    id: "u3",
+    title: "2025.09.15 업데이트 (판매자 이용 택배사 지정, 상품 형용코드 표시)",
+    date: "2025-09-15",
+  },
+  { id: "u4", title: "2025.09.12 타이어존 업데이트 (출고시간 지정 기능 추가)", date: "2025-09-12" },
+] as const;
+
+export const REGIONS: Record<string, Record<string, string[]>> = {
+  경기도: {
+    화성시: ["기안동", "병점동", "반월동", "봉담읍"],
+    수원시: ["영통동", "장안동", "권선동"],
+    성남시: ["분당동", "수정동", "중원동"],
+  },
+  서울특별시: {
+    강남구: ["역삼동", "삼성동", "대치동"],
+    마포구: ["합정동", "망원동", "연남동"],
+  },
+  인천광역시: {
+    남동구: ["구월동", "간석동"],
+    연수구: ["송도동", "옥련동"],
+  },
+};
+
+export const DIRECT_NOTICE =
+  "타이어존으로 구매한 타이어, 오늘 받아보고 싶으시다면? 타이어 당일 직배송 주문으로~!";
 
 export const WISH_SELLERS: WishSeller[] = [];
 
