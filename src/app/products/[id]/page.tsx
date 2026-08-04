@@ -8,7 +8,7 @@ import { ChevronLeft, Star } from "lucide-react";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import LoadingState from "@/components/LoadingState";
 import { useCart } from "@/lib/cart";
-import { useOrders } from "@/lib/orders";
+import { OrderRequestError, useOrders } from "@/lib/orders";
 import { useWishlist } from "@/lib/wishlist";
 import { useAuth } from "@/lib/auth";
 import type { Manufacturer, Seller } from "@/lib/types";
@@ -151,7 +151,7 @@ function ProductDetailContent() {
     );
   }
 
-  function handleAdd(seller: Seller, buyNow: boolean) {
+  async function handleAdd(seller: Seller, buyNow: boolean) {
     if (!user) {
       router.push(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
@@ -174,8 +174,17 @@ function ProductDetailContent() {
     };
 
     if (buyNow) {
-      addOrders([{ ...item, id: `${item.tireId}-${item.sellerCode}-${Date.now()}` }]);
-      router.push("/orders?justOrdered=1");
+      try {
+        await addOrders([{ ...item, id: `${item.tireId}-${item.sellerCode}-${Date.now()}` }]);
+        router.push("/orders?justOrdered=1");
+      } catch (error) {
+        const code = error instanceof OrderRequestError ? error.code : "ORDER_REQUEST_FAILED";
+        window.alert(
+          code === "ORDER_STOCK_INSUFFICIENT"
+            ? "재고가 부족한 상품이 있어 주문할 수 없습니다."
+            : "주문 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        );
+      }
       return;
     }
 
@@ -328,13 +337,13 @@ function ProductDetailContent() {
                   {user ? (
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleAdd(seller, false)}
+                        onClick={() => void handleAdd(seller, false)}
                         className="btn-outline h-9 px-3 text-xs whitespace-nowrap"
                       >
                         장바구니
                       </button>
                       <button
-                        onClick={() => handleAdd(seller, true)}
+                        onClick={() => void handleAdd(seller, true)}
                         className="btn-primary h-9 px-3 text-xs whitespace-nowrap"
                       >
                         바로구매
@@ -412,13 +421,13 @@ function ProductDetailContent() {
                   className="h-10 w-20 px-2 rounded-lg border border-border text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 />
                 <button
-                  onClick={() => handleAdd(seller, false)}
+                  onClick={() => void handleAdd(seller, false)}
                   className="btn-outline flex-1 h-10 text-sm"
                 >
                   장바구니 담기
                 </button>
                 <button
-                  onClick={() => handleAdd(seller, true)}
+                  onClick={() => void handleAdd(seller, true)}
                   className="btn-primary flex-1 h-10 text-sm"
                 >
                   바로 구매

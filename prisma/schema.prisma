@@ -177,6 +177,7 @@ model Order {
   unitPrice      Int
   extraShipping  Int            @default(0)
   status         String
+  cancelReason   String?
   shippingStatus ShippingStatus @default(PREPARING)
   courier        String?
   trackingNumber String?

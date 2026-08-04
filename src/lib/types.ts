@@ -114,6 +114,16 @@ export interface FullOrder {
   total: number;
   sellerCode: string;
   orderedAt: string;
+  listingId?: string;
+  sellerId?: string;
+  dot?: string;
+  cancelReason?: string | null;
+  shippingStatus?: string;
+  shippingStatusLabel?: string;
+  courier?: string | null;
+  trackingNumber?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
 }
 
 export interface DepositRecord {
