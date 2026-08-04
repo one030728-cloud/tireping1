@@ -217,10 +217,19 @@ function ProductDetailContent() {
       <p className="text-xs text-muted mb-4">{product.manufacturer}</p>
 
       <div className="card p-5 mb-5 flex flex-col md:flex-row gap-4 md:gap-6">
-        <ImagePlaceholder
-          className="w-40 h-40 mx-auto md:mx-0 shrink-0"
-          manufacturer={product.manufacturer}
-        />
+        {product.sellers.find((seller) => seller.images?.[0])?.images?.[0] ? (
+          // eslint-disable-next-line @next/next/no-img-element -- seller image URLs come from configured object storage
+          <img
+            src={product.sellers.find((seller) => seller.images?.[0])?.images?.[0]}
+            alt={`${product.manufacturer} ${product.model}`}
+            className="h-40 w-40 rounded-lg object-contain mx-auto md:mx-0 shrink-0"
+          />
+        ) : (
+          <ImagePlaceholder
+            className="w-40 h-40 mx-auto md:mx-0 shrink-0"
+            manufacturer={product.manufacturer}
+          />
+        )}
         <div className="flex-1">
           <h2 className="text-lg font-bold mb-1">{product.model}</h2>
           <p className="text-muted mb-4">

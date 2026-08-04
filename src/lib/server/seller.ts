@@ -37,7 +37,7 @@ export const listingSchema = z.object({
   tag: tagSchema,
   shippingNote: nullableText(500),
   courier: z.string().trim().min(1).max(80).optional(),
-  imageUrls: z.array(z.string().trim().min(1).max(2_000)).max(10).optional(),
+  imageUrls: z.array(z.string().trim().url().max(2_000)).max(10).optional(),
 });
 
 export const listingPatchSchema = listingSchema.partial();

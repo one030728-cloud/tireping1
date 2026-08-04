@@ -55,6 +55,7 @@ export interface Seller {
   minOrder: number;
   shippingNote: string;
   courier: string;
+  images?: string[];
 }
 
 export interface TireSpec {

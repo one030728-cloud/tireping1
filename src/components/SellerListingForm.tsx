@@ -3,9 +3,20 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { ImagePlus, X } from "lucide-react";
 import LoadingState from "@/components/LoadingState";
 import { MANUFACTURERS } from "@/lib/mockData";
 import type { SellerListingView } from "@/lib/seller-types";
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_COUNT = 10;
+const IMAGE_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+interface ImageDraft {
+  id?: string;
+  url: string;
+  file?: File;
+}
 
 interface FormState {
   manufacturer: string;
@@ -82,6 +93,8 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
   const router = useRouter();
   const [form, setForm] = useState<FormState>(emptyForm);
   const [listing, setListing] = useState<SellerListingView | null>(null);
+  const [images, setImages] = useState<ImageDraft[]>([]);
+  const [imagesChanged, setImagesChanged] = useState(false);
   const [loading, setLoading] = useState(Boolean(listingId));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +112,8 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
         if (!cancelled) {
           setListing(data.listing);
           setForm(formFromListing(data.listing));
+          setImages(data.listing.images.map((image) => ({ id: image.id, url: image.url })));
+          setImagesChanged(false);
         }
       })
       .catch((reason: Error) => {
@@ -117,37 +132,119 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function handleImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!files.length) return;
+
+    if (images.length + files.length > MAX_IMAGE_COUNT) {
+      setError(`이미지는 최대 ${MAX_IMAGE_COUNT}장까지 등록할 수 있습니다.`);
+      return;
+    }
+
+    const invalidFile = files.find(
+      (file) => !IMAGE_CONTENT_TYPES.has(file.type) || file.size > MAX_IMAGE_BYTES,
+    );
+    if (invalidFile) {
+      setError("JPG, PNG, WebP 이미지만 등록할 수 있으며 파일당 최대 10MB입니다.");
+      return;
+    }
+
+    setError(null);
+    setImages((current) => [
+      ...current,
+      ...files.map((file) => ({ file, url: URL.createObjectURL(file) })),
+    ]);
+    setImagesChanged(true);
+  }
+
+  function removeImage(index: number) {
+    setImages((current) => {
+      const removed = current[index];
+      if (removed?.file) URL.revokeObjectURL(removed.url);
+      return current.filter((_, imageIndex) => imageIndex !== index);
+    });
+    setImagesChanged(true);
+  }
+
+  async function uploadImage(file: File) {
+    const presignResponse = await fetch("/api/uploads/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
+    });
+    const presign = (await presignResponse.json().catch(() => null)) as
+      | { uploadUrl?: string; url?: string; error?: string }
+      | null;
+    if (!presignResponse.ok || !presign?.uploadUrl || !presign.url) {
+      throw new Error(
+        presign?.error === "STORAGE_NOT_CONFIGURED"
+          ? "이미지 저장소가 아직 설정되지 않았습니다. 관리자에게 문의해 주세요."
+          : "이미지 업로드용 URL을 발급하지 못했습니다.",
+      );
+    }
+
+    const uploadResponse = await fetch(presign.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!uploadResponse.ok) throw new Error("이미지 파일을 저장하지 못했습니다.");
+    return presign.url;
+  }
+
+  async function resolveImageUrls() {
+    return Promise.all(images.map((image) => (image.file ? uploadImage(image.file) : image.url)));
+  }
+
   async function persist(requestApproval: boolean) {
     setBusy(true);
     setError(null);
 
-    const url = listingId ? `/api/seller/listings/${listingId}` : "/api/seller/listings";
-    const response = await fetch(url, {
-      method: listingId ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
+    try {
+      const url = listingId ? `/api/seller/listings/${listingId}` : "/api/seller/listings";
+      const response = await fetch(url, {
+        method: listingId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
 
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error === "VALIDATION_ERROR" ? "입력값을 확인해 주세요." : "상품을 저장하지 못했습니다.");
-      setBusy(false);
-      return;
-    }
-
-    const data = (await response.json()) as { listing: SellerListingView };
-    const savedId = data.listing.id;
-
-    if (requestApproval) {
-      const submitResponse = await fetch(`/api/seller/listings/${savedId}/submit`, { method: "POST" });
-      if (!submitResponse.ok) {
-        setError("상품은 저장되었지만 승인 요청에 실패했습니다.");
-        setBusy(false);
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error === "VALIDATION_ERROR" ? "입력값을 확인해 주세요." : "상품을 저장하지 못했습니다.");
         return;
       }
-    }
 
-    router.push("/seller/listings");
+      const data = (await response.json()) as { listing: SellerListingView };
+      const savedId = data.listing.id;
+
+      if (imagesChanged) {
+        const imageUrls = await resolveImageUrls();
+        const imageResponse = await fetch(`/api/seller/listings/${savedId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrls }),
+        });
+        if (!imageResponse.ok) throw new Error("상품은 저장되었지만 이미지 정보를 저장하지 못했습니다.");
+
+        images.forEach((image) => {
+          if (image.file) URL.revokeObjectURL(image.url);
+        });
+        setImages(imageUrls.map((imageUrl) => ({ url: imageUrl })));
+        setImagesChanged(false);
+      }
+
+      if (requestApproval) {
+        const submitResponse = await fetch(`/api/seller/listings/${savedId}/submit`, { method: "POST" });
+        if (!submitResponse.ok) throw new Error("상품은 저장되었지만 승인 요청에 실패했습니다.");
+      }
+
+      router.push("/seller/listings");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "상품을 저장하지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function handleSubmit(event: FormEvent) {
@@ -253,6 +350,47 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
             <div className="grid sm:grid-cols-2 gap-3">
               <TextField label="택배사" field="courier" form={form} setField={setField} required />
               <TextField label="배송 안내 문구" field="shippingNote" form={form} setField={setField} />
+            </div>
+          </section>
+
+          <section className="card p-5">
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <h2 className="font-bold">상품 이미지</h2>
+              <span className="text-xs text-muted">{images.length}/{MAX_IMAGE_COUNT}</span>
+            </div>
+            <p className="text-xs text-muted mb-4">
+              JPG, PNG, WebP 이미지를 파일당 최대 10MB까지 등록할 수 있습니다.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {images.map((image, index) => (
+                <div key={`${image.id ?? "new"}-${image.url}`} className="relative aspect-square overflow-hidden rounded-xl border border-border bg-surface-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- uploaded object-storage URLs are user-configured and not known at build time */}
+                  <img src={image.url} alt={`상품 이미지 ${index + 1}`} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index)}
+                    disabled={busy}
+                    aria-label={`상품 이미지 ${index + 1} 삭제`}
+                    className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white hover:bg-black/80 disabled:opacity-50"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+              ))}
+              {images.length < MAX_IMAGE_COUNT && (
+                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong text-muted transition-colors hover:border-brand hover:bg-brand/5">
+                  <ImagePlus size={22} strokeWidth={1.6} />
+                  <span className="text-xs font-semibold">이미지 추가</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="sr-only"
+                    onChange={handleImageChange}
+                    disabled={busy}
+                  />
+                </label>
+              )}
             </div>
           </section>
 

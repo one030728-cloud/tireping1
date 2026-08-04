@@ -24,6 +24,10 @@ const publicListingSelect = {
       shippingNote: true,
     },
   },
+  images: {
+    orderBy: { sortOrder: "asc" },
+    select: { url: true },
+  },
 } satisfies Prisma.ListingSelect;
 
 const publicProductSelect = {
@@ -79,6 +83,7 @@ function toSeller(listing: PublicListing) {
     minOrder: listing.minOrder,
     shippingNote: listing.seller.shippingNote ?? "",
     courier: listing.seller.courier,
+    images: listing.images.map((image) => image.url),
   };
 }
 
