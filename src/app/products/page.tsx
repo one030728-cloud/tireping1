@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SearchX } from "lucide-react";
 import LoadingState from "@/components/LoadingState";
-import { CATALOG, MANUFACTURERS } from "@/lib/mockData";
+import { MANUFACTURERS } from "@/lib/mockData";
 import type { CatalogRow } from "@/lib/types";
 import { parseTireSize } from "@/lib/tireSearch";
 import { useAuth } from "@/lib/auth";
@@ -53,11 +53,37 @@ function ProductsContent() {
   const [dot, setDot] = useState("");
   const [sort, setSort] = useState<SortKey>("registered");
   const [page, setPage] = useState(1);
+  const [catalog, setCatalog] = useState<CatalogRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/products", { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error("상품 목록을 불러오지 못했습니다.");
+        return response.json() as Promise<{ products: CatalogRow[] }>;
+      })
+      .then((data) => {
+        if (!cancelled) setCatalog(data.products);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const results = useMemo(() => {
     const parsedSize = parseTireSize(size);
     const hasInvalidSize = size.trim().length > 0 && !parsedSize;
-    const filtered = CATALOG.filter((r) => {
+    const filtered = catalog.filter((r) => {
       if (hasInvalidSize) return false;
       if (tag && r.tag !== tag) return false;
       if (manufacturer && r.manufacturer !== manufacturer) return false;
@@ -74,13 +100,26 @@ function ProductsContent() {
       return true;
     });
     return sortRows(filtered, sort);
-  }, [tag, manufacturer, model, productCode, width, ratio, rim, dot, size, sort]);
+  }, [catalog, tag, manufacturer, model, productCode, width, ratio, rim, dot, size, sort]);
 
   const pageCount = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
   const pageRows = results.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function resetPage() {
     setPage(1);
+  }
+
+  if (loading) return <LoadingState />;
+
+  if (loadError) {
+    return (
+      <div className="px-4 py-16 text-center">
+        <p className="text-muted mb-4">상품 목록을 불러오지 못했습니다.</p>
+        <button className="btn-outline" onClick={() => window.location.reload()}>
+          다시 시도
+        </button>
+      </div>
+    );
   }
 
   return (

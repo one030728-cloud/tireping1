@@ -1,13 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ChevronLeft, Star } from "lucide-react";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import LoadingState from "@/components/LoadingState";
-import { FACTORY_TIRES, TIRES, TIRE_SPECS, getSellersForTire } from "@/lib/mockData";
 import { useCart } from "@/lib/cart";
 import { useOrders } from "@/lib/orders";
 import { useWishlist } from "@/lib/wishlist";
@@ -34,6 +33,7 @@ interface ProductView {
   sellers: Seller[];
 }
 
+/*
 const FALLBACK_SPEC = {
   loadIndex: "-",
   speedIndex: "-",
@@ -90,6 +90,7 @@ function resolveProduct(id: string, dot: string | null): ProductView | null {
 
   return null;
 }
+*/
 
 function ProductDetailContent() {
   const params = useParams<{ id: string }>();
@@ -100,11 +101,46 @@ function ProductDetailContent() {
   const { isWished, toggleWish } = useWishlist();
   const { user } = useAuth();
   const dot = searchParams.get("dot");
-  const product = useMemo(() => resolveProduct(params.id, dot), [params.id, dot]);
+  const [product, setProduct] = useState<ProductView | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const lowestPrice = product ? Math.min(...product.sellers.map((s) => s.price)) : 0;
 
-  if (!product) {
+  useEffect(() => {
+    let cancelled = false;
+
+    const query = dot ? `?dot=${encodeURIComponent(dot)}` : "";
+    fetch(`/api/products/${encodeURIComponent(params.id)}${query}`, { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error("상품 상세 정보를 불러오지 못했습니다.");
+        return response.json() as Promise<{ product: ProductView }>;
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setLoadError(false);
+          setProduct(data.product);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, dot]);
+
+  const lowestPrice = useMemo(
+    () => (product ? Math.min(...product.sellers.map((s) => s.price)) : 0),
+    [product],
+  );
+
+  if (loading) return <LoadingState />;
+
+  if (!product || loadError) {
     return (
       <div className="px-4 py-16 text-center">
         <p className="text-muted mb-4">존재하지 않는 상품입니다.</p>
