@@ -31,7 +31,7 @@ export default function LoginPage() {
     const result = await login(id, password);
     setSubmitting(false);
     if (result.ok) {
-      router.push(result.role === "SELLER" ? "/seller" : "/main");
+      router.push(result.role === "SELLER" ? "/seller" : result.role === "ADMIN" ? "/admin" : "/main");
     } else {
       setError(result.message ?? "로그인에 실패했습니다.");
     }

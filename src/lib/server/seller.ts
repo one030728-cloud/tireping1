@@ -137,6 +137,18 @@ export async function requireSeller() {
     } as const;
   }
 
+  const seller = await prisma.seller.findUnique({
+    where: { id: sellerId },
+    select: { status: true },
+  });
+  if (!seller || seller.status !== "ACTIVE") {
+    return {
+      session: null,
+      sellerId: null,
+      response: NextResponse.json({ error: "SELLER_INACTIVE" }, { status: 403 }),
+    } as const;
+  }
+
   return { session: auth.session, sellerId, response: null } as const;
 }
 
