@@ -70,6 +70,15 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-export function getSession() {
-  return getServerSession(authOptions);
+export async function getSession() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return session;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { withdrawnAt: true },
+  });
+  if (!user || user.withdrawnAt) return null;
+
+  return session;
 }
