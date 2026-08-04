@@ -1,71 +1,149 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { useAuth } from "./auth";
 import type { CartItem } from "./types";
-
-const STORAGE_KEY = "tirezone_cart";
 
 interface CartContextValue {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "id">) => void;
-  removeItem: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
-  clear: () => void;
+  loading: boolean;
+  addItem: (item: Omit<CartItem, "id">) => Promise<void>;
+  removeItem: (id: string) => Promise<void>;
+  updateQuantity: (id: string, quantity: number) => Promise<void>;
+  clear: () => Promise<void>;
+  refreshCart: () => Promise<CartItem[]>;
+}
+
+interface CartResponse {
+  items?: CartItem[];
+  item?: CartItem;
+  error?: string;
+}
+
+export class CartRequestError extends Error {
+  constructor(public readonly code: string) {
+    super(code);
+    this.name = "CartRequestError";
+  }
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
 
+async function readCartResponse(response: Response) {
+  const body = (await response.json().catch(() => null)) as CartResponse | null;
+  if (!response.ok) throw new CartRequestError(body?.error ?? "CART_REQUEST_FAILED");
+  return body;
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id;
+  const userRole = user?.role;
   const [items, setItems] = useState<CartItem[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [itemsOwnerId, setItemsOwnerId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refreshCart = useCallback(async () => {
+    const response = await fetch("/api/cart", { cache: "no-store" });
+    const body = await readCartResponse(response);
+    const nextItems = body?.items ?? [];
+    setItems(nextItems);
+    setItemsOwnerId(userId ?? null);
+    return nextItems;
+  }, [userId]);
 
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage hydration after mount, required to avoid SSR/client markup mismatch
-        setItems(JSON.parse(raw));
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
+    if (authLoading) return;
+    let cancelled = false;
+    if (!userId || userRole !== "BUYER") {
+      return () => {
+        cancelled = true;
+      };
     }
-    setHydrated(true);
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronize the session with the external cart API
+    void refreshCart()
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, refreshCart, userId, userRole]);
+
+  const addItem = useCallback(async (item: Omit<CartItem, "id">) => {
+    const response = await fetch("/api/cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(item),
+    });
+    const body = await readCartResponse(response);
+    if (!body?.item) throw new CartRequestError("CART_RESPONSE_INVALID");
+    const savedItem = body.item;
+    setItemsOwnerId(userId ?? null);
+    setItems((current) => {
+      const existing = current.find(
+        (currentItem) =>
+          currentItem.tireId === savedItem.tireId &&
+          currentItem.sellerCode === savedItem.sellerCode &&
+          currentItem.dot === savedItem.dot,
+      );
+      return existing
+        ? current.map((currentItem) => (currentItem.id === existing.id ? savedItem : currentItem))
+        : [...current, savedItem];
+    });
+  }, [userId]);
+
+  const removeItem = useCallback(async (id: string) => {
+    const response = await fetch(`/api/cart/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await readCartResponse(response);
+    setItems((current) => current.filter((item) => item.id !== id));
   }, []);
 
-  useEffect(() => {
-    if (hydrated) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    }
-  }, [items, hydrated]);
-
-  const addItem: CartContextValue["addItem"] = (item) => {
-    setItems((prev) => {
-      const existing = prev.find(
-        (p) => p.tireId === item.tireId && p.sellerCode === item.sellerCode,
-      );
-      if (existing) {
-        return prev.map((p) =>
-          p.id === existing.id ? { ...p, quantity: p.quantity + item.quantity } : p,
-        );
-      }
-      return [...prev, { ...item, id: `${item.tireId}-${item.sellerCode}-${Date.now()}` }];
+  const updateQuantity = useCallback(async (id: string, quantity: number) => {
+    const response = await fetch(`/api/cart/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity: Math.max(1, quantity) }),
     });
-  };
-
-  const removeItem = (id: string) => {
-    setItems((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  const updateQuantity = (id: string, quantity: number) => {
-    setItems((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, quantity: Math.max(1, quantity) } : p)),
+    const body = await readCartResponse(response);
+    if (!body?.item) throw new CartRequestError("CART_RESPONSE_INVALID");
+    setItems((current) =>
+      current.map((item) => (item.id === body.item?.id ? body.item : item)),
     );
-  };
+  }, []);
 
-  const clear = () => setItems([]);
+  const clear = useCallback(async () => {
+    const response = await fetch("/api/cart", { method: "DELETE" });
+    await readCartResponse(response);
+    setItems([]);
+  }, []);
+
+  const visibleItems = itemsOwnerId === userId && userRole === "BUYER" ? items : [];
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clear }}>
+    <CartContext.Provider
+      value={{
+        items: visibleItems,
+        loading: authLoading || (userRole === "BUYER" ? loading || itemsOwnerId !== userId : false),
+        addItem,
+        removeItem,
+        updateQuantity,
+        clear,
+        refreshCart,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );

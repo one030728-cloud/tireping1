@@ -7,9 +7,9 @@ import { Suspense } from "react";
 import { ChevronLeft, Star } from "lucide-react";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import LoadingState from "@/components/LoadingState";
-import { useCart } from "@/lib/cart";
+import { CartRequestError, useCart } from "@/lib/cart";
 import { OrderRequestError, useOrders } from "@/lib/orders";
-import { useWishlist } from "@/lib/wishlist";
+import { useWishlist, WishlistRequestError } from "@/lib/wishlist";
 import { useAuth } from "@/lib/auth";
 import type { Manufacturer, Seller } from "@/lib/types";
 
@@ -152,7 +152,7 @@ function ProductDetailContent() {
   }
 
   async function handleAdd(seller: Seller, buyNow: boolean) {
-    if (!user) {
+    if (!user || user.role !== "BUYER") {
       router.push(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
@@ -173,38 +173,46 @@ function ProductDetailContent() {
       stock: seller.stock,
     };
 
-    if (buyNow) {
-      try {
+    try {
+      if (buyNow) {
         await addOrders([{ ...item, id: `${item.tireId}-${item.sellerCode}-${Date.now()}` }]);
         router.push("/orders?justOrdered=1");
-      } catch (error) {
-        const code = error instanceof OrderRequestError ? error.code : "ORDER_REQUEST_FAILED";
-        window.alert(
-          code === "ORDER_STOCK_INSUFFICIENT"
-            ? "재고가 부족한 상품이 있어 주문할 수 없습니다."
-            : "주문 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-        );
+      } else {
+        await addItem(item);
+        router.push("/cart");
       }
-      return;
+    } catch (error) {
+      const code =
+        error instanceof OrderRequestError || error instanceof CartRequestError
+          ? error.code
+          : "ORDER_REQUEST_FAILED";
+      window.alert(
+        code === "ORDER_STOCK_INSUFFICIENT"
+          ? "재고가 부족한 상품이 있어 주문할 수 없습니다."
+          : "요청 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      );
     }
-
-    addItem(item);
-    router.push("/cart");
   }
 
-  function handleWish(seller: Seller) {
+  async function handleWish(seller: Seller) {
     if (!user) {
       router.push(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
 
-    toggleWish({
-      id: `${product!.id}-${seller.code}`,
-      type: "타이어판매점",
-      code: seller.code,
-      location: "판매점 소재지 비공개",
-      intro: `${product!.manufacturer} ${product!.model} 취급 판매점`,
-    });
+    try {
+      await toggleWish({
+        id: `${product!.id}-${seller.code}`,
+        type: "타이어판매점",
+        code: seller.code,
+        location: "판매점 소재지 비공개",
+        intro: `${product!.manufacturer} ${product!.model} 취급 판매점`,
+      });
+    } catch (error) {
+      if (error instanceof WishlistRequestError) {
+        window.alert("관심 판매처를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    }
   }
 
   return (
@@ -291,7 +299,7 @@ function ProductDetailContent() {
                 <td className="py-3 px-4 font-semibold">
                   {user && (
                     <button
-                      onClick={() => handleWish(seller)}
+                      onClick={() => void handleWish(seller)}
                       aria-label="판매점 찜하기"
                       className={`mr-1.5 align-middle inline-flex active:scale-90 ${isWished(seller.code) ? "text-accent" : "text-muted hover:text-accent"}`}
                     >
@@ -384,7 +392,7 @@ function ProductDetailContent() {
               <span className="text-sm font-semibold flex items-center">
                 {user && (
                   <button
-                    onClick={() => handleWish(seller)}
+                    onClick={() => void handleWish(seller)}
                     aria-label="판매점 찜하기"
                     className={`flex items-center p-2 -m-2 mr-0.5 active:scale-90 ${isWished(seller.code) ? "text-accent" : "text-muted hover:text-accent"}`}
                   >

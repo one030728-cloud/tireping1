@@ -6,7 +6,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Package, Plus, Trash2, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import LoadingState from "@/components/LoadingState";
-import { useListings } from "@/lib/listings";
+import { ListingsRequestError, useListings } from "@/lib/listings";
 import { MANUFACTURERS } from "@/lib/mockData";
 import type { Manufacturer } from "@/lib/types";
 
@@ -69,24 +69,46 @@ function SellContent() {
   const { listings, addListing, removeListing, toggleStatus } = useListings();
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const onSaleCount = listings.filter((l) => l.status === "판매중").length;
   const soldOutCount = listings.filter((l) => l.status === "품절").length;
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    addListing({
-      manufacturer: form.manufacturer,
-      model: form.model,
-      width: Number(form.width),
-      ratio: Number(form.ratio),
-      rim: Number(form.rim),
-      dot: form.dot || String(new Date().getFullYear()),
-      price: Number(form.price),
-      stock: Number(form.stock),
-    });
-    setForm(EMPTY_FORM);
-    setFormOpen(false);
+    setSaving(true);
+    setError(null);
+    try {
+      await addListing({
+        manufacturer: form.manufacturer,
+        model: form.model,
+        width: Number(form.width),
+        ratio: Number(form.ratio),
+        rim: Number(form.rim),
+        dot: form.dot || String(new Date().getFullYear()),
+        price: Number(form.price),
+        stock: Number(form.stock),
+      });
+      setForm(EMPTY_FORM);
+      setFormOpen(false);
+    } catch (reason) {
+      setError(
+        reason instanceof ListingsRequestError
+          ? "상품을 저장하지 못했습니다. 입력값과 판매자 승인 상태를 확인해 주세요."
+          : "상품을 저장하지 못했습니다.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runListingAction(action: () => Promise<void>) {
+    try {
+      await action();
+    } catch {
+      window.alert("상품 상태를 변경하지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+    }
   }
 
   return (
@@ -95,6 +117,7 @@ function SellContent() {
       <p className="text-sm text-muted mb-5">
         등록한 타이어 재고를 관리하고 판매 상태를 변경하세요.
       </p>
+      {error && <p className="mb-4 text-sm text-accent">{error}</p>}
 
       <div className="grid grid-cols-3 gap-2 mb-6">
         <div className="card p-4 text-center">
@@ -222,8 +245,8 @@ function SellContent() {
                   />
                 </Field>
               </div>
-              <button type="submit" className="btn-primary h-11 mt-2">
-                등록하기
+              <button type="submit" disabled={saving} className="btn-primary h-11 mt-2">
+                {saving ? "저장 중..." : "등록하기"}
               </button>
             </form>
           </Dialog.Content>
@@ -269,7 +292,7 @@ function SellContent() {
                     <td className="py-3 px-4 whitespace-nowrap">{l.registeredAt}</td>
                     <td className="py-3 px-4">
                       <button
-                        onClick={() => toggleStatus(l.id)}
+                        onClick={() => void runListingAction(() => toggleStatus(l.id))}
                         className={`text-xs font-semibold px-2.5 py-1.5 rounded-full ${
                           l.status === "판매중"
                             ? "bg-brand/10 text-brand"
@@ -281,7 +304,7 @@ function SellContent() {
                     </td>
                     <td className="py-3 px-4">
                       <button
-                        onClick={() => removeListing(l.id)}
+                        onClick={() => void runListingAction(() => removeListing(l.id))}
                         className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent"
                       >
                         <Trash2 size={13} /> 삭제
@@ -311,7 +334,7 @@ function SellContent() {
                     </p>
                   </div>
                   <button
-                    onClick={() => removeListing(l.id)}
+                    onClick={() => void runListingAction(() => removeListing(l.id))}
                     className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent shrink-0"
                   >
                     <Trash2 size={13} /> 삭제
@@ -323,7 +346,7 @@ function SellContent() {
                     <span className="text-xs font-normal text-muted">· 재고 {l.stock}</span>
                   </span>
                   <button
-                    onClick={() => toggleStatus(l.id)}
+                    onClick={() => void runListingAction(() => toggleStatus(l.id))}
                     className={`text-xs font-semibold px-2.5 py-1.5 rounded-full ${
                       l.status === "판매중" ? "bg-brand/10 text-brand" : "bg-muted/10 text-muted"
                     }`}
@@ -347,7 +370,7 @@ export default function SellPage() {
     return <LoadingState />;
   }
 
-  if (!user) {
+  if (!user || user.role !== "SELLER") {
     return <GuestSell />;
   }
 

@@ -7,6 +7,14 @@ import { useWishlist } from "@/lib/wishlist";
 function WishlistContent() {
   const { sellers, removeWish } = useWishlist();
 
+  async function handleRemove(id: string) {
+    try {
+      await removeWish(id);
+    } catch {
+      window.alert("관심 판매처를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+
   return (
     <div className="px-4 py-5">
       <h1 className="text-xl font-extrabold mb-1">찜한 판매업체</h1>
@@ -44,7 +52,7 @@ function WishlistContent() {
                     <td className="py-3 px-4 whitespace-nowrap">{s.wishedAt}</td>
                     <td className="py-3 px-4">
                       <button
-                        onClick={() => removeWish(s.id)}
+                        onClick={() => void handleRemove(s.id)}
                         className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent"
                       >
                         <Trash2 size={13} /> 삭제
@@ -69,7 +77,7 @@ function WishlistContent() {
                     <p className="font-semibold">{s.code}</p>
                   </div>
                   <button
-                    onClick={() => removeWish(s.id)}
+                    onClick={() => void handleRemove(s.id)}
                     className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent shrink-0"
                   >
                     <Trash2 size={13} /> 삭제

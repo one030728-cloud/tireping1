@@ -1,66 +1,120 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import { useAuth } from "./auth";
 import type { WishSeller } from "./types";
-import { WISH_SELLERS } from "./mockData";
-
-const STORAGE_KEY = "tirezone_wishlist";
 
 interface WishlistContextValue {
   sellers: WishSeller[];
+  loading: boolean;
   isWished: (code: string) => boolean;
-  toggleWish: (seller: Omit<WishSeller, "wishedAt">) => void;
-  removeWish: (id: string) => void;
+  toggleWish: (seller: Omit<WishSeller, "wishedAt">) => Promise<void>;
+  removeWish: (id: string) => Promise<void>;
+  refreshWishlist: () => Promise<WishSeller[]>;
+}
+
+interface WishlistResponse {
+  sellers?: WishSeller[];
+  wished?: boolean;
+  seller?: WishSeller | null;
+  error?: string;
+}
+
+export class WishlistRequestError extends Error {
+  constructor(public readonly code: string) {
+    super(code);
+    this.name = "WishlistRequestError";
+  }
 }
 
 const WishlistContext = createContext<WishlistContextValue | null>(null);
 
-function formatDate(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+async function readWishlistResponse(response: Response) {
+  const body = (await response.json().catch(() => null)) as WishlistResponse | null;
+  if (!response.ok) throw new WishlistRequestError(body?.error ?? "WISHLIST_REQUEST_FAILED");
+  return body;
 }
 
 export function WishlistProvider({ children }: { children: ReactNode }) {
-  const [sellers, setSellers] = useState<WishSeller[]>(WISH_SELLERS);
-  const [hydrated, setHydrated] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id;
+  const [sellers, setSellers] = useState<WishSeller[]>([]);
+  const [sellersOwnerId, setSellersOwnerId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refreshWishlist = useCallback(async () => {
+    const response = await fetch("/api/wishlist", { cache: "no-store" });
+    const body = await readWishlistResponse(response);
+    const nextSellers = body?.sellers ?? [];
+    setSellers(nextSellers);
+    setSellersOwnerId(userId ?? null);
+    return nextSellers;
+  }, [userId]);
 
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage hydration after mount, required to avoid SSR/client markup mismatch
-        setSellers(JSON.parse(raw));
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
+    if (authLoading) return;
+    let cancelled = false;
+    if (!userId) {
+      return () => {
+        cancelled = true;
+      };
     }
-    setHydrated(true);
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronize the session with the external wishlist API
+    void refreshWishlist()
+      .catch(() => {
+        if (!cancelled) setSellers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, refreshWishlist, userId]);
+
+  const toggleWish = useCallback(async (seller: Omit<WishSeller, "wishedAt">) => {
+    const response = await fetch("/api/wishlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(seller),
+    });
+    const body = await readWishlistResponse(response);
+    setSellersOwnerId(userId ?? null);
+    if (body?.wished && body.seller) {
+      setSellers((current) => [body.seller!, ...current.filter((item) => item.code !== seller.code)]);
+    } else {
+      setSellers((current) => current.filter((item) => item.code !== seller.code));
+    }
+  }, [userId]);
+
+  const removeWish = useCallback(async (id: string) => {
+    const response = await fetch(`/api/wishlist/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await readWishlistResponse(response);
+    setSellers((current) => current.filter((seller) => seller.id !== id));
   }, []);
 
-  useEffect(() => {
-    if (hydrated) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sellers));
-    }
-  }, [sellers, hydrated]);
-
-  const isWished = (code: string) => sellers.some((s) => s.code === code);
-
-  const toggleWish: WishlistContextValue["toggleWish"] = (seller) => {
-    setSellers((prev) => {
-      const existing = prev.find((s) => s.code === seller.code);
-      if (existing) {
-        return prev.filter((s) => s.code !== seller.code);
-      }
-      return [{ ...seller, wishedAt: formatDate(new Date()) }, ...prev];
-    });
-  };
-
-  const removeWish = (id: string) => {
-    setSellers((prev) => prev.filter((s) => s.id !== id));
-  };
+  const visibleSellers = sellersOwnerId === userId && Boolean(userId) ? sellers : [];
 
   return (
-    <WishlistContext.Provider value={{ sellers, isWished, toggleWish, removeWish }}>
+    <WishlistContext.Provider
+      value={{
+        sellers: visibleSellers,
+        loading: authLoading || (userId ? loading || sellersOwnerId !== userId : false),
+        isWished: (code) => visibleSellers.some((seller) => seller.code === code),
+        toggleWish,
+        removeWish,
+        refreshWishlist,
+      }}
+    >
       {children}
     </WishlistContext.Provider>
   );

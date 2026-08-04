@@ -161,7 +161,7 @@ export interface MyListing {
   dot: string;
   price: number;
   stock: number;
-  status: "판매중" | "품절";
+  status: "작성중" | "승인대기" | "판매중" | "반려" | "품절" | "비노출";
   registeredAt: string;
 }
 

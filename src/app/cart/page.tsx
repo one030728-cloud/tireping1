@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
-import { useCart } from "@/lib/cart";
+import { CartRequestError, useCart } from "@/lib/cart";
 import { OrderRequestError, useOrders } from "@/lib/orders";
 
 function CartContent() {
@@ -16,9 +16,25 @@ function CartContent() {
 
   const total = items.reduce((sum, i) => sum + i.price * i.quantity + i.extraShipping, 0);
 
-  function handleClear() {
+  async function handleClear() {
     if (window.confirm("장바구니에 담긴 모든 상품을 삭제할까요?")) {
-      clear();
+      try {
+        await clear();
+      } catch {
+        window.alert("장바구니를 비우지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    }
+  }
+
+  async function runCartAction(action: () => Promise<void>) {
+    try {
+      await action();
+    } catch (error) {
+      const message =
+        error instanceof CartRequestError && error.code === "CART_ITEM_NOT_FOUND"
+          ? "장바구니 상품을 찾지 못했습니다. 새로고침 후 다시 시도해 주세요."
+          : "장바구니를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+      window.alert(message);
     }
   }
 
@@ -26,7 +42,11 @@ function CartContent() {
     setSubmitting(true);
     try {
       await addOrders(items);
-      clear();
+      try {
+        await clear();
+      } catch {
+        window.alert("주문은 완료되었지만 장바구니를 비우지 못했습니다. 주문내역을 확인해 주세요.");
+      }
       router.push("/orders?justOrdered=1");
     } catch (error) {
       const code = error instanceof OrderRequestError ? error.code : "ORDER_REQUEST_FAILED";
@@ -88,7 +108,7 @@ function CartContent() {
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => void runCartAction(() => updateQuantity(item.id, item.quantity - 1))}
                           aria-label="수량 감소"
                           disabled={item.quantity <= 1}
                           className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
@@ -102,7 +122,7 @@ function CartContent() {
                           {item.quantity}
                         </span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => void runCartAction(() => updateQuantity(item.id, item.quantity + 1))}
                           aria-label="수량 증가"
                           disabled={item.stock !== undefined && item.quantity >= item.stock}
                           className="w-7 h-7 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
@@ -117,7 +137,7 @@ function CartContent() {
                     <td className="py-3 px-4">{item.sellerCode}</td>
                     <td className="py-3 px-4">
                       <button
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => void runCartAction(() => removeItem(item.id))}
                         className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent"
                       >
                         <Trash2 size={13} /> 삭제
@@ -147,7 +167,7 @@ function CartContent() {
                     </p>
                   </div>
                   <button
-                    onClick={() => removeItem(item.id)}
+                    onClick={() => void runCartAction(() => removeItem(item.id))}
                     className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent shrink-0"
                   >
                     <Trash2 size={13} /> 삭제
@@ -156,7 +176,7 @@ function CartContent() {
                 <div className="flex items-center justify-between mt-3">
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      onClick={() => void runCartAction(() => updateQuantity(item.id, item.quantity - 1))}
                       aria-label="수량 감소"
                       disabled={item.quantity <= 1}
                       className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
@@ -170,7 +190,7 @@ function CartContent() {
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      onClick={() => void runCartAction(() => updateQuantity(item.id, item.quantity + 1))}
                       aria-label="수량 증가"
                       disabled={item.stock !== undefined && item.quantity >= item.stock}
                       className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-surface-2 active:scale-90 disabled:opacity-40 disabled:pointer-events-none"
@@ -198,7 +218,7 @@ function CartContent() {
 
           <div className="flex gap-2 mt-4 pb-8">
             <button
-              onClick={handleClear}
+              onClick={() => void handleClear()}
               className="h-12 px-5 rounded-xl border border-border text-sm font-semibold hover:bg-surface-2 active:scale-95 transition-all"
             >
               전체삭제
