@@ -43,6 +43,8 @@ export interface User {
   businessName: string;
   ownerName: string;
   phone: string;
+  role?: "BUYER" | "SELLER" | "ADMIN";
+  sellerId?: string | null;
 }
 
 export interface Seller {

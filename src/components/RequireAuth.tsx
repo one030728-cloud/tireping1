@@ -5,17 +5,26 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import LoadingState from "./LoadingState";
 
-export default function RequireAuth({ children }: { children: React.ReactNode }) {
+type Role = "BUYER" | "SELLER" | "ADMIN";
+
+export default function RequireAuth({
+  children,
+  allow,
+}: {
+  children: React.ReactNode;
+  allow?: readonly Role[];
+}) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const allowed = Boolean(user && (!allow || (user.role && allow.includes(user.role))));
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !allowed) {
       router.replace("/login");
     }
-  }, [loading, user, router]);
+  }, [loading, allowed, router]);
 
-  if (loading || !user) {
+  if (loading || !allowed) {
     return <LoadingState />;
   }
 

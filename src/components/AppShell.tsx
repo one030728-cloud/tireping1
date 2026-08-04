@@ -11,9 +11,14 @@ import MobileBottomNav from "./MobileBottomNav";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const pathname = usePathname();
-  const hasOwnSidebar = pathname.startsWith("/goods") || pathname.startsWith("/customer");
+  const hasOwnSidebar =
+    pathname.startsWith("/goods") ||
+    pathname.startsWith("/customer") ||
+    pathname.startsWith("/seller") ||
+    pathname.startsWith("/admin");
+  const hasPortalShell = pathname.startsWith("/seller") || pathname.startsWith("/admin");
   const showAppShell = pathname !== "/login" && pathname !== "/";
-  const showBreadcrumb = showAppShell;
+  const showBreadcrumb = showAppShell && !hasPortalShell;
   const showSidebar = showAppShell && !hasOwnSidebar && Boolean(user);
   const showFooter = pathname !== "/login";
   const isMainDashboard = pathname === "/main";
@@ -38,7 +43,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
       {showFooter && <Footer />}
       <ScrollToTopButton />
-      {showAppShell && <MobileBottomNav />}
+      {showAppShell && !hasPortalShell && <MobileBottomNav />}
     </div>
   );
 }

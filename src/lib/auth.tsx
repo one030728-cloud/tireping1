@@ -1,61 +1,59 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import type { User } from "./types";
-
-const STORAGE_KEY = "tirezone_user";
-
-const MOCK_ACCOUNT = { id: "demo", password: "demo1234" };
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (id: string, password: string) => Promise<{ ok: boolean; message?: string }>;
+  login: (id: string, password: string) => Promise<{
+    ok: boolean;
+    message?: string;
+    role?: User["role"];
+  }>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage hydration after mount, required to avoid SSR/client markup mismatch
-        setUser(JSON.parse(raw));
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
+  const { data: session, status } = useSession();
+  const sessionUser = session?.user;
+  const user: User | null = sessionUser
+    ? {
+        id: sessionUser.id,
+        businessName: sessionUser.name ?? "회원",
+        ownerName: sessionUser.name ?? "회원",
+        phone: "",
+        role: sessionUser.role,
+        sellerId: sessionUser.sellerId,
       }
-    }
-    setLoading(false);
-  }, []);
+    : null;
 
   const login: AuthContextValue["login"] = async (id, password) => {
-    await new Promise((r) => setTimeout(r, 300));
-    if (id !== MOCK_ACCOUNT.id || password !== MOCK_ACCOUNT.password) {
-      return { ok: false, message: "아이디 또는 비밀번호가 일치하지 않습니다." };
+    const result = await signIn("credentials", {
+      loginId: id,
+      password,
+      redirect: false,
+    });
+
+    if (!result || result.error) {
+      return { ok: false, message: "아이디 또는 비밀번호를 확인해 주세요." };
     }
-    const loggedInUser: User = {
-      id,
-      businessName: "산악타이어상사",
-      ownerName: "홍길동",
-      phone: "010-1234-5678",
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(loggedInUser));
-    setUser(loggedInUser);
-    return { ok: true };
+    const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
+    const currentSession = (await sessionResponse.json()) as { user?: { role?: User["role"] } };
+    return { ok: true, role: currentSession.user?.role };
   };
 
   const logout = () => {
-    localStorage.removeItem(STORAGE_KEY);
-    setUser(null);
+    void signOut({ redirect: false });
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading: status === "loading", login, logout }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

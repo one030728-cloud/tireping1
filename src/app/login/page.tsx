@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
@@ -30,7 +31,7 @@ export default function LoginPage() {
     const result = await login(id, password);
     setSubmitting(false);
     if (result.ok) {
-      router.push("/main");
+      router.push(result.role === "SELLER" ? "/seller" : "/main");
     } else {
       setError(result.message ?? "로그인에 실패했습니다.");
     }
@@ -113,6 +114,10 @@ export default function LoginPage() {
               회원가입
             </button>
           </div>
+
+          <Link href="/seller/signup" className="text-center text-sm text-brand hover:underline">
+            판매자 가입 신청
+          </Link>
 
           <div className="text-xs text-muted bg-surface-2 border border-dashed border-border-strong rounded-lg p-3 mt-2 leading-relaxed">
             데모 계정 · 아이디: <b className="text-foreground">demo</b> / 비밀번호:{" "}
