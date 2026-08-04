@@ -36,7 +36,11 @@ export const bankAccountSchema = z.object({
 
 export class AccountDomainError extends Error {
   constructor(
-    public readonly code: "ACCOUNT_NOT_FOUND" | "ACCOUNT_ALREADY_WITHDRAWN" | "ACTIVE_ORDERS_EXIST",
+    public readonly code:
+      | "ACCOUNT_NOT_FOUND"
+      | "ACCOUNT_ALREADY_WITHDRAWN"
+      | "ACTIVE_ORDERS_EXIST"
+      | "SELLER_PROFILE_NOT_FOUND",
     public readonly status = 409,
   ) {
     super(code);
@@ -160,16 +164,21 @@ export async function saveBankAccount(
 
 const cancelledStatuses = Object.values(CANCEL_STATUS);
 
-export async function withdrawAccount(userId: string, role: Role) {
+export async function withdrawAccount(userId: string, role: Role, sellerId: string | null) {
   const result = await prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({ where: { id: userId }, select: { withdrawnAt: true } });
     if (!user) throw new AccountDomainError("ACCOUNT_NOT_FOUND", 404);
     if (user.withdrawnAt) throw new AccountDomainError("ACCOUNT_ALREADY_WITHDRAWN");
 
     if (role === "BUYER" || role === "SELLER") {
+      const orderOwnerFilter =
+        role === "BUYER" ? { buyerId: userId } : sellerId ? { sellerId } : null;
+      if (!orderOwnerFilter) throw new AccountDomainError("SELLER_PROFILE_NOT_FOUND");
+
+      // Order.sellerId stores Seller.id, so seller withdrawal uses the session sellerId.
       const activeOrders = await tx.order.count({
         where: {
-          ...(role === "BUYER" ? { buyerId: userId } : { sellerId: userId }),
+          ...orderOwnerFilter,
           status: { notIn: cancelledStatuses },
           shippingStatus: { not: "DELIVERED" },
         },

@@ -15,7 +15,11 @@ export async function POST() {
   if (auth.response) return auth.response;
 
   try {
-    const result = await withdrawAccount(auth.session.user.id, auth.session.user.role);
+    const result = await withdrawAccount(
+      auth.session.user.id,
+      auth.session.user.role,
+      auth.session.user.sellerId,
+    );
     return NextResponse.json(result);
   } catch (error) {
     const domain = domainErrorResponse(error);
