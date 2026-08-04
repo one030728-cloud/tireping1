@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "db:seed": "prisma db seed",
     "lint": "eslint",
     "format": "prettier --write ."
   },
@@ -32,6 +33,10 @@
     "prettier": "^3.9.6",
     "prisma": "6.19.0",
     "tailwindcss": "^4",
+    "tsx": "4.23.5",
     "typescript": "^5"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
