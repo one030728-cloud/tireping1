@@ -11,18 +11,18 @@ import type { Tire } from "../src/lib/types";
 const prisma = new PrismaClient();
 const PASSWORD_ROUNDS = 10;
 
+const CANONICAL_LOGIN_IDS = ["admin", "buyer", "seller"];
+const CANONICAL_SELLER_CODE = "SELLER";
+
 type SeedAdmin = { id: string };
+type SeedSeller = { id: string };
 
 function normalFactoryPrice(price: number, discountRate: number) {
   return Math.round((price / (1 - discountRate / 100)) / 100) * 100;
 }
 
-function sellerLoginId(code: string) {
-  return `seller_${code.toLowerCase()}`;
-}
-
 async function createBaseUsers() {
-  const demoPasswordHash = await bcrypt.hash("demo1234", PASSWORD_ROUNDS);
+  const buyerPasswordHash = await bcrypt.hash("buyer1234", PASSWORD_ROUNDS);
   const configuredAdminPassword = process.env.SEED_ADMIN_PASSWORD;
   if (process.env.NODE_ENV === "production" && !configuredAdminPassword) {
     throw new Error(
@@ -32,13 +32,14 @@ async function createBaseUsers() {
 
   const adminPassword = configuredAdminPassword ?? "admin1234";
   const adminPasswordHash = await bcrypt.hash(adminPassword, PASSWORD_ROUNDS);
+  const sellerPasswordHash = await bcrypt.hash("seller1234", PASSWORD_ROUNDS);
 
-  const demo = await prisma.user.upsert({
-    where: { loginId: "demo" },
+  const buyer = await prisma.user.upsert({
+    where: { loginId: "buyer" },
     create: {
-      id: "seed-buyer-demo",
-      loginId: "demo",
-      passwordHash: demoPasswordHash,
+      id: "seed-buyer",
+      loginId: "buyer",
+      passwordHash: buyerPasswordHash,
       role: "BUYER",
       businessName: "산악타이어상사",
       businessRegNumber: "000-00-00000",
@@ -46,7 +47,7 @@ async function createBaseUsers() {
       mobilePhone: "010-1234-5678",
     },
     update: {
-      passwordHash: demoPasswordHash,
+      passwordHash: buyerPasswordHash,
       role: "BUYER",
       businessName: "산악타이어상사",
       ownerName: "홍길동",
@@ -77,56 +78,87 @@ async function createBaseUsers() {
     },
   });
 
-  return { demo, admin };
-}
-
-async function upsertSeller(
-  sellerInput: ReturnType<typeof getSellersForTire>[number],
-  admin: SeedAdmin,
-) {
-  const user = await prisma.user.upsert({
-    where: { loginId: sellerLoginId(sellerInput.code) },
+  const sellerUser = await prisma.user.upsert({
+    where: { loginId: "seller" },
     create: {
-      id: `seed-user-${sellerInput.code.toLowerCase()}`,
-      loginId: sellerLoginId(sellerInput.code),
-      passwordHash: await bcrypt.hash("seller1234", PASSWORD_ROUNDS),
+      id: "seed-seller-user",
+      loginId: "seller",
+      passwordHash: sellerPasswordHash,
       role: "SELLER",
-      businessName: `판매점 ${sellerInput.code}`,
-      businessRegNumber: `SEED-${sellerInput.code}`,
-      ownerName: `판매자 ${sellerInput.code}`,
+      businessName: "판매점 SELLER",
+      businessRegNumber: "SEED-SELLER",
+      ownerName: "판매자 SELLER",
       mobilePhone: "010-0000-0000",
     },
     update: {
+      passwordHash: sellerPasswordHash,
       role: "SELLER",
-      businessName: `판매점 ${sellerInput.code}`,
-      ownerName: `판매자 ${sellerInput.code}`,
+      businessName: "판매점 SELLER",
+      ownerName: "판매자 SELLER",
       mobilePhone: "010-0000-0000",
       withdrawnAt: null,
     },
   });
 
-  return prisma.seller.upsert({
-    where: { code: sellerInput.code },
+  const seller = await prisma.seller.upsert({
+    where: { code: CANONICAL_SELLER_CODE },
     create: {
-      id: `seed-seller-${sellerInput.code.toLowerCase()}`,
-      userId: user.id,
-      code: sellerInput.code,
+      id: "seed-seller",
+      userId: sellerUser.id,
+      code: CANONICAL_SELLER_CODE,
       status: "ACTIVE",
-      courier: sellerInput.courier,
-      shippingNote: sellerInput.shippingNote,
+      courier: "CJ대한통운",
       approvedAt: new Date(),
       approvedBy: admin.id,
     },
     update: {
-      userId: user.id,
+      userId: sellerUser.id,
       status: "ACTIVE",
-      courier: sellerInput.courier,
-      shippingNote: sellerInput.shippingNote,
+      courier: "CJ대한통운",
       approvedAt: new Date(),
       approvedBy: admin.id,
       suspendReason: null,
     },
   });
+
+  return { buyer, admin, seller };
+}
+
+async function removeNonCanonicalSeedData() {
+  const staleUsers = await prisma.user.findMany({
+    where: { loginId: { notIn: CANONICAL_LOGIN_IDS } },
+    select: { id: true, seller: { select: { id: true } } },
+  });
+  if (staleUsers.length === 0) return { removedUsers: 0 };
+
+  const staleUserIds = staleUsers.map((u) => u.id);
+  const staleSellerIds = staleUsers.flatMap((u) => (u.seller ? [u.seller.id] : []));
+
+  if (staleSellerIds.length > 0) {
+    const staleListings = await prisma.listing.findMany({
+      where: { sellerId: { in: staleSellerIds } },
+      select: { id: true },
+    });
+    const staleListingIds = staleListings.map((l) => l.id);
+
+    if (staleListingIds.length > 0) {
+      await prisma.listingPriceChange.deleteMany({ where: { listingId: { in: staleListingIds } } });
+      await prisma.listingImage.deleteMany({ where: { listingId: { in: staleListingIds } } });
+      await prisma.order.deleteMany({ where: { listingId: { in: staleListingIds } } });
+      await prisma.listing.deleteMany({ where: { id: { in: staleListingIds } } });
+    }
+  }
+
+  await prisma.order.deleteMany({ where: { buyerId: { in: staleUserIds } } });
+  await prisma.cartItem.deleteMany({ where: { userId: { in: staleUserIds } } });
+  await prisma.wishlistEntry.deleteMany({ where: { userId: { in: staleUserIds } } });
+
+  if (staleSellerIds.length > 0) {
+    await prisma.seller.deleteMany({ where: { id: { in: staleSellerIds } } });
+  }
+  await prisma.user.deleteMany({ where: { id: { in: staleUserIds } } });
+
+  return { removedUsers: staleUsers.length };
 }
 
 async function upsertProduct(
@@ -213,35 +245,36 @@ async function upsertListing(input: {
   });
 }
 
-async function seedTires(admin: SeedAdmin) {
+async function seedTires(admin: SeedAdmin, seller: SeedSeller) {
   let listingCount = 0;
 
   for (const tire of TIRES) {
     const product = await upsertProduct(tire.manufacturer, tire.model, tire.width, tire.ratio, tire.rim);
     const spec = TIRE_SPECS[tire.id];
 
-    for (const sellerInput of getSellersForTire(tire)) {
-      const seller = await upsertSeller(sellerInput, admin);
-      await upsertListing({
-        id: `seed-listing-${tire.id}-${sellerInput.code.toLowerCase()}`,
-        productId: product.id,
-        sellerId: seller.id,
-        dot: tire.dot,
-        loadIndex: spec?.loadIndex ?? "-",
-        speedIndex: spec?.speedIndex ?? "-",
-        ply: spec?.ply ?? "-",
-        season: spec?.season ?? "-",
-        productCode: spec?.productCode ?? tire.id.toUpperCase(),
-        discountRate: sellerInput.discountRate,
-        price: sellerInput.price,
-        factoryPrice: normalFactoryPrice(tire.price, tire.discountRate),
-        stock: sellerInput.stock,
-        minOrder: sellerInput.minOrder,
-        tag: tire.tag,
-        adminId: admin.id,
-      });
-      listingCount += 1;
-    }
+    // Only the first mock seller row per tire is used — every listing belongs to the single canonical seller account.
+    const [sellerInput] = getSellersForTire(tire);
+    if (!sellerInput) continue;
+
+    await upsertListing({
+      id: `seed-listing-${tire.id}`,
+      productId: product.id,
+      sellerId: seller.id,
+      dot: tire.dot,
+      loadIndex: spec?.loadIndex ?? "-",
+      speedIndex: spec?.speedIndex ?? "-",
+      ply: spec?.ply ?? "-",
+      season: spec?.season ?? "-",
+      productCode: spec?.productCode ?? tire.id.toUpperCase(),
+      discountRate: sellerInput.discountRate,
+      price: sellerInput.price,
+      factoryPrice: normalFactoryPrice(tire.price, tire.discountRate),
+      stock: sellerInput.stock,
+      minOrder: sellerInput.minOrder,
+      tag: tire.tag,
+      adminId: admin.id,
+    });
+    listingCount += 1;
   }
 
   return listingCount;
@@ -257,7 +290,7 @@ function factorySpecFields(spec: string) {
   };
 }
 
-async function seedFactoryTires(admin: SeedAdmin) {
+async function seedFactoryTires(admin: SeedAdmin, seller: SeedSeller) {
   let listingCount = 0;
 
   for (const group of FACTORY_TIRES) {
@@ -287,28 +320,29 @@ async function seedFactoryTires(admin: SeedAdmin) {
         stock: row.stock,
       };
 
-      for (const sellerInput of getSellersForTire(factoryTire)) {
-        const seller = await upsertSeller(sellerInput, admin);
-        await upsertListing({
-          id: `seed-listing-${group.id}-${row.dot}-${sellerInput.code.toLowerCase()}`,
-          productId: product.id,
-          sellerId: seller.id,
-          dot: row.dot,
-          loadIndex: spec.loadIndex,
-          speedIndex: spec.speedIndex,
-          ply: spec.ply,
-          season: spec.season,
-          productCode: `${group.id}${row.dot}`.toUpperCase(),
-          discountRate: sellerInput.discountRate,
-          price: sellerInput.price,
-          factoryPrice: group.factoryPrice,
-          stock: sellerInput.stock,
-          minOrder: sellerInput.minOrder,
-          tag: null,
-          adminId: admin.id,
-        });
-        listingCount += 1;
-      }
+      // Only the first mock seller row is used — every listing belongs to the single canonical seller account.
+      const [sellerInput] = getSellersForTire(factoryTire);
+      if (!sellerInput) continue;
+
+      await upsertListing({
+        id: `seed-listing-${group.id}-${row.dot}`,
+        productId: product.id,
+        sellerId: seller.id,
+        dot: row.dot,
+        loadIndex: spec.loadIndex,
+        speedIndex: spec.speedIndex,
+        ply: spec.ply,
+        season: spec.season,
+        productCode: `${group.id}${row.dot}`.toUpperCase(),
+        discountRate: sellerInput.discountRate,
+        price: sellerInput.price,
+        factoryPrice: group.factoryPrice,
+        stock: sellerInput.stock,
+        minOrder: sellerInput.minOrder,
+        tag: null,
+        adminId: admin.id,
+      });
+      listingCount += 1;
     }
   }
 
@@ -316,9 +350,10 @@ async function seedFactoryTires(admin: SeedAdmin) {
 }
 
 async function main() {
-  const { demo, admin } = await createBaseUsers();
-  const tireListings = await seedTires(admin);
-  const factoryListings = await seedFactoryTires(admin);
+  const { buyer, admin, seller } = await createBaseUsers();
+  const tireListings = await seedTires(admin, seller);
+  const factoryListings = await seedFactoryTires(admin, seller);
+  const { removedUsers } = await removeNonCanonicalSeedData();
   const [userCount, sellerCount, productCount, listingCount] = await Promise.all([
     prisma.user.count(),
     prisma.seller.count(),
@@ -326,10 +361,12 @@ async function main() {
     prisma.listing.count(),
   ]);
 
-  console.log(`Seeded buyer: ${demo.loginId}`);
+  console.log(`Seeded buyer: ${buyer.loginId}`);
   console.log(`Seeded admin: ${admin.loginId}`);
+  console.log(`Seeded seller: seller (code ${CANONICAL_SELLER_CODE})`);
   console.log(`Seeded tire listings: ${tireListings}`);
   console.log(`Seeded factory listings: ${factoryListings}`);
+  console.log(`Removed non-canonical seed users: ${removedUsers}`);
   console.log(
     `Database totals — users: ${userCount}, sellers: ${sellerCount}, products: ${productCount}, listings: ${listingCount}`,
   );
