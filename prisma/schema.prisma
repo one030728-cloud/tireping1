@@ -184,6 +184,10 @@ model Order {
   shippedAt      DateTime?
   deliveredAt    DateTime?
   orderedAt      DateTime       @default(now())
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([listingId])
 }
 
 model CartItem {
