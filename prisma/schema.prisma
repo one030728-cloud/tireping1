@@ -208,6 +208,7 @@ model CartItem {
   stock          Int?
 
   @@index([userId])
+  @@unique([userId, tireId])
 }
 
 model WishlistEntry {
@@ -221,4 +222,5 @@ model WishlistEntry {
   wishedAt  DateTime @default(now())
 
   @@index([userId])
+  @@unique([userId, code])
 }
