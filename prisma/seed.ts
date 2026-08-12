@@ -101,7 +101,7 @@ async function createBaseUsers() {
   });
 
   const seller = await prisma.seller.upsert({
-    where: { code: CANONICAL_SELLER_CODE },
+    where: { userId: sellerUser.id },
     create: {
       id: "seed-seller",
       userId: sellerUser.id,
@@ -112,6 +112,7 @@ async function createBaseUsers() {
       approvedBy: admin.id,
     },
     update: {
+      code: CANONICAL_SELLER_CODE,
       userId: sellerUser.id,
       status: "ACTIVE",
       courier: "CJ대한통운",
