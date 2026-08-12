@@ -33,7 +33,9 @@ export async function proxy(request: NextRequest) {
   if (!secret) return redirectToLogin(request);
 
   try {
-    const token = await getToken({ req: request, secret });
+    const secureCookie =
+      request.headers.get("x-forwarded-proto") === "https" || request.nextUrl.protocol === "https:";
+    const token = await getToken({ req: request, secret, secureCookie });
     if (token?.role !== requiredRole) return redirectToLogin(request);
   } catch {
     return redirectToLogin(request);

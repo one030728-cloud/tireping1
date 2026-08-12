@@ -2,27 +2,40 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
 function notSupported() {
   alert("데모 버전에서는 지원하지 않는 기능입니다.");
 }
 
+function defaultPathForRole(role?: "BUYER" | "SELLER" | "ADMIN") {
+  return role === "SELLER" ? "/seller" : role === "ADMIN" ? "/admin" : "/main";
+}
+
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const { login, user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      router.replace("/main");
-    }
-  }, [user, router]);
+    if (!user) return;
+    const redirect = searchParams.get("redirect");
+    router.replace(redirect && redirect.startsWith("/") ? redirect : defaultPathForRole(user.role));
+  }, [user, router, searchParams]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -31,7 +44,8 @@ export default function LoginPage() {
     const result = await login(id, password);
     setSubmitting(false);
     if (result.ok) {
-      router.push(result.role === "SELLER" ? "/seller" : result.role === "ADMIN" ? "/admin" : "/main");
+      const redirect = searchParams.get("redirect");
+      router.push(redirect && redirect.startsWith("/") ? redirect : defaultPathForRole(result.role));
     } else {
       setError(result.message ?? "로그인에 실패했습니다.");
     }
