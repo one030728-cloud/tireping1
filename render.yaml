@@ -15,7 +15,7 @@ services:
       - key: DATABASE_URL
         fromDatabase:
           name: tirezone-db
-          property: connectionString
+          property: externalConnectionString
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: SEED_ADMIN_PASSWORD
