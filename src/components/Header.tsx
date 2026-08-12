@@ -311,6 +311,14 @@ export default function Header() {
               >
                 {user.businessName}
               </Link>
+              {(user.role === "ADMIN" || user.role === "SELLER") && (
+                <Link
+                  href={user.role === "ADMIN" ? "/admin" : "/seller"}
+                  className="text-[11px] text-brand hover:underline"
+                >
+                  {user.role === "ADMIN" ? "관리자 페이지" : "판매자센터"}
+                </Link>
+              )}
               <Link href="/mypage/settings" className="text-[11px] text-brand hover:underline">
                 회원정보수정
               </Link>
@@ -397,6 +405,15 @@ export default function Header() {
                   >
                     {user.businessName}
                   </Link>
+                  {(user.role === "ADMIN" || user.role === "SELLER") && (
+                    <Link
+                      href={user.role === "ADMIN" ? "/admin" : "/seller"}
+                      onClick={() => setMenuOpen(false)}
+                      className="text-xs text-brand hover:underline whitespace-nowrap"
+                    >
+                      {user.role === "ADMIN" ? "관리자 페이지" : "판매자센터"}
+                    </Link>
+                  )}
                   <Link
                     href="/mypage/settings"
                     onClick={() => setMenuOpen(false)}
