@@ -23,7 +23,14 @@ function sellerLoginId(code: string) {
 
 async function createBaseUsers() {
   const demoPasswordHash = await bcrypt.hash("demo1234", PASSWORD_ROUNDS);
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "admin1234";
+  const configuredAdminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (process.env.NODE_ENV === "production" && !configuredAdminPassword) {
+    throw new Error(
+      "SEED_ADMIN_PASSWORD must be set when running the seed script in production.",
+    );
+  }
+
+  const adminPassword = configuredAdminPassword ?? "admin1234";
   const adminPasswordHash = await bcrypt.hash(adminPassword, PASSWORD_ROUNDS);
 
   const demo = await prisma.user.upsert({
