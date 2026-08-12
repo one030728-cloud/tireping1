@@ -14,6 +14,13 @@ function defaultPathForRole(role?: "BUYER" | "SELLER" | "ADMIN") {
   return role === "SELLER" ? "/seller" : role === "ADMIN" ? "/admin" : "/main";
 }
 
+function resolveRedirect(redirect: string | null, role?: "BUYER" | "SELLER" | "ADMIN") {
+  if (!redirect || !redirect.startsWith("/")) return defaultPathForRole(role);
+  if (redirect.startsWith("/admin") && role !== "ADMIN") return defaultPathForRole(role);
+  if (redirect.startsWith("/seller") && role !== "SELLER") return defaultPathForRole(role);
+  return redirect;
+}
+
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
@@ -33,8 +40,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (!user) return;
-    const redirect = searchParams.get("redirect");
-    router.replace(redirect && redirect.startsWith("/") ? redirect : defaultPathForRole(user.role));
+    router.replace(resolveRedirect(searchParams.get("redirect"), user.role));
   }, [user, router, searchParams]);
 
   async function handleSubmit(e: FormEvent) {
@@ -44,8 +50,7 @@ function LoginForm() {
     const result = await login(id, password);
     setSubmitting(false);
     if (result.ok) {
-      const redirect = searchParams.get("redirect");
-      router.push(redirect && redirect.startsWith("/") ? redirect : defaultPathForRole(result.role));
+      router.push(resolveRedirect(searchParams.get("redirect"), result.role));
     } else {
       setError(result.message ?? "로그인에 실패했습니다.");
     }
