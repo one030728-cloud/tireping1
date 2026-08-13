@@ -80,9 +80,16 @@ export async function getSession() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { withdrawnAt: true },
+    select: {
+      withdrawnAt: true,
+      role: true,
+      seller: { select: { status: true } },
+      buyer: { select: { status: true } },
+    },
   });
   if (!user || user.withdrawnAt) return null;
+  if (user.role === "SELLER" && user.seller?.status !== "ACTIVE") return null;
+  if (user.role === "BUYER" && user.buyer?.status !== "ACTIVE") return null;
 
   return session;
 }

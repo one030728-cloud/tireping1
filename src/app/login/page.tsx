@@ -138,10 +138,6 @@ function LoginForm() {
             판매자 가입 신청
           </Link>
 
-          <div className="text-xs text-muted bg-surface-2 border border-dashed border-border-strong rounded-lg p-3 mt-2 leading-relaxed">
-            데모 계정 · 아이디: <b className="text-foreground">demo</b> / 비밀번호:{" "}
-            <b className="text-foreground">demo1234</b>
-          </div>
         </form>
       </div>
     </div>
