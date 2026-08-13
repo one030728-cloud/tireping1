@@ -20,13 +20,17 @@ export const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({
           where: { loginId },
-          include: { seller: true },
+          include: { seller: true, buyer: true },
         });
 
         if (!user || user.withdrawnAt) return null;
         if (!(await compare(password, user.passwordHash))) return null;
 
         if (user.role === "SELLER" && user.seller?.status !== "ACTIVE") {
+          return null;
+        }
+
+        if (user.role === "BUYER" && user.buyer?.status !== "ACTIVE") {
           return null;
         }
 

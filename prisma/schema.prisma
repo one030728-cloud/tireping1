@@ -20,6 +20,13 @@ enum SellerStatus {
   SUSPENDED
 }
 
+enum BuyerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
 enum ListingStatus {
   DRAFT
   PENDING
@@ -58,6 +65,7 @@ model User {
   bankAccountVerifiedAt DateTime?
 
   seller        Seller?
+  buyer         Buyer?
   orders        Order[]
   cartItems     CartItem[]
   wishlist      WishlistEntry[]
@@ -78,6 +86,17 @@ model Seller {
   suspendReason String?
 
   listings Listing[]
+}
+
+model Buyer {
+  id             String      @id @default(cuid())
+  user           User        @relation(fields: [userId], references: [id])
+  userId         String      @unique
+  status         BuyerStatus @default(PENDING)
+  approvedAt     DateTime?
+  approvedBy     String?
+  rejectedReason String?
+  suspendReason  String?
 }
 
 model Product {

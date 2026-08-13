@@ -1,4 +1,4 @@
-import { ListingStatus, Prisma, SellerStatus, type ShippingStatus } from "@prisma/client";
+import { BuyerStatus, ListingStatus, Prisma, SellerStatus, type ShippingStatus } from "@prisma/client";
 import { z } from "zod";
 import { requireRole } from "./guard";
 import { prisma } from "./prisma";
@@ -22,6 +22,24 @@ const adminSellerInclude = {
   },
   _count: { select: { listings: true } },
 } satisfies Prisma.SellerInclude;
+
+const adminBuyerInclude = {
+  user: {
+    select: {
+      id: true,
+      loginId: true,
+      businessName: true,
+      businessRegNumber: true,
+      ownerName: true,
+      email: true,
+      mobilePhone: true,
+      officePhone: true,
+      postalCode: true,
+      address: true,
+      createdAt: true,
+    },
+  },
+} satisfies Prisma.BuyerInclude;
 
 const adminListingInclude = {
   product: true,
@@ -61,6 +79,7 @@ const adminOrderInclude = {
 } satisfies Prisma.OrderInclude;
 
 type AdminSellerRecord = Prisma.SellerGetPayload<{ include: typeof adminSellerInclude }>;
+type AdminBuyerRecord = Prisma.BuyerGetPayload<{ include: typeof adminBuyerInclude }>;
 type AdminListingRecord = Prisma.ListingGetPayload<{ include: typeof adminListingInclude }>;
 type AdminOrderRecord = Prisma.OrderGetPayload<{ include: typeof adminOrderInclude }>;
 
@@ -103,6 +122,21 @@ function toAdminSellerView(seller: AdminSellerRecord) {
       createdAt: seller.user.createdAt.toISOString(),
     },
     listingCount: seller._count.listings,
+  };
+}
+
+function toAdminBuyerView(buyer: AdminBuyerRecord) {
+  return {
+    id: buyer.id,
+    status: buyer.status,
+    approvedAt: buyer.approvedAt?.toISOString() ?? null,
+    approvedBy: buyer.approvedBy,
+    rejectedReason: buyer.rejectedReason,
+    suspendReason: buyer.suspendReason,
+    user: {
+      ...buyer.user,
+      createdAt: buyer.user.createdAt.toISOString(),
+    },
   };
 }
 
@@ -241,6 +275,101 @@ export async function suspendAdminSeller(sellerId: string, adminId: string, reas
       },
     });
     return { kind: "OK" as const, seller: toAdminSellerView(updated) };
+  });
+}
+
+export async function getAdminBuyers(status?: string) {
+  const validStatus = status && Object.values(BuyerStatus).includes(status as BuyerStatus)
+    ? (status as BuyerStatus)
+    : undefined;
+  const buyers = await prisma.buyer.findMany({
+    where: validStatus ? { status: validStatus } : undefined,
+    orderBy: { user: { createdAt: "desc" } },
+    include: adminBuyerInclude,
+  });
+  return buyers.map(toAdminBuyerView);
+}
+
+export async function approveAdminBuyer(buyerId: string, adminId: string) {
+  return prisma.$transaction(async (tx) => {
+    const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
+    if (!buyer) return { kind: "NOT_FOUND" as const };
+    if (buyer.status !== "PENDING") {
+      return { kind: "INVALID_STATUS" as const, status: buyer.status };
+    }
+
+    const updated = await tx.buyer.update({
+      where: { id: buyerId },
+      data: {
+        status: "ACTIVE",
+        approvedAt: new Date(),
+        approvedBy: adminId,
+        rejectedReason: null,
+        suspendReason: null,
+      },
+      include: adminBuyerInclude,
+    });
+    await tx.adminActionLog.create({
+      data: {
+        adminId,
+        action: "BUYER_APPROVE",
+        targetType: "Buyer",
+        targetId: buyerId,
+      },
+    });
+    return { kind: "OK" as const, buyer: toAdminBuyerView(updated) };
+  });
+}
+
+export async function rejectAdminBuyer(buyerId: string, adminId: string, reason: string) {
+  return prisma.$transaction(async (tx) => {
+    const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
+    if (!buyer) return { kind: "NOT_FOUND" as const };
+    if (buyer.status !== "PENDING") {
+      return { kind: "INVALID_STATUS" as const, status: buyer.status };
+    }
+
+    const updated = await tx.buyer.update({
+      where: { id: buyerId },
+      data: { status: "REJECTED", rejectedReason: reason },
+      include: adminBuyerInclude,
+    });
+    await tx.adminActionLog.create({
+      data: {
+        adminId,
+        action: "BUYER_REJECT",
+        targetType: "Buyer",
+        targetId: buyerId,
+        reason,
+      },
+    });
+    return { kind: "OK" as const, buyer: toAdminBuyerView(updated) };
+  });
+}
+
+export async function suspendAdminBuyer(buyerId: string, adminId: string, reason: string) {
+  return prisma.$transaction(async (tx) => {
+    const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
+    if (!buyer) return { kind: "NOT_FOUND" as const };
+    if (buyer.status === "SUSPENDED") {
+      return { kind: "INVALID_STATUS" as const, status: buyer.status };
+    }
+
+    const updated = await tx.buyer.update({
+      where: { id: buyerId },
+      data: { status: "SUSPENDED", suspendReason: reason },
+      include: adminBuyerInclude,
+    });
+    await tx.adminActionLog.create({
+      data: {
+        adminId,
+        action: "BUYER_SUSPEND",
+        targetType: "Buyer",
+        targetId: buyerId,
+        reason,
+      },
+    });
+    return { kind: "OK" as const, buyer: toAdminBuyerView(updated) };
   });
 }
 

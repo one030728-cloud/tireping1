@@ -129,9 +129,9 @@ function LoginForm() {
               비밀번호 재설정
             </button>
             <span>·</span>
-            <button type="button" onClick={notSupported} className="hover:text-brand">
+            <Link href="/signup" className="hover:text-brand">
               회원가입
-            </button>
+            </Link>
           </div>
 
           <Link href="/seller/signup" className="text-center text-sm text-brand hover:underline">

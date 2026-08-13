@@ -78,6 +78,25 @@ async function createBaseUsers() {
     },
   });
 
+  await prisma.buyer.upsert({
+    where: { userId: buyer.id },
+    create: {
+      id: "seed-buyer-profile",
+      userId: buyer.id,
+      status: "ACTIVE",
+      approvedAt: new Date(),
+      approvedBy: admin.id,
+    },
+    update: {
+      userId: buyer.id,
+      status: "ACTIVE",
+      approvedAt: new Date(),
+      approvedBy: admin.id,
+      rejectedReason: null,
+      suspendReason: null,
+    },
+  });
+
   const sellerUser = await prisma.user.upsert({
     where: { loginId: "seller" },
     create: {
@@ -128,12 +147,17 @@ async function createBaseUsers() {
 async function removeNonCanonicalSeedData() {
   const staleUsers = await prisma.user.findMany({
     where: { loginId: { notIn: CANONICAL_LOGIN_IDS } },
-    select: { id: true, seller: { select: { id: true } } },
+    select: {
+      id: true,
+      seller: { select: { id: true } },
+      buyer: { select: { id: true } },
+    },
   });
   if (staleUsers.length === 0) return { removedUsers: 0 };
 
   const staleUserIds = staleUsers.map((u) => u.id);
   const staleSellerIds = staleUsers.flatMap((u) => (u.seller ? [u.seller.id] : []));
+  const staleBuyerIds = staleUsers.flatMap((u) => (u.buyer ? [u.buyer.id] : []));
 
   if (staleSellerIds.length > 0) {
     const staleListings = await prisma.listing.findMany({
@@ -153,6 +177,10 @@ async function removeNonCanonicalSeedData() {
   await prisma.order.deleteMany({ where: { buyerId: { in: staleUserIds } } });
   await prisma.cartItem.deleteMany({ where: { userId: { in: staleUserIds } } });
   await prisma.wishlistEntry.deleteMany({ where: { userId: { in: staleUserIds } } });
+
+  if (staleBuyerIds.length > 0) {
+    await prisma.buyer.deleteMany({ where: { id: { in: staleBuyerIds } } });
+  }
 
   if (staleSellerIds.length > 0) {
     await prisma.seller.deleteMany({ where: { id: { in: staleSellerIds } } });

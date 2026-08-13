@@ -1,5 +1,29 @@
 export type AdminSellerStatus = "PENDING" | "ACTIVE" | "SUSPENDED";
 
+export type AdminBuyerStatus = "PENDING" | "ACTIVE" | "SUSPENDED" | "REJECTED";
+
+export interface AdminBuyerView {
+  id: string;
+  status: AdminBuyerStatus;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  rejectedReason: string | null;
+  suspendReason: string | null;
+  user: {
+    id: string;
+    loginId: string;
+    businessName: string;
+    businessRegNumber: string;
+    ownerName: string;
+    email: string | null;
+    mobilePhone: string;
+    officePhone: string | null;
+    postalCode: string | null;
+    address: string | null;
+    createdAt: string;
+  };
+}
+
 export interface AdminSellerView {
   id: string;
   code: string;
