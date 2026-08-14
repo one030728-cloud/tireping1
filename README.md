@@ -16,6 +16,21 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Toss Payments test setup
+
+Online payment uses the account-specific Toss Payments API individual integration keys. Add the following values to `.env.local` for local testing; never commit the real secret key.
+
+```env
+TOSS_CLIENT_KEY=test_ck_your_account_client_key
+TOSS_SECRET_KEY=test_sk_your_account_secret_key
+```
+
+`TOSS_CLIENT_KEY` is read on the server by the payment preparation API and returned to the browser for SDK initialization, so it does not need a `NEXT_PUBLIC_` prefix. `TOSS_SECRET_KEY` is used only by the server-side payment confirmation API.
+
+The current Toss Payments SDK v2 distinguishes API individual integration keys (`test_ck_`/`test_sk_`) from payment-widget integration keys (`test_gck_`/`test_gsk_`). This implementation uses the v2 `payment().requestPayment()` flow because the account keys provided for this project are API individual integration keys; it does not use the public documentation test keys.
+
+To test locally, start the app with `npm run dev`, sign in as a buyer, create an order, and select `결제하기` from the order list. Use the test keys from your own Toss Payments account. The payment success redirect confirms the payment on the server and changes linked orders to `입금완료`; the failure redirect returns to the order list so the payment can be retried.
+
 ## Database seeding
 
 Database seeding is not run automatically during Render builds. To run it manually once, open the **Shell** tab in the Render dashboard and run:

@@ -27,6 +27,13 @@ enum BuyerStatus {
   REJECTED
 }
 
+enum PaymentStatus {
+  READY
+  DONE
+  FAILED
+  CANCELED
+}
+
 enum ListingStatus {
   DRAFT
   PENDING
@@ -67,6 +74,7 @@ model User {
   seller        Seller?
   buyer         Buyer?
   orders        Order[]
+  payments      Payment[]
   cartItems     CartItem[]
   wishlist      WishlistEntry[]
 }
@@ -170,6 +178,24 @@ model AdminActionLog {
   createdAt  DateTime @default(now())
 }
 
+model Payment {
+  id          String        @id @default(cuid())
+  tossOrderId String        @unique
+  buyer       User          @relation(fields: [buyerId], references: [id])
+  buyerId     String
+  amount      Int
+  status      PaymentStatus @default(READY)
+  paymentKey  String?
+  method      String?
+  requestedAt DateTime      @default(now())
+  approvedAt  DateTime?
+  failReason  String?
+
+  orders Order[]
+
+  @@index([buyerId])
+}
+
 model ListingImage {
   id        String  @id @default(cuid())
   listing   Listing @relation(fields: [listingId], references: [id])
@@ -204,10 +230,13 @@ model Order {
   shippedAt      DateTime?
   deliveredAt    DateTime?
   orderedAt      DateTime       @default(now())
+  paymentId      String?
+  payment        Payment?       @relation(fields: [paymentId], references: [id])
 
   @@index([buyerId])
   @@index([sellerId])
   @@index([listingId])
+  @@index([paymentId])
 }
 
 model CartItem {

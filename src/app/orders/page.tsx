@@ -1,12 +1,13 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, PackageSearch } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
 import { OrderRequestError, useOrders } from "@/lib/orders";
-import { CANCEL_STATUS } from "@/lib/order-status";
+import { CANCEL_STATUS, ORDER_STATUS } from "@/lib/order-status";
 import { getStatusStyle } from "@/lib/status";
 
 function OrdersContent() {
@@ -71,6 +72,14 @@ function OrdersContent() {
                   {o.status}
                 </span>
                 {o.shippingStatusLabel && <span className="text-xs text-muted">{o.shippingStatusLabel}</span>}
+                {o.status === ORDER_STATUS.PAYMENT_PENDING && (
+                  <Link
+                    href={`/orders/pay?orderId=${encodeURIComponent(o.id)}`}
+                    className="btn-primary h-9 px-3 text-xs inline-flex items-center"
+                  >
+                    결제하기
+                  </Link>
+                )}
                 {o.shippingStatus !== "SHIPPED" &&
                   o.shippingStatus !== "DELIVERED" &&
                   !Object.values(CANCEL_STATUS).includes(o.status as (typeof CANCEL_STATUS)[keyof typeof CANCEL_STATUS]) && (
