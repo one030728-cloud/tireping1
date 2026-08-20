@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
+import { loginIdLimiter, loginIpLimiter } from "./rateLimit";
+import { getClientIp } from "./requestIp";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -12,27 +14,47 @@ export const authOptions: NextAuthOptions = {
         loginId: { label: "아이디", type: "text" },
         password: { label: "비밀번호", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         const loginId = typeof credentials?.loginId === "string" ? credentials.loginId.trim() : "";
         const password = typeof credentials?.password === "string" ? credentials.password : "";
 
         if (!loginId || !password) return null;
+
+        const ip = getClientIp(req.headers);
+        const loginIdKey = `login:${loginId}`;
+        const loginIpKey = `login-ip:${ip}`;
+
+        // Check both axes — and skip the DB lookup and bcrypt compare below —
+        // before doing any real work, so a lockout also caps the CPU/DB cost an
+        // attacker can force per request.
+        if (loginIdLimiter.isBlocked(loginIdKey) || loginIpLimiter.isBlocked(loginIpKey)) {
+          return null;
+        }
+
+        const fail = () => {
+          loginIdLimiter.record(loginIdKey);
+          loginIpLimiter.record(loginIpKey);
+          return null;
+        };
 
         const user = await prisma.user.findUnique({
           where: { loginId },
           include: { seller: true, buyer: true },
         });
 
-        if (!user || user.withdrawnAt) return null;
-        if (!(await compare(password, user.passwordHash))) return null;
+        if (!user || user.withdrawnAt) return fail();
+        if (!(await compare(password, user.passwordHash))) return fail();
 
         if (user.role === "SELLER" && user.seller?.status !== "ACTIVE") {
-          return null;
+          return fail();
         }
 
         if (user.role === "BUYER" && user.buyer?.status !== "ACTIVE") {
-          return null;
+          return fail();
         }
+
+        loginIdLimiter.reset(loginIdKey);
+        loginIpLimiter.reset(loginIpKey);
 
         return {
           id: user.id,
