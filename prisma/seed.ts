@@ -21,18 +21,41 @@ function normalFactoryPrice(price: number, discountRate: number) {
   return Math.round((price / (1 - discountRate / 100)) / 100) * 100;
 }
 
-async function createBaseUsers() {
-  const buyerPasswordHash = await bcrypt.hash("buyer1234", PASSWORD_ROUNDS);
-  const configuredAdminPassword = process.env.SEED_ADMIN_PASSWORD;
-  if (process.env.NODE_ENV === "production" && !configuredAdminPassword) {
-    throw new Error(
-      "SEED_ADMIN_PASSWORD must be set when running the seed script in production.",
-    );
+// Reads a demo account's password from the environment, falling back to a
+// well-known default only outside production. createDemoUsers() is only ever
+// reached when NODE_ENV !== "production" (main() refuses SEED_DEMO_USERS=true
+// in production before calling it) — the production check here is
+// belt-and-suspenders, not the primary guard.
+function demoPassword(envVar: string, devFallback: string): string {
+  const configured = process.env[envVar];
+  if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(`${envVar} must be set when running the seed script in production.`);
+  }
+  return devFallback;
+}
+
+// Creates the three demo accounts (buyer/seller/admin) with well-known login
+// IDs. These IDs are published in this repo's README, so this must never run
+// unattended against a real database: it is gated behind SEED_DEMO_USERS=true
+// and refused outright in production regardless of that flag (see main()).
+async function createDemoUsers() {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("createDemoUsers must not run when NODE_ENV=production.");
   }
 
-  const adminPassword = configuredAdminPassword ?? "admin1234";
-  const adminPasswordHash = await bcrypt.hash(adminPassword, PASSWORD_ROUNDS);
-  const sellerPasswordHash = await bcrypt.hash("seller1234", PASSWORD_ROUNDS);
+  const buyerPasswordHash = await bcrypt.hash(
+    demoPassword("SEED_DEMO_BUYER_PASSWORD", "buyer1234"),
+    PASSWORD_ROUNDS,
+  );
+  const adminPasswordHash = await bcrypt.hash(
+    demoPassword("SEED_ADMIN_PASSWORD", "admin1234"),
+    PASSWORD_ROUNDS,
+  );
+  const sellerPasswordHash = await bcrypt.hash(
+    demoPassword("SEED_DEMO_SELLER_PASSWORD", "seller1234"),
+    PASSWORD_ROUNDS,
+  );
 
   const buyer = await prisma.user.upsert({
     where: { loginId: "buyer" },
@@ -386,8 +409,52 @@ async function seedFactoryTires(admin: SeedAdmin, seller: SeedSeller) {
   return listingCount;
 }
 
+// Looks up the canonical admin/seller accounts an earlier run created, for a
+// catalog-only run that intentionally skips demo user creation.
+async function findCanonicalSeedTargets() {
+  const [admin, seller] = await Promise.all([
+    prisma.user.findUnique({ where: { loginId: "admin" } }),
+    prisma.seller.findUnique({ where: { code: CANONICAL_SELLER_CODE } }),
+  ]);
+  return { admin, seller };
+}
+
 async function main() {
-  const { buyer, admin, seller } = await createBaseUsers();
+  const demoUsersRequested = process.env.SEED_DEMO_USERS === "true";
+  if (demoUsersRequested && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Refusing to run: SEED_DEMO_USERS=true is not allowed when NODE_ENV=production " +
+        "because it creates buyer/seller/admin accounts under login IDs " +
+        "(admin/buyer/seller) published in this repo's README.",
+    );
+  }
+
+  const demoUsers = demoUsersRequested ? await createDemoUsers() : null;
+  if (!demoUsersRequested) {
+    console.log(
+      "Skipped demo user creation (set SEED_DEMO_USERS=true to opt in; refused in production regardless).",
+    );
+  }
+
+  // Catalog seeding attaches every listing to the canonical seller account, so
+  // it needs that account (plus an admin id for the listing review audit
+  // fields) to already exist — either created above this run, or from an
+  // earlier run. Deliberately not falling back to creating them implicitly
+  // here: a catalog-only run against a database with no canonical seller yet
+  // should fail loudly instead of silently inventing one or attaching the
+  // mock catalog to the wrong seller.
+  const existing = demoUsers ? null : await findCanonicalSeedTargets();
+  const admin = demoUsers?.admin ?? existing?.admin;
+  const seller = demoUsers?.seller ?? existing?.seller;
+
+  if (!admin || !seller) {
+    throw new Error(
+      "Cannot seed the tire catalog: no canonical admin/seller account found. " +
+        "Run with SEED_DEMO_USERS=true (outside production) at least once first, " +
+        "or run this against a database that already has one.",
+    );
+  }
+
   const tireListings = await seedTires(admin, seller);
   const factoryListings = await seedFactoryTires(admin, seller);
 
@@ -415,9 +482,13 @@ async function main() {
     prisma.listing.count(),
   ]);
 
-  console.log(`Seeded buyer: ${buyer.loginId}`);
-  console.log(`Seeded admin: ${admin.loginId}`);
-  console.log(`Seeded seller: seller (code ${CANONICAL_SELLER_CODE})`);
+  if (demoUsers) {
+    console.log(`Seeded buyer: ${demoUsers.buyer.loginId}`);
+    console.log(`Seeded admin: ${demoUsers.admin.loginId}`);
+    console.log(`Seeded seller: seller (code ${CANONICAL_SELLER_CODE})`);
+  } else {
+    console.log(`Using existing admin (id ${admin.id}) and seller (code ${CANONICAL_SELLER_CODE}) for catalog seeding.`);
+  }
   console.log(`Seeded tire listings: ${tireListings}`);
   console.log(`Seeded factory listings: ${factoryListings}`);
   console.log(`Removed non-canonical seed users: ${removedUsers}`);

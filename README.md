@@ -33,13 +33,18 @@ To test locally, start the app with `npm run dev`, sign in as a buyer, create an
 
 ## Database seeding
 
-Database seeding is not run automatically during Render builds. To run it manually once, open the **Shell** tab in the Render dashboard and run:
+Database seeding is not run automatically during Render builds. To run it manually, open the **Shell** tab in the Render dashboard (or run locally) with:
 
 ```bash
 npm run db:seed
 ```
 
-When seeding in production, set `SEED_ADMIN_PASSWORD` before running the command.
+The seed script has two independent parts:
+
+- **Demo accounts** (`admin`/`buyer`/`seller` login IDs, matching this README) — only created when `SEED_DEMO_USERS=true` is set, and refused outright whenever `NODE_ENV=production`, regardless of that flag. This is intentional: those login IDs are public, so this must never run unattended against a real database. Set `SEED_ADMIN_PASSWORD`, `SEED_DEMO_BUYER_PASSWORD`, and `SEED_DEMO_SELLER_PASSWORD` to choose their passwords; outside production, any left unset fall back to a hardcoded local-dev default.
+- **Tire catalog** (products + listings from `src/lib/mockData.ts`) — runs every time, and always attaches to the canonical `seller` account. If that account doesn't exist yet (e.g. a catalog-only run against a fresh database), the script fails with an explicit error instead of guessing — run once with `SEED_DEMO_USERS=true` first (outside production) to create it, or point at a database that already has it.
+
+`SEED_RESET_NON_CANONICAL=true` additionally deletes every non-demo user (and their orders/cart/wishlist); also refused when `NODE_ENV=production`.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
