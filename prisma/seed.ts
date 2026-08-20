@@ -145,49 +145,57 @@ async function createBaseUsers() {
 }
 
 async function removeNonCanonicalSeedData() {
-  const staleUsers = await prisma.user.findMany({
-    where: { loginId: { notIn: CANONICAL_LOGIN_IDS } },
-    select: {
-      id: true,
-      seller: { select: { id: true } },
-      buyer: { select: { id: true } },
-    },
-  });
-  if (staleUsers.length === 0) return { removedUsers: 0 };
-
-  const staleUserIds = staleUsers.map((u) => u.id);
-  const staleSellerIds = staleUsers.flatMap((u) => (u.seller ? [u.seller.id] : []));
-  const staleBuyerIds = staleUsers.flatMap((u) => (u.buyer ? [u.buyer.id] : []));
-
-  if (staleSellerIds.length > 0) {
-    const staleListings = await prisma.listing.findMany({
-      where: { sellerId: { in: staleSellerIds } },
-      select: { id: true },
+  return prisma.$transaction(async (tx) => {
+    const staleUsers = await tx.user.findMany({
+      where: { loginId: { notIn: CANONICAL_LOGIN_IDS } },
+      select: {
+        id: true,
+        seller: { select: { id: true } },
+        buyer: { select: { id: true } },
+      },
     });
-    const staleListingIds = staleListings.map((l) => l.id);
+    if (staleUsers.length === 0) return { removedUsers: 0 };
 
-    if (staleListingIds.length > 0) {
-      await prisma.listingPriceChange.deleteMany({ where: { listingId: { in: staleListingIds } } });
-      await prisma.listingImage.deleteMany({ where: { listingId: { in: staleListingIds } } });
-      await prisma.order.deleteMany({ where: { listingId: { in: staleListingIds } } });
-      await prisma.listing.deleteMany({ where: { id: { in: staleListingIds } } });
+    const staleUserIds = staleUsers.map((u) => u.id);
+    const staleSellerIds = staleUsers.flatMap((u) => (u.seller ? [u.seller.id] : []));
+    const staleBuyerIds = staleUsers.flatMap((u) => (u.buyer ? [u.buyer.id] : []));
+
+    if (staleSellerIds.length > 0) {
+      const staleListings = await tx.listing.findMany({
+        where: { sellerId: { in: staleSellerIds } },
+        select: { id: true },
+      });
+      const staleListingIds = staleListings.map((l) => l.id);
+
+      if (staleListingIds.length > 0) {
+        // CartItem.listingId is ON DELETE SET NULL, so no explicit cleanup is
+        // needed for it before the listing rows below are deleted.
+        await tx.listingPriceChange.deleteMany({ where: { listingId: { in: staleListingIds } } });
+        await tx.listingImage.deleteMany({ where: { listingId: { in: staleListingIds } } });
+        await tx.order.deleteMany({ where: { listingId: { in: staleListingIds } } });
+        await tx.listing.deleteMany({ where: { id: { in: staleListingIds } } });
+      }
     }
-  }
 
-  await prisma.order.deleteMany({ where: { buyerId: { in: staleUserIds } } });
-  await prisma.cartItem.deleteMany({ where: { userId: { in: staleUserIds } } });
-  await prisma.wishlistEntry.deleteMany({ where: { userId: { in: staleUserIds } } });
+    await tx.order.deleteMany({ where: { buyerId: { in: staleUserIds } } });
+    // Payment.buyerId is a required, RESTRICT-on-delete FK, so payments for stale
+    // buyers must be removed before the buyer's User row, or user.deleteMany below
+    // fails with P2003 and leaves the earlier deletes in this half-applied.
+    await tx.payment.deleteMany({ where: { buyerId: { in: staleUserIds } } });
+    await tx.cartItem.deleteMany({ where: { userId: { in: staleUserIds } } });
+    await tx.wishlistEntry.deleteMany({ where: { userId: { in: staleUserIds } } });
 
-  if (staleBuyerIds.length > 0) {
-    await prisma.buyer.deleteMany({ where: { id: { in: staleBuyerIds } } });
-  }
+    if (staleBuyerIds.length > 0) {
+      await tx.buyer.deleteMany({ where: { id: { in: staleBuyerIds } } });
+    }
 
-  if (staleSellerIds.length > 0) {
-    await prisma.seller.deleteMany({ where: { id: { in: staleSellerIds } } });
-  }
-  await prisma.user.deleteMany({ where: { id: { in: staleUserIds } } });
+    if (staleSellerIds.length > 0) {
+      await tx.seller.deleteMany({ where: { id: { in: staleSellerIds } } });
+    }
+    await tx.user.deleteMany({ where: { id: { in: staleUserIds } } });
 
-  return { removedUsers: staleUsers.length };
+    return { removedUsers: staleUsers.length };
+  });
 }
 
 async function upsertProduct(
@@ -382,7 +390,24 @@ async function main() {
   const { buyer, admin, seller } = await createBaseUsers();
   const tireListings = await seedTires(admin, seller);
   const factoryListings = await seedFactoryTires(admin, seller);
-  const { removedUsers } = await removeNonCanonicalSeedData();
+
+  const resetNonCanonicalRequested = process.env.SEED_RESET_NON_CANONICAL === "true";
+  if (resetNonCanonicalRequested && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "Refusing to run: SEED_RESET_NON_CANONICAL=true is not allowed when NODE_ENV=production " +
+        "because it deletes every non-canonical User (and their orders/cart/wishlist) from the database.",
+    );
+  }
+
+  let removedUsers = 0;
+  if (resetNonCanonicalRequested) {
+    ({ removedUsers } = await removeNonCanonicalSeedData());
+  } else {
+    console.log(
+      "Skipped non-canonical seed data cleanup (set SEED_RESET_NON_CANONICAL=true to opt in; refused in production regardless).",
+    );
+  }
+
   const [userCount, sellerCount, productCount, listingCount] = await Promise.all([
     prisma.user.count(),
     prisma.seller.count(),
