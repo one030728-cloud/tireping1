@@ -71,9 +71,18 @@ export async function createImagePresign(
     Bucket: config.bucket,
     Key: key,
     ContentType: data.contentType,
+    ContentLength: data.size,
   });
+  // Binding ContentLength into the signature (via signableHeaders) means the
+  // browser's PUT request must carry a matching Content-Length header or S3
+  // rejects it with a signature mismatch. Browsers compute that header from
+  // the actual request body they send, so this is what makes the declared
+  // `size` enforceable — without it, `size` only fed the MAX_IMAGE_BYTES
+  // check on this endpoint and the client could still upload a body of any
+  // length to the presigned URL.
   const uploadUrl = await getSignedUrl(config.client, command, {
     expiresIn: PRESIGNED_URL_EXPIRES_IN,
+    signableHeaders: new Set(["content-length"]),
   });
 
   return {
@@ -81,6 +90,7 @@ export async function createImagePresign(
     uploadUrl,
     url: publicObjectUrl(config.publicBaseUrl, key),
     contentType: data.contentType,
+    contentLength: data.size,
     expiresIn: PRESIGNED_URL_EXPIRES_IN,
   };
 }

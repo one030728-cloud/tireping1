@@ -184,6 +184,11 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
       );
     }
 
+    // The presigned URL now binds Content-Length to the `size` sent above, so
+    // this PUT must carry the exact same body length. "Content-Length" is a
+    // forbidden fetch header that can't be set manually, but that's fine:
+    // the browser always computes it from the actual `file` body being sent,
+    // which is what makes the bound size enforceable server-side.
     const uploadResponse = await fetch(presign.uploadUrl, {
       method: "PUT",
       headers: { "Content-Type": file.type },
