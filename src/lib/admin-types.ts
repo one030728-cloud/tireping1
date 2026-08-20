@@ -131,4 +131,11 @@ export interface AdminOrderView {
     postalCode: string | null;
     address: string | null;
   };
+  payment: {
+    id: string;
+    status: "READY" | "DONE" | "FAILED" | "CANCELED";
+    refundRequiredAt: string | null;
+    refundReason: string | null;
+    refundAmount: number;
+  } | null;
 }

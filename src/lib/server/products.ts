@@ -30,6 +30,15 @@ const publicListingSelect = {
   },
 } satisfies Prisma.ListingSelect;
 
+// A suspended or withdrawn seller can no longer log in to ship orders (see
+// requireSeller's SELLER_INACTIVE check), so their listings must not appear
+// as purchasable in the public catalog even while the listing row itself is
+// still ACTIVE.
+const activeListingWhere = {
+  status: "ACTIVE",
+  seller: { status: "ACTIVE", user: { withdrawnAt: null } },
+} satisfies Prisma.ListingWhereInput;
+
 const publicProductSelect = {
   id: true,
   manufacturer: true,
@@ -39,7 +48,7 @@ const publicProductSelect = {
   rim: true,
   createdAt: true,
   listings: {
-    where: { status: "ACTIVE" },
+    where: activeListingWhere,
     orderBy: [{ createdAt: "asc" }, { price: "asc" }],
     select: publicListingSelect,
   },
@@ -47,7 +56,7 @@ const publicProductSelect = {
 
 export async function getPublicProducts() {
   return prisma.product.findMany({
-    where: { listings: { some: { status: "ACTIVE" } } },
+    where: { listings: { some: activeListingWhere } },
     orderBy: { createdAt: "asc" },
     select: publicProductSelect,
   });
@@ -55,7 +64,7 @@ export async function getPublicProducts() {
 
 export async function getPublicProduct(id: string) {
   return prisma.product.findFirst({
-    where: { id, listings: { some: { status: "ACTIVE" } } },
+    where: { id, listings: { some: activeListingWhere } },
     select: publicProductSelect,
   });
 }
@@ -76,6 +85,7 @@ function groupByDot(listings: readonly PublicListing[]) {
 
 function toSeller(listing: PublicListing) {
   return {
+    id: listing.id,
     code: listing.seller.code,
     discountRate: Number(listing.discountRate),
     price: listing.price,

@@ -76,6 +76,15 @@ const adminOrderInclude = {
       address: true,
     },
   },
+  payment: {
+    select: {
+      id: true,
+      status: true,
+      refundRequiredAt: true,
+      refundReason: true,
+      refundAmount: true,
+    },
+  },
 } satisfies Prisma.OrderInclude;
 
 type AdminSellerRecord = Prisma.SellerGetPayload<{ include: typeof adminSellerInclude }>;
@@ -207,6 +216,15 @@ function toAdminOrderView(order: AdminOrderRecord) {
       businessName: order.listing.seller.user.businessName,
     },
     buyer: order.buyer,
+    payment: order.payment
+      ? {
+          id: order.payment.id,
+          status: order.payment.status,
+          refundRequiredAt: order.payment.refundRequiredAt?.toISOString() ?? null,
+          refundReason: order.payment.refundReason,
+          refundAmount: order.payment.refundAmount,
+        }
+      : null,
   };
 }
 
@@ -264,6 +282,19 @@ export async function suspendAdminSeller(sellerId: string, adminId: string, reas
       where: { id: sellerId },
       data: { status: "SUSPENDED", suspendReason: reason },
       include: adminSellerInclude,
+    });
+    // getPublicProducts/getPublicProduct and findActiveListing already filter
+    // out listings from a non-ACTIVE seller, so this isn't required for
+    // correctness — but flipping the listings to HIDDEN keeps the seller's
+    // own listing dashboard honest while they're suspended, instead of
+    // showing listings as "판매중" that no buyer can actually see or order.
+    // There's no seller "reinstate from SUSPENDED" flow in this codebase
+    // (approveAdminSeller only accepts PENDING -> ACTIVE), so there is
+    // nothing to restore HIDDEN -> ACTIVE from yet; add that alongside a
+    // future unsuspend action rather than guessing at its policy here.
+    await tx.listing.updateMany({
+      where: { sellerId, status: "ACTIVE" },
+      data: { status: "HIDDEN" },
     });
     await tx.adminActionLog.create({
       data: {

@@ -48,6 +48,7 @@ export interface User {
 }
 
 export interface Seller {
+  id?: string;
   code: string;
   discountRate: number;
   price: number;
@@ -98,6 +99,7 @@ export interface CartItem {
   extraShipping: number;
   sellerCode: string;
   stock?: number;
+  listingId?: string;
 }
 
 export interface FullOrder {

@@ -19,6 +19,7 @@ const orderItemSchema = z.object({
   extraShipping: z.coerce.number().int().min(0).max(1_000_000),
   sellerCode: z.string().trim().min(1).max(40),
   stock: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  listingId: z.string().trim().min(1).max(200).optional(),
 });
 
 export const createOrderSchema = z.object({
@@ -122,15 +123,43 @@ export async function getBuyerOrders(buyerId: string) {
 
 type OrderItemInput = z.infer<typeof orderItemSchema>;
 
+// Only listings from a seller in good standing may be ordered — a suspended
+// or withdrawn seller can no longer log in to ship, so their listings must be
+// excluded here even if a client bypasses the public catalog and posts an
+// order request directly.
+const sellerInGoodStanding = {
+  status: "ACTIVE" as const,
+  user: { withdrawnAt: null },
+};
+
 async function findActiveListing(tx: Prisma.TransactionClient, item: OrderItemInput) {
   const commonWhere = {
-    seller: { code: item.sellerCode },
+    seller: { code: item.sellerCode, ...sellerInGoodStanding },
     dot: item.dot,
     status: "ACTIVE" as const,
   };
 
+  // The cart/product page now carries the exact listing the buyer priced and
+  // clicked on. Prefer it and re-validate ownership/status/seller-code here
+  // rather than trusting the client — this is what makes checkout match the
+  // listing (and price) actually shown on screen instead of falling through
+  // to an unordered findFirst over every listing that happens to share the
+  // same product + DOT.
+  if (item.listingId) {
+    const byListingId = await tx.listing.findFirst({
+      where: { ...commonWhere, id: item.listingId },
+      include: { product: true },
+    });
+    if (byListingId) return byListingId;
+  }
+
+  // Deterministic fallback for older clients that don't send listingId yet:
+  // order by price then id so a seller with several ACTIVE listings for the
+  // same product/DOT always resolves to the same (cheapest) one instead of
+  // whichever row the database happens to return first.
   const byProductId = await tx.listing.findFirst({
     where: { ...commonWhere, productId: item.tireId },
+    orderBy: [{ price: "asc" }, { id: "asc" }],
     include: { product: true },
   });
   if (byProductId) return byProductId;
@@ -146,6 +175,7 @@ async function findActiveListing(tx: Prisma.TransactionClient, item: OrderItemIn
         rim: item.rim,
       },
     },
+    orderBy: [{ price: "asc" }, { id: "asc" }],
     include: { product: true },
   });
 }
@@ -217,6 +247,29 @@ type CancelActor =
   | { kind: "SELLER"; sellerId: string }
   | { kind: "ADMIN"; userId: string };
 
+const cancelledStatusValues = Object.values(CANCEL_STATUS);
+
+async function cancelTossPaymentForRefund(paymentKey: string | null, reason: string): Promise<boolean> {
+  if (!paymentKey) return false;
+  const secretKey = process.env.TOSS_SECRET_KEY;
+  if (!secretKey) {
+    console.error("TOSS_PAYMENT_CANCEL_SECRET_KEY_MISSING", { paymentKey });
+    return false;
+  }
+  const authorization = Buffer.from(`${secretKey}:`).toString("base64");
+  try {
+    const response = await fetch(`https://api.tosspayments.com/v1/payments/${paymentKey}/cancel`, {
+      method: "POST",
+      headers: { Authorization: `Basic ${authorization}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ cancelReason: reason }),
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("TOSS_PAYMENT_CANCEL_REQUEST_FAILED", { paymentKey, error });
+    return false;
+  }
+}
+
 export async function cancelOrder(
   orderId: string,
   actor: CancelActor,
@@ -271,6 +324,65 @@ export async function cancelOrder(
       },
     });
 
+    // Cancelling an already-paid order (입금후취소) doesn't touch its Payment
+    // by itself — the card was already charged, so the refund has to be
+    // tracked (and, when nothing is left on the payment, actually reversed)
+    // or it just disappears from the system.
+    if (nextStatus === CANCEL_STATUS.PAYMENT_AFTER && order.paymentId) {
+      const payment = await tx.payment.findUnique({ where: { id: order.paymentId } });
+      if (payment && payment.status === "DONE") {
+        const cancelledOrderAmount = order.unitPrice * order.quantity + order.extraShipping;
+        const remainingActiveOrders = await tx.order.count({
+          where: {
+            paymentId: payment.id,
+            id: { not: orderId },
+            status: { notIn: cancelledStatusValues },
+          },
+        });
+
+        if (remainingActiveOrders === 0) {
+          // Nothing is left on this payment — refund the full charge via
+          // Toss instead of just flagging it, since there's nothing left for
+          // the buyer to receive.
+          const tossCancelSucceeded = await cancelTossPaymentForRefund(
+            payment.paymentKey,
+            "ALL_ORDERS_ON_PAYMENT_CANCELLED",
+          );
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: tossCancelSucceeded
+              ? {
+                  status: "CANCELED",
+                  refundRequiredAt: null,
+                  refundReason: "FULLY_REFUNDED_VIA_TOSS_CANCEL",
+                  refundAmount: { increment: cancelledOrderAmount },
+                }
+              : {
+                  refundRequiredAt: new Date(),
+                  refundReason: "ALL_ORDERS_CANCELLED_AUTO_REFUND_FAILED",
+                  refundAmount: { increment: cancelledOrderAmount },
+                },
+          });
+        } else {
+          // Partial cancellation. Toss's partial-cancel call needs an exact
+          // cancelAmount (and, for card payments, a taxFreeAmount breakdown)
+          // that stays consistent with the orders still active on this
+          // payment — this codebase doesn't track per-order tax treatment,
+          // so computing that automatically risks an incorrect live charge
+          // adjustment. Recording the amount for a manual/admin-driven
+          // partial refund is the safer choice here.
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              refundRequiredAt: new Date(),
+              refundReason: "ORDER_CANCELED_AFTER_PAYMENT",
+              refundAmount: { increment: cancelledOrderAmount },
+            },
+          });
+        }
+      }
+    }
+
     if (actor.kind === "ADMIN") {
       await tx.adminActionLog.create({
         data: {
@@ -287,7 +399,7 @@ export async function cancelOrder(
       where: { id: orderId },
       include: buyerOrderInclude,
     });
-  });
+  }, { timeout: 15_000 }); // higher timeout: this tx may call Toss's cancel API above
 
   return toBuyerOrderView(updated);
 }

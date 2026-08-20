@@ -186,6 +186,18 @@ export async function withdrawAccount(userId: string, role: Role, sellerId: stri
       if (activeOrders > 0) throw new AccountDomainError("ACTIVE_ORDERS_EXIST");
     }
 
+    if (role === "SELLER" && sellerId) {
+      // Withdrawal is also filtered out by getPublicProducts/getPublicProduct
+      // and findActiveListing via user.withdrawnAt, but hide the listings too
+      // so the (now inaccessible) seller dashboard doesn't keep showing them
+      // as on sale. See suspendAdminSeller for why there's no HIDDEN -> ACTIVE
+      // restore path yet.
+      await tx.listing.updateMany({
+        where: { sellerId, status: "ACTIVE" },
+        data: { status: "HIDDEN" },
+      });
+    }
+
     return tx.user.update({
       where: { id: userId },
       data: { withdrawnAt: new Date() },

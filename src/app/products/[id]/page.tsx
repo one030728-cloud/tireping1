@@ -171,6 +171,7 @@ function ProductDetailContent() {
       extraShipping: 0,
       sellerCode: seller.code,
       stock: seller.stock,
+      ...(seller.id ? { listingId: seller.id } : {}),
     };
 
     try {

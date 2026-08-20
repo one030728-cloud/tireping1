@@ -586,7 +586,16 @@ export async function updateSellerShipping(
     return { kind: "INVALID_TRANSITION" as const };
   }
 
+  // An empty submitted value means "keep the current value", not "clear it" —
+  // the seller order list always prefills these inputs with the current
+  // value (`?? ""`), so a blank field here means the seller never touched it,
+  // not that they deliberately erased it. Save must use these same
+  // fallback-to-existing values (not a fresh `data.X || null`), or a save
+  // with a blank input would pass the TRACKING_REQUIRED check below using the
+  // old value and then persist null, leaving a SHIPPED order with no
+  // tracking number.
   const trackingNumber = data.trackingNumber?.trim() || order.trackingNumber;
+  const courier = data.courier?.trim() || order.courier;
   if ((nextStatus === "TRACKING_REGISTERED" || nextStatus === "SHIPPED") && !trackingNumber) {
     return { kind: "TRACKING_REQUIRED" as const };
   }
@@ -595,8 +604,8 @@ export async function updateSellerShipping(
     where: { id: orderId },
     data: {
       shippingStatus: nextStatus,
-      ...(data.courier !== undefined ? { courier: data.courier || null } : {}),
-      ...(data.trackingNumber !== undefined ? { trackingNumber: data.trackingNumber || null } : {}),
+      courier: courier ?? null,
+      trackingNumber: trackingNumber ?? null,
       ...(nextStatus === "SHIPPED" && !order.shippedAt ? { shippedAt: new Date() } : {}),
       ...(nextStatus === "DELIVERED" && !order.deliveredAt ? { deliveredAt: new Date() } : {}),
     },
