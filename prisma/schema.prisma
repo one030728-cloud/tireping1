@@ -148,6 +148,7 @@ model Listing {
   images       ListingImage[]
   priceHistory ListingPriceChange[]
   orders       Order[]
+  cartItems    CartItem[]
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   submittedAt  DateTime?
@@ -179,17 +180,20 @@ model AdminActionLog {
 }
 
 model Payment {
-  id          String        @id @default(cuid())
-  tossOrderId String        @unique
-  buyer       User          @relation(fields: [buyerId], references: [id])
-  buyerId     String
-  amount      Int
-  status      PaymentStatus @default(READY)
-  paymentKey  String?
-  method      String?
-  requestedAt DateTime      @default(now())
-  approvedAt  DateTime?
-  failReason  String?
+  id               String        @id @default(cuid())
+  tossOrderId      String        @unique
+  buyer            User          @relation(fields: [buyerId], references: [id])
+  buyerId          String
+  amount           Int
+  status           PaymentStatus @default(READY)
+  paymentKey       String?
+  method           String?
+  requestedAt      DateTime      @default(now())
+  approvedAt       DateTime?
+  failReason       String?
+  refundRequiredAt DateTime?
+  refundReason     String?
+  refundAmount     Int           @default(0)
 
   orders Order[]
 
@@ -240,8 +244,8 @@ model Order {
 }
 
 model CartItem {
-  id             String @id @default(cuid())
-  user           User   @relation(fields: [userId], references: [id])
+  id             String   @id @default(cuid())
+  user           User     @relation(fields: [userId], references: [id])
   userId         String
   tireId         String
   manufacturer   String
@@ -255,9 +259,12 @@ model CartItem {
   extraShipping  Int
   sellerCode     String
   stock          Int?
+  listing        Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  listingId      String?
 
   @@index([userId])
-  @@unique([userId, tireId])
+  @@index([listingId])
+  @@unique([userId, tireId, sellerCode, dot])
 }
 
 model WishlistEntry {
