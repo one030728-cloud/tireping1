@@ -17,6 +17,7 @@ export const cartItemSchema = z.object({
   extraShipping: z.coerce.number().int().min(0).max(1_000_000),
   sellerCode: z.string().trim().min(1).max(40),
   stock: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  listingId: z.string().trim().min(1).max(200).optional(),
 });
 
 export const cartQuantitySchema = z.object({
@@ -48,6 +49,7 @@ function toCartItem(item: Prisma.CartItemGetPayload<object>): CartItem {
     extraShipping: item.extraShipping,
     sellerCode: item.sellerCode,
     ...(item.stock === null ? {} : { stock: item.stock }),
+    ...(item.listingId === null ? {} : { listingId: item.listingId }),
   };
 }
 
@@ -61,6 +63,9 @@ export function validationResponse(error: unknown) {
 
 export function serverErrorResponse(error: unknown, message: string) {
   console.error(message, error);
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    return NextResponse.json({ error: "DUPLICATE_RESOURCE" }, { status: 409 });
+  }
   return NextResponse.json({ error: message }, { status: 500 });
 }
 
@@ -78,33 +83,21 @@ export async function getCartItems(userId: string) {
 }
 
 export async function addCartItem(userId: string, data: z.infer<typeof cartItemSchema>) {
+  // Upsert on the same key as the CartItem unique constraint (userId, tireId,
+  // sellerCode, dot) makes the merge-or-create atomic, so two concurrent adds
+  // of the same line can no longer race past each other the way a
+  // findFirst-then-create/update pair would.
   const item = await prisma.$transaction(async (tx) => {
-    const existing = await tx.cartItem.findFirst({
-      where: { userId, tireId: data.tireId, sellerCode: data.sellerCode, dot: data.dot },
-    });
-    const nextQuantity = (existing?.quantity ?? 0) + data.quantity;
-    if (nextQuantity > 100_000) throw new CartDomainError("CART_QUANTITY_EXCEEDED", 400);
-
-    if (existing) {
-      return tx.cartItem.update({
-        where: { id: existing.id },
-        data: {
-          manufacturer: data.manufacturer,
-          model: data.model,
-          width: data.width,
-          ratio: data.ratio,
-          rim: data.rim,
+    const upserted = await tx.cartItem.upsert({
+      where: {
+        userId_tireId_sellerCode_dot: {
+          userId,
+          tireId: data.tireId,
+          sellerCode: data.sellerCode,
           dot: data.dot,
-          price: data.price,
-          quantity: nextQuantity,
-          extraShipping: data.extraShipping,
-          stock: data.stock ?? null,
         },
-      });
-    }
-
-    return tx.cartItem.create({
-      data: {
+      },
+      create: {
         userId,
         tireId: data.tireId,
         manufacturer: data.manufacturer,
@@ -118,8 +111,26 @@ export async function addCartItem(userId: string, data: z.infer<typeof cartItemS
         extraShipping: data.extraShipping,
         sellerCode: data.sellerCode,
         stock: data.stock ?? null,
+        listingId: data.listingId ?? null,
+      },
+      update: {
+        manufacturer: data.manufacturer,
+        model: data.model,
+        width: data.width,
+        ratio: data.ratio,
+        rim: data.rim,
+        price: data.price,
+        extraShipping: data.extraShipping,
+        stock: data.stock ?? null,
+        listingId: data.listingId ?? null,
+        quantity: { increment: data.quantity },
       },
     });
+
+    if (upserted.quantity > 100_000) {
+      throw new CartDomainError("CART_QUANTITY_EXCEEDED", 400);
+    }
+    return upserted;
   });
   return toCartItem(item);
 }
