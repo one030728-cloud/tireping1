@@ -249,7 +249,11 @@ type CancelActor =
 
 const cancelledStatusValues = Object.values(CANCEL_STATUS);
 
-async function cancelTossPaymentForRefund(paymentKey: string | null, reason: string): Promise<boolean> {
+async function cancelTossPaymentForRefund(
+  paymentKey: string | null,
+  reason: string,
+  idempotencyKey: string,
+): Promise<boolean> {
   if (!paymentKey) return false;
   const secretKey = process.env.TOSS_SECRET_KEY;
   if (!secretKey) {
@@ -260,13 +264,45 @@ async function cancelTossPaymentForRefund(paymentKey: string | null, reason: str
   try {
     const response = await fetch(`https://api.tosspayments.com/v1/payments/${paymentKey}/cancel`, {
       method: "POST",
-      headers: { Authorization: `Basic ${authorization}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Basic ${authorization}`,
+        "Content-Type": "application/json",
+        // Toss dedupes cancel requests by this header, so a retried call
+        // after a network timeout (where we can't tell if the first call
+        // actually landed) can't double-refund the same cancellation.
+        "Idempotency-Key": idempotencyKey,
+      },
       body: JSON.stringify({ cancelReason: reason }),
     });
     return response.ok;
   } catch (error) {
     console.error("TOSS_PAYMENT_CANCEL_REQUEST_FAILED", { paymentKey, error });
     return false;
+  }
+}
+
+// Runs after the DB transaction that recorded refundRequiredAt has already
+// committed — an external HTTP call must never happen inside a Prisma
+// transaction (see cancelOrder). The refundRequiredAt/refundReason/
+// refundAmount written by that transaction are the durable record of "a
+// refund is owed"; this call is best-effort on top of it; if it fails (or
+// the process dies before it runs), that record is still sitting in the DB
+// for an admin to act on rather than being lost.
+async function settleFullRefundViaToss(paymentId: string, paymentKey: string | null, orderId: string) {
+  try {
+    const tossCancelSucceeded = await cancelTossPaymentForRefund(
+      paymentKey,
+      "ALL_ORDERS_ON_PAYMENT_CANCELLED",
+      `order-cancel-refund:${orderId}`,
+    );
+    await prisma.payment.updateMany({
+      where: { id: paymentId, status: "DONE" },
+      data: tossCancelSucceeded
+        ? { status: "CANCELED", refundRequiredAt: null, refundReason: "FULLY_REFUNDED_VIA_TOSS_CANCEL" }
+        : { refundReason: "ALL_ORDERS_CANCELLED_AUTO_REFUND_FAILED" },
+    });
+  } catch (error) {
+    console.error("TOSS_PAYMENT_CANCEL_SETTLEMENT_FAILED", { paymentId, paymentKey, orderId, error });
   }
 }
 
@@ -279,7 +315,9 @@ export async function cancelOrder(
     throw new OrderDomainError("CANCEL_REASON_REQUIRED", 400);
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const { order: updated, fullRefundCandidate } = await prisma.$transaction(async (tx) => {
+    let fullRefundCandidate: { paymentId: string; paymentKey: string | null } | null = null;
+
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { listing: true },
@@ -328,6 +366,15 @@ export async function cancelOrder(
     // by itself — the card was already charged, so the refund has to be
     // tracked (and, when nothing is left on the payment, actually reversed)
     // or it just disappears from the system.
+    //
+    // Only DB writes happen in this transaction. Calling Toss's cancel API
+    // here would mean an external HTTP call that Postgres cannot roll back:
+    // if Toss actually processed the cancellation but a later statement in
+    // this same transaction then failed (or the transaction hit its
+    // timeout), the refund would have gone out for real while the order
+    // stayed un-cancelled, stock un-restored, and Payment stuck at DONE.
+    // So the transaction only ever records "a refund is owed" durably;
+    // cancelOrder calls Toss afterward, once that record is committed.
     if (nextStatus === CANCEL_STATUS.PAYMENT_AFTER && order.paymentId) {
       const payment = await tx.payment.findUnique({ where: { id: order.paymentId } });
       if (payment && payment.status === "DONE") {
@@ -339,46 +386,30 @@ export async function cancelOrder(
             status: { notIn: cancelledStatusValues },
           },
         });
+        const isFullRefund = remainingActiveOrders === 0;
 
-        if (remainingActiveOrders === 0) {
-          // Nothing is left on this payment — refund the full charge via
-          // Toss instead of just flagging it, since there's nothing left for
-          // the buyer to receive.
-          const tossCancelSucceeded = await cancelTossPaymentForRefund(
-            payment.paymentKey,
-            "ALL_ORDERS_ON_PAYMENT_CANCELLED",
-          );
-          await tx.payment.update({
-            where: { id: payment.id },
-            data: tossCancelSucceeded
-              ? {
-                  status: "CANCELED",
-                  refundRequiredAt: null,
-                  refundReason: "FULLY_REFUNDED_VIA_TOSS_CANCEL",
-                  refundAmount: { increment: cancelledOrderAmount },
-                }
-              : {
-                  refundRequiredAt: new Date(),
-                  refundReason: "ALL_ORDERS_CANCELLED_AUTO_REFUND_FAILED",
-                  refundAmount: { increment: cancelledOrderAmount },
-                },
-          });
-        } else {
-          // Partial cancellation. Toss's partial-cancel call needs an exact
-          // cancelAmount (and, for card payments, a taxFreeAmount breakdown)
-          // that stays consistent with the orders still active on this
-          // payment — this codebase doesn't track per-order tax treatment,
-          // so computing that automatically risks an incorrect live charge
-          // adjustment. Recording the amount for a manual/admin-driven
-          // partial refund is the safer choice here.
-          await tx.payment.update({
-            where: { id: payment.id },
-            data: {
-              refundRequiredAt: new Date(),
-              refundReason: "ORDER_CANCELED_AFTER_PAYMENT",
-              refundAmount: { increment: cancelledOrderAmount },
-            },
-          });
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            refundRequiredAt: new Date(),
+            refundReason: isFullRefund
+              ? "ALL_ORDERS_ON_PAYMENT_CANCELLED"
+              : // Partial cancellation. Toss's partial-cancel call needs an
+                // exact cancelAmount (and, for card payments, a
+                // taxFreeAmount breakdown) that stays consistent with the
+                // orders still active on this payment — this codebase
+                // doesn't track per-order tax treatment, so computing that
+                // automatically risks an incorrect live charge adjustment.
+                // Recording the amount for a manual/admin-driven partial
+                // refund is the safer choice here; it is never
+                // auto-submitted to Toss.
+                "ORDER_CANCELED_AFTER_PAYMENT",
+            refundAmount: { increment: cancelledOrderAmount },
+          },
+        });
+
+        if (isFullRefund) {
+          fullRefundCandidate = { paymentId: payment.id, paymentKey: payment.paymentKey };
         }
       }
     }
@@ -395,11 +426,16 @@ export async function cancelOrder(
       });
     }
 
-    return tx.order.findUniqueOrThrow({
+    const cancelledOrder = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       include: buyerOrderInclude,
     });
-  }, { timeout: 15_000 }); // higher timeout: this tx may call Toss's cancel API above
+    return { order: cancelledOrder, fullRefundCandidate };
+  }); // default timeout is fine now that no external call runs inside the tx
+
+  if (fullRefundCandidate) {
+    await settleFullRefundViaToss(fullRefundCandidate.paymentId, fullRefundCandidate.paymentKey, orderId);
+  }
 
   return toBuyerOrderView(updated);
 }
