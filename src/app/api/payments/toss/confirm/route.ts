@@ -163,8 +163,19 @@ export async function POST(request: Request) {
         data: { status: ORDER_STATUS.PAYMENT_COMPLETED },
       });
 
-      const staleOrders = payment.orders.filter(
-        (order) => order.status !== ORDER_STATUS.PAYMENT_PENDING,
+      // Recompute which orders are stale from a fresh read taken *inside*
+      // this transaction, not from the `payment.orders` snapshot fetched
+      // above (before the Toss approval round trip). That round trip can
+      // take anywhere from hundreds of ms to a few seconds, which is enough
+      // time for an order to be cancelled in another request; deciding
+      // refunds off the pre-approval snapshot would silently miss exactly
+      // that order's amount.
+      const currentOrders = await tx.order.findMany({
+        where: { paymentId: payment.id },
+        select: { id: true, status: true, unitPrice: true, quantity: true, extraShipping: true },
+      });
+      const staleOrders = currentOrders.filter(
+        (order) => order.status !== ORDER_STATUS.PAYMENT_COMPLETED,
       );
       if (staleOrders.length > 0) {
         const staleAmount = staleOrders.reduce(
@@ -207,7 +218,18 @@ export async function POST(request: Request) {
     // over anything else: if we can persist paymentKey/approvedAt, the charge
     // is legitimate and only the per-order status sync needs a manual/async
     // follow-up, so keep the money and flag it via failReason for reconciliation.
-    let recorded = false;
+    //
+    // The compensating write below can fail in two different ways that must
+    // NOT be treated the same:
+    //  - it throws (a real DB error) -> we genuinely couldn't record anything.
+    //  - it runs but matches 0 rows (the `status: "READY"` filter misses)
+    //    -> some other request already moved this payment off READY. If that
+    //    other request is the reason (a concurrent confirm that finished
+    //    first and left the payment DONE with its orders already marked
+    //    입금완료), then reaching the auto-cancel fallback below would refund
+    //    a legitimately completed payment while its orders stay paid.
+    let writeThrew = false;
+    let recordedRowCount = 0;
     try {
       const recordedUpdate = await prisma.payment.updateMany({
         where: { id: payment.id, status: "READY" },
@@ -223,8 +245,9 @@ export async function POST(request: Request) {
             ),
         },
       });
-      recorded = recordedUpdate.count === 1;
+      recordedRowCount = recordedUpdate.count;
     } catch (recordError) {
+      writeThrew = true;
       console.error("TOSS_PAYMENT_CONFIRM_COMPENSATION_RECORD_FAILED", {
         paymentId: payment.id,
         tossOrderId: payment.tossOrderId,
@@ -234,13 +257,41 @@ export async function POST(request: Request) {
       });
     }
 
-    if (recorded) {
+    if (recordedRowCount === 1) {
       return NextResponse.json({ error: "PAYMENT_CONFIRM_PENDING_RECONCILIATION" }, { status: 202 });
     }
 
-    // We could not even record that Toss approved the charge. As a last
-    // resort, try to reverse the charge so it doesn't sit uncredited and
-    // unrecorded; only then is it safe to tell the buyer to retry.
+    if (!writeThrew) {
+      // The write ran cleanly but matched nothing: re-check what the payment
+      // actually is now before deciding whether cancelling it is safe.
+      const currentPayment = await prisma.payment.findUnique({ where: { id: payment.id } });
+      if (currentPayment?.status === "DONE") {
+        // A concurrent confirm request already approved and persisted this
+        // payment. Treat this the same as the idempotent-replay branch above
+        // this transaction — report success, and do not call Toss's cancel
+        // API on a charge that was legitimately completed.
+        const completedOrderCount = await prisma.order.count({
+          where: { paymentId: currentPayment.id, status: ORDER_STATUS.PAYMENT_COMPLETED },
+        });
+        return NextResponse.json({
+          payment: {
+            tossOrderId: currentPayment.tossOrderId,
+            status: currentPayment.status,
+            method: currentPayment.method,
+            approvedAt: currentPayment.approvedAt?.toISOString() ?? null,
+            orderCount: completedOrderCount,
+          },
+        });
+      }
+      // Any other status here (e.g. CANCELED via toss/prepare's
+      // supersede-on-re-prepare cleanup) means nobody else recorded this
+      // approval as legitimate, so reversing the charge below is correct.
+    }
+
+    // We could not treat this approval as a legitimately recorded payment.
+    // As a last resort, try to reverse the charge so it doesn't sit
+    // uncredited and unrecorded; only then is it safe to tell the buyer to
+    // retry.
     const tossCancelSucceeded = await cancelTossPayment(
       paymentKey,
       authorization,
@@ -249,7 +300,7 @@ export async function POST(request: Request) {
     if (tossCancelSucceeded) {
       await prisma.payment
         .updateMany({
-          where: { id: payment.id, status: "READY" },
+          where: { id: payment.id, status: { not: "DONE" } },
           data: { status: "CANCELED", failReason: "DB_SAVE_FAILED_AUTO_CANCELED" },
         })
         .catch((cancelRecordError) => {
