@@ -64,7 +64,7 @@ function CartContent() {
     <div className="px-4 py-5">
       <h1 className="text-xl font-extrabold mb-1">타이어 장바구니</h1>
       <p className="text-sm text-muted mb-5">
-        장바구니에 담긴 상품은 주문이 없을 경우 1시간 후에 자동 삭제됩니다.
+        장바구니에 담긴 상품은 담거나 수량을 변경한 뒤 1시간 동안 그대로 두면 자동 삭제됩니다.
       </p>
 
       {items.length === 0 ? (

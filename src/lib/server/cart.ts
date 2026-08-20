@@ -74,7 +74,21 @@ export function domainErrorResponse(error: unknown) {
   return NextResponse.json({ error: error.code }, { status: error.status });
 }
 
+// Matches the "1시간 후 자동 삭제" copy on the cart page. There's no cron here —
+// expiry is enforced lazily, by deleting stale rows for this user whenever
+// their cart is read. `updatedAt` (not `createdAt`) is the basis, so adding
+// more of the same line or changing its quantity resets the clock; an item
+// nobody has touched for an hour is dropped. Note this only prunes the
+// querying user's own rows — another user's expired rows just sit unseen
+// until that user next opens their cart, which is fine since nothing reads
+// them until then.
+const CART_ITEM_TTL_MS = 60 * 60 * 1000;
+
 export async function getCartItems(userId: string) {
+  await prisma.cartItem.deleteMany({
+    where: { userId, updatedAt: { lt: new Date(Date.now() - CART_ITEM_TTL_MS) } },
+  });
+
   const items = await prisma.cartItem.findMany({
     where: { userId },
     orderBy: { id: "asc" },

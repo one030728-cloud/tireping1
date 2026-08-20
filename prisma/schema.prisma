@@ -261,6 +261,8 @@ model CartItem {
   stock          Int?
   listing        Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
   listingId      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([userId])
   @@index([listingId])
