@@ -63,6 +63,22 @@ export async function POST(request: Request) {
 
   try {
     const payment = await prisma.$transaction(async (tx) => {
+      // Re-preparing payment for orders that already carry a paymentId (tab
+      // reopened, page refreshed) would otherwise leave the earlier READY
+      // Payment orphaned: it can still be approved by Toss later, but by then
+      // these orders point at the new payment and the confirm route's
+      // updateMany affects 0 rows, so the card is charged with no order to
+      // show for it. Close out any such stale READY payment first.
+      const priorPaymentIds = Array.from(
+        new Set(orders.flatMap((order) => (order.paymentId ? [order.paymentId] : []))),
+      );
+      if (priorPaymentIds.length > 0) {
+        await tx.payment.updateMany({
+          where: { id: { in: priorPaymentIds }, status: "READY" },
+          data: { status: "CANCELED", failReason: "SUPERSEDED_BY_NEW_PAYMENT_PREPARE" },
+        });
+      }
+
       const createdPayment = await tx.payment.create({
         data: {
           tossOrderId: `order_${randomUUID()}`,

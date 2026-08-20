@@ -20,6 +20,7 @@ function SuccessContent() {
   const started = useRef(false);
   const [payment, setPayment] = useState<ConfirmedPayment | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   const paymentKey = searchParams.get("paymentKey");
   const tossOrderId = searchParams.get("orderId");
@@ -51,13 +52,17 @@ function SuccessContent() {
         setPayment(body.payment);
       })
       .catch((caughtError: unknown) => {
-        setError(
-          caughtError instanceof Error
-            ? caughtError.message === "PAYMENT_AMOUNT_MISMATCH"
-              ? "결제 금액이 주문 금액과 달라 결제를 완료할 수 없습니다."
-              : "결제 승인에 실패했습니다. 주문내역에서 다시 시도해 주세요."
-            : "결제 승인에 실패했습니다. 주문내역에서 다시 시도해 주세요.",
-        );
+        const code = caughtError instanceof Error ? caughtError.message : null;
+        if (code === "PAYMENT_AMOUNT_MISMATCH") {
+          setError("결제 금액이 주문 금액과 달라 결제를 완료할 수 없습니다.");
+        } else if (code === "PAYMENT_CONFIRM_PENDING_RECONCILIATION") {
+          setPending(true);
+          setError("결제는 정상적으로 처리되었습니다. 주문 상태 반영에 다소 시간이 걸릴 수 있으니 잠시 후 주문내역에서 확인해 주세요. 같은 결제를 다시 시도하지 마세요.");
+        } else if (code === "PAYMENT_HAS_NO_ORDERS") {
+          setError("이 결제에 연결된 주문을 찾을 수 없습니다. 주문내역에서 다시 시도해 주세요.");
+        } else {
+          setError("결제 승인에 실패했습니다. 주문내역에서 다시 시도해 주세요.");
+        }
       });
   }, [amount, paymentKey, tossOrderId]);
 
@@ -77,6 +82,15 @@ function SuccessContent() {
           </p>
           <Link href="/mypage/status" className="btn-primary mt-6 inline-flex h-11 items-center px-5">
             주문 상태 확인하기
+          </Link>
+        </div>
+      ) : pending ? (
+        <div className="card p-6 text-center">
+          <CheckCircle2 size={48} className="mx-auto text-brand" />
+          <h1 className="mt-4 text-xl font-extrabold">결제를 확인하고 있습니다</h1>
+          <p className="mt-3 text-sm text-muted">{error}</p>
+          <Link href="/orders" className="btn-primary mt-6 inline-flex h-11 items-center px-5">
+            주문내역으로 이동
           </Link>
         </div>
       ) : (
