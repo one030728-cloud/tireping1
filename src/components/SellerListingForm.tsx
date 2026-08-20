@@ -174,9 +174,9 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
       body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
     });
     const presign = (await presignResponse.json().catch(() => null)) as
-      | { uploadUrl?: string; url?: string; error?: string }
+      | { uploadUrl?: string; fields?: Record<string, string>; url?: string; error?: string }
       | null;
-    if (!presignResponse.ok || !presign?.uploadUrl || !presign.url) {
+    if (!presignResponse.ok || !presign?.uploadUrl || !presign.fields || !presign.url) {
       throw new Error(
         presign?.error === "STORAGE_NOT_CONFIGURED"
           ? "이미지 저장소가 아직 설정되지 않았습니다. 관리자에게 문의해 주세요."
@@ -184,15 +184,19 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
       );
     }
 
-    // The presigned URL now binds Content-Length to the `size` sent above, so
-    // this PUT must carry the exact same body length. "Content-Length" is a
-    // forbidden fetch header that can't be set manually, but that's fine:
-    // the browser always computes it from the actual `file` body being sent,
-    // which is what makes the bound size enforceable server-side.
+    // Presigned POST (not PUT): the server signs a policy with a
+    // content-length-range condition instead of an exact Content-Length, so
+    // the upload form must carry every field from `fields` plus the file
+    // itself, appended last, under the "file" key.
+    const formData = new FormData();
+    for (const [name, value] of Object.entries(presign.fields)) {
+      formData.append(name, value);
+    }
+    formData.append("file", file);
+
     const uploadResponse = await fetch(presign.uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file,
+      method: "POST",
+      body: formData,
     });
     if (!uploadResponse.ok) throw new Error("이미지 파일을 저장하지 못했습니다.");
     return presign.url;
