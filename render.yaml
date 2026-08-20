@@ -7,7 +7,7 @@ services:
     name: tirezone-app
     runtime: node
     plan: free
-    buildCommand: npm install && rm -rf node_modules/.prisma node_modules/@prisma/client && npx prisma generate && npx prisma migrate deploy && npm run build
+    buildCommand: npm install && rm -rf node_modules/.prisma && npx prisma generate && npx prisma migrate deploy && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
@@ -18,5 +18,25 @@ services:
           property: externalConnectionString
       - key: NEXTAUTH_SECRET
         generateValue: true
+      - key: NEXTAUTH_URL
+        sync: false
       - key: SEED_ADMIN_PASSWORD
         sync: false
+      - key: TOSS_CLIENT_KEY
+        sync: false
+      - key: TOSS_SECRET_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_PUBLIC_BASE_URL
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: S3_FORCE_PATH_STYLE
+        value: "false"
