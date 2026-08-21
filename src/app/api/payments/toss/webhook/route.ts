@@ -104,11 +104,18 @@ export const runtime = "nodejs";
 //                            payment cancelled + restocked. Full refund.
 //   - PARTIAL_CANCELED    -> local status LEFT AT DONE, deliberately. Only
 //                            refundRequiredAt/refundReason/refundAmount are
-//                            recorded (owed, pending manual reconciliation —
-//                            same policy as cancelOrder's own partial-cancel
-//                            branch, since this codebase has no per-order tax
-//                            breakdown to safely auto-match a partial amount
-//                            to a specific order). Mapping this to local
+//                            recorded (owed, pending manual reconciliation).
+//                            cancelOrder's own partial-cancel branch now
+//                            auto-submits its own per-order cancelAmount to
+//                            Toss (see settleOrderRefundViaToss in
+//                            src/lib/server/orders.ts) instead of always
+//                            deferring to an admin — but a PARTIAL_CANCELED
+//                            event arriving *here* means Toss recorded a
+//                            partial cancellation this app cannot attribute
+//                            to a specific order (e.g. done directly in the
+//                            Toss console), and this codebase still has no
+//                            per-order tax breakdown to safely auto-match an
+//                            unattributed amount to one. Mapping this to local
 //                            CANCELED instead would be a real bug:
 //                            settlement.ts's getDeposits reads
 //                            `status === "CANCELED" && refundRequiredAt ===
@@ -440,11 +447,14 @@ export async function POST(request: Request) {
           // — see the TOSS STATUS -> LOCAL STATUS MAPPING comment at the top
           // of this file for why flipping status to CANCELED on a partial
           // cancellation would misreport a full refund on settlement.ts's
-          // buyer-facing money screen. Same policy as cancelOrder's own
-          // partial-cancel branch: this codebase has no per-order tax
-          // breakdown, so it cannot safely guess which specific order(s) the
-          // partial amount belongs to — record it as owed for manual/admin
-          // reconciliation instead of guessing at which order to cancel.
+          // buyer-facing money screen. Unlike cancelOrder's own partial-
+          // cancel branch (which now knows exactly which order and exactly
+          // how much — see settleOrderRefundViaToss), a partial cancellation
+          // reported here arrived without this app ever choosing it, so
+          // there is no specific order to attribute it to and no per-order
+          // tax breakdown to safely guess one — record it as owed for
+          // manual/admin reconciliation instead of guessing at which order
+          // to cancel.
           if (newlyCancelledAmount > 0) {
             await tx.payment.update({
               where: { id: localPayment.id },

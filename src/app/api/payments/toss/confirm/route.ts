@@ -188,6 +188,24 @@ export async function POST(request: Request) {
           staleOrderIds: staleOrders.map((order) => order.id),
           staleAmount,
         });
+        // This is the same "money owed on a still-active payment" shape that
+        // src/lib/server/orders.ts's cancelOrder now auto-submits to Toss for
+        // (see settleOrderRefundViaToss there) — but deliberately NOT wired
+        // to that same auto-submit mechanism here. Two reasons: (1) this
+        // write happens inside the transaction that also just marked the
+        // Payment DONE, and an external Toss call must never run inside a
+        // Prisma transaction (see the long comment in cancelOrder for why);
+        // adding a post-commit Toss call here would mean restructuring this
+        // route's already-intricate save-failure/compensation logic below,
+        // which is exactly the kind of change that risks destabilizing a
+        // money-critical recovery path it wasn't scoped to touch. (2)
+        // staleAmount can span several stale orders at once, so refunding it
+        // automatically here would need its own careful reasoning about
+        // idempotency/over-refund guards independent of cancelOrder's
+        // per-order ones. Recording it durably here — exactly as before —
+        // still makes the admin "환불 필요" badge and manual Toss-console
+        // fallback (README's 운영 가이드) work; only the automatic-submission
+        // half is out of scope for this change.
         await tx.payment.update({
           where: { id: payment.id },
           data: {

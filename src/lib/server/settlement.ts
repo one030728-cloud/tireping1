@@ -34,19 +34,31 @@ type BuyerPaymentRecord = Prisma.PaymentGetPayload<{
 
 // Distinguishes 환불완료 from 환불예정/처리중 for one Payment row. See the
 // refundRequiredAt/refundReason handling in cancelOrder and
-// settleFullRefundViaToss (src/lib/server/orders.ts):
+// settleOrderRefundViaToss (src/lib/server/orders.ts):
 //   - refundAmount > 0 && refundRequiredAt === null && status === "CANCELED"
-//     only happens once settleFullRefundViaToss records that Toss's cancel
-//     call actually returned success (refundReason "FULLY_REFUNDED_VIA_TOSS_CANCEL").
-//     That is the only path that clears refundRequiredAt, so it is the only
-//     state that may be shown as "환불완료".
+//     only happens once settleOrderRefundViaToss records that Toss's cancel
+//     call for the LAST active order on this payment actually returned
+//     success (refundReason "FULLY_REFUNDED_VIA_TOSS_CANCEL") with no
+//     earlier unresolved failure outstanding. That is the only path that
+//     both clears refundRequiredAt and flips status to CANCELED, so it is
+//     the only state that may be shown as "환불완료".
+//   - Cancelling one order out of several on the same payment (부분 취소) is
+//     now ALSO auto-submitted to Toss, one order at a time — see
+//     settleOrderRefundViaToss — but that never sets status to "CANCELED"
+//     (the payment still has other active orders, or an earlier refund
+//     attempt on it is still unresolved), so refundCompleted here stays
+//     false regardless of refundRequiredAt. This is the load-bearing reason
+//     a partially-refunded payment can never misreport as "환불완료": the
+//     condition below requires status === "CANCELED", which nothing but a
+//     genuine full settlement ever sets.
 //   - refundAmount > 0 with refundRequiredAt still set means money is owed
-//     but has not left this payment yet — either a partial cancellation
-//     (cancelOrder always routes those to manual/admin processing rather
-//     than auto-submitting to Toss) or a full-cancel Toss call that failed
-//     (refundReason "ALL_ORDERS_CANCELLED_AUTO_REFUND_FAILED"). Both must
-//     read as pending, never as completed, or this screen would state a
-//     refund happened when the buyer's money hasn't actually moved.
+//     but has not (fully) left this payment yet — a partial or full Toss
+//     cancel attempt that is still pending, failed (refundReason
+//     "AUTO_REFUND_FAILED_NEEDS_MANUAL_TOSS_CANCEL"), or was deliberately
+//     superseded by a newer cancellation before its flag could be cleared.
+//     All of these must read as pending, never as completed, or this screen
+//     would state a refund happened when the buyer's money hasn't actually
+//     moved (or has only partly moved).
 function toDepositEntry(payment: BuyerPaymentRecord): DepositEntry {
   const hasRefund = payment.refundAmount > 0;
   const refundCompleted = hasRefund && payment.refundRequiredAt === null && payment.status === "CANCELED";
@@ -74,8 +86,9 @@ async function getDeposits(buyerId: string) {
   // What belongs in an 입출금 내역 is "Toss actually approved a charge", and
   // `status` alone does NOT answer that — three different code paths set
   // CANCELED and only one of them involves money that ever moved:
-  //   1. settleFullRefundViaToss (orders.ts) — was DONE, charged, then Toss's
-  //      cancel succeeded. Real: charged then returned. Belongs here.
+  //   1. settleOrderRefundViaToss (orders.ts) — was DONE, charged, then
+  //      Toss's cancel succeeded (in full or in part). Real: charged then
+  //      returned. Belongs here.
   //   2. confirm/route.ts's DB_SAVE_FAILED_AUTO_CANCELED — the charge was
   //      reversed before this payment was ever recorded as approved, so it
   //      nets to zero and its approvedAt was never set.

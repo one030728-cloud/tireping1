@@ -394,8 +394,25 @@ type CancelActor =
 
 const cancelledStatusValues = Object.values(CANCEL_STATUS);
 
+// Sticky failure marker (Payment.refundReason). Once ANY automated refund
+// attempt for a payment fails, every later cancellation on that same payment
+// preserves this marker instead of overwriting it with its own optimistic
+// label (see the read of it inside cancelOrder's transaction below), and
+// settleOrderRefundViaToss refuses to clear refundRequiredAt — or flip the
+// payment to CANCELED — while it is present (see the guarded updateMany
+// there). This is what makes Task 6's "only clear it for the portion
+// genuinely refunded" hold even across several cancellations on one payment:
+// this codebase has no per-order ledger of which specific slice of
+// refundAmount actually left via Toss, so once one slice is known to be
+// stuck, the whole payment permanently defers to manual reconciliation
+// (README's 운영 가이드) rather than risk a later, unrelated success quietly
+// clearing the "환불 필요" badge while the earlier failure's money is still
+// sitting un-refunded.
+const AUTO_REFUND_TOSS_FAILURE_REASON = "AUTO_REFUND_FAILED_NEEDS_MANUAL_TOSS_CANCEL";
+
 async function cancelTossPaymentForRefund(
   paymentKey: string | null,
+  cancelAmount: number,
   reason: string,
   idempotencyKey: string,
 ): Promise<boolean> {
@@ -422,12 +439,31 @@ async function cancelTossPaymentForRefund(
         // a retry of this exact cancellation attempted after 15 days would
         // NOT be deduped and could double-cancel. Not a concern for the
         // immediate retry this key is designed for (see the call site in
-        // settleFullRefundViaToss, which runs once right after the
+        // settleOrderRefundViaToss, which runs once right after the
         // triggering DB transaction commits), but worth knowing before this
         // key is ever reused for a long-delayed manual retry.
         "Idempotency-Key": idempotencyKey,
       },
-      body: JSON.stringify({ cancelReason: reason }),
+      body: JSON.stringify({
+        cancelReason: reason,
+        // Task 1: refund exactly this order's own amount, never the whole
+        // remaining balance — see the long comment on
+        // settleOrderRefundViaToss for why every cancellation (including
+        // what used to be "the full refund") now sends its own explicit
+        // cancelAmount instead of omitting it.
+        cancelAmount,
+        // Every product this marketplace sells is a taxable tire — nothing
+        // in Product/Listing carries a tax-exempt flag, so the tax-free
+        // portion of any cancellation here is always 0. Toss's own docs call
+        // out that partial cancellation of a CARD payment is NOT permitted
+        // when a tax-exempt amount is present (their example is 컵보증금);
+        // this app is card-only and 0-tax-free today, so partial cancel is
+        // permitted — but if this app ever sells a tax-exempt line item,
+        // this hardcoded 0 (and therefore partial cancellation itself)
+        // stops being safe without per-order tax tracking that does not
+        // exist in this schema.
+        taxFreeAmount: 0,
+      }),
     });
     return response.ok;
   } catch (error) {
@@ -438,23 +474,100 @@ async function cancelTossPaymentForRefund(
 
 // Runs after the DB transaction that recorded refundRequiredAt has already
 // committed — an external HTTP call must never happen inside a Prisma
-// transaction (see cancelOrder). The refundRequiredAt/refundReason/
-// refundAmount written by that transaction are the durable record of "a
-// refund is owed"; this call is best-effort on top of it; if it fails (or
-// the process dies before it runs), that record is still sitting in the DB
-// for an admin to act on rather than being lost.
-async function settleFullRefundViaToss(paymentId: string, paymentKey: string | null, orderId: string) {
+// transaction (see cancelOrder). Fires for EVERY order cancelled off a DONE
+// payment now, not just the last remaining one: each cancellation submits
+// its own cancelledOrderAmount as Toss's cancelAmount (Task 1), so a buyer
+// who cancels one of three items gets that item's money back immediately
+// instead of waiting for someone to notice the "환불 필요" badge and process
+// it by hand in the Toss console.
+//
+// Why the old "last order omits cancelAmount to cancel the whole remaining
+// balance" shape is gone: that was correct only in a world where NO earlier
+// order on the same payment had ever been auto-refunded, so the entire
+// original amount was still sitting uncancelled on Toss's side right up
+// until the last order was cancelled. Now that earlier orders may already
+// have been individually refunded via Toss, Toss's real remaining balance by
+// the time the last order is cancelled is just that order's own amount —
+// unless an earlier partial call actually failed, in which case more than
+// that is still outstanding, and there is no way to tell which case we're in
+// from here without a per-order Toss ledger this schema doesn't have.
+// Sending a specific, known, exact amount is correct in the first case and
+// merely incomplete (never wrong/over-refunding) in the second — Toss will
+// simply reject a cancelAmount that exceeds its real balance rather than
+// silently doing the wrong thing. "Omit cancelAmount" would instead risk
+// either double-refunding money that already went out via an earlier
+// successful partial call, or refunding an unrelated earlier chunk together
+// with this order's — both worse than the exact-amount approach.
+//
+// refundRequiredAt/refundReason/refundAmount stay the durable record an
+// operator acts on (README's 운영 가이드) for whatever this call does not
+// resolve.
+async function settleOrderRefundViaToss(
+  paymentId: string,
+  paymentKey: string | null,
+  orderId: string,
+  cancelAmount: number,
+  refundRequiredAt: Date,
+  isFullRefund: boolean,
+) {
+  const reasonWhenSubmitting = isFullRefund ? "ALL_ORDERS_ON_PAYMENT_CANCELLED" : "ORDER_CANCELED_AFTER_PAYMENT";
   try {
     const tossCancelSucceeded = await cancelTossPaymentForRefund(
       paymentKey,
-      "ALL_ORDERS_ON_PAYMENT_CANCELLED",
+      cancelAmount,
+      reasonWhenSubmitting,
+      // Stable per order (not per attempt): a retry of this exact call for
+      // the exact same order replays Toss's first response instead of
+      // cancelling twice. See the Idempotency-Key comment above for the
+      // 15-day validity window this relies on.
       `order-cancel-refund:${orderId}`,
     );
+
+    if (tossCancelSucceeded) {
+      // Only clear refundRequiredAt — and, for the order that locally leaves
+      // nothing else active on the payment, only flip Payment to CANCELED —
+      // if BOTH hold right now:
+      //   1. Nothing newer has claimed this payment's refund flag since we
+      //      set it (refundRequiredAt still equals the exact timestamp our
+      //      own transaction wrote). Otherwise a concurrent cancellation of
+      //      a *different* order on the same payment could have its own
+      //      still-pending obligation silently wiped out by our success.
+      //   2. No earlier cancellation on this same payment ever recorded the
+      //      sticky AUTO_REFUND_TOSS_FAILURE_REASON marker — see its
+      //      definition above for why a success here must never clear a
+      //      still-unresolved earlier failure's flag.
+      const updated = await prisma.payment.updateMany({
+        where: {
+          id: paymentId,
+          refundRequiredAt,
+          refundReason: { not: AUTO_REFUND_TOSS_FAILURE_REASON },
+        },
+        data: {
+          refundRequiredAt: null,
+          refundReason: isFullRefund ? "FULLY_REFUNDED_VIA_TOSS_CANCEL" : "PARTIALLY_REFUNDED_VIA_TOSS_CANCEL",
+          ...(isFullRefund ? { status: "CANCELED" as const } : {}),
+        },
+      });
+      if (updated.count !== 1) {
+        // The cancelAmount really did reach Toss (tossCancelSucceeded is
+        // true) — it's only the payment-level flag that couldn't be safely
+        // cleared from here, because it was superseded by a newer
+        // cancellation or a prior failure is still outstanding. Leave it for
+        // whichever later settle (or a human) can actually resolve the whole
+        // payment; log so this isn't silently invisible.
+        console.error("TOSS_PAYMENT_CANCEL_SETTLED_BUT_FLAG_NOT_CLEARED", { paymentId, orderId, isFullRefund });
+      }
+      return;
+    }
+
+    // Toss was not actually charged back. Mark the payment as needing manual
+    // reconciliation (sticky — see AUTO_REFUND_TOSS_FAILURE_REASON above),
+    // but only if nothing newer already owns the flag; a concurrent
+    // cancellation that has since moved this payment on should not be
+    // stamped with our stale failure note.
     await prisma.payment.updateMany({
-      where: { id: paymentId, status: "DONE" },
-      data: tossCancelSucceeded
-        ? { status: "CANCELED", refundRequiredAt: null, refundReason: "FULLY_REFUNDED_VIA_TOSS_CANCEL" }
-        : { refundReason: "ALL_ORDERS_CANCELLED_AUTO_REFUND_FAILED" },
+      where: { id: paymentId, refundRequiredAt },
+      data: { refundReason: AUTO_REFUND_TOSS_FAILURE_REASON },
     });
   } catch (error) {
     console.error("TOSS_PAYMENT_CANCEL_SETTLEMENT_FAILED", { paymentId, paymentKey, orderId, error });
@@ -470,8 +583,16 @@ export async function cancelOrder(
     throw new OrderDomainError("CANCEL_REASON_REQUIRED", 400);
   }
 
-  const { order: updated, fullRefundCandidate } = await prisma.$transaction(async (tx) => {
-    let fullRefundCandidate: { paymentId: string; paymentKey: string | null } | null = null;
+  const { order: updated, refundCandidate } = await prisma.$transaction(async (tx) => {
+    let refundCandidate:
+      | {
+          paymentId: string;
+          paymentKey: string | null;
+          cancelAmount: number;
+          refundRequiredAt: Date;
+          isFullRefund: boolean;
+        }
+      | null = null;
 
     const order = await tx.order.findUnique({
       where: { id: orderId },
@@ -556,30 +677,83 @@ export async function cancelOrder(
             status: { notIn: cancelledStatusValues },
           },
         });
+        // isFullRefund only ever means "this is the last active order on the
+        // payment, by our own row count" — a purely local fact. It does NOT
+        // by itself mean the whole original payment amount is still
+        // uncancelled on Toss's side; see settleOrderRefundViaToss for why
+        // the Toss call this triggers is shaped the same way regardless.
         const isFullRefund = remainingActiveOrders === 0;
 
+        // Over-refund guard (never ask Toss to cancel more than this
+        // payment could still owe, by our own bookkeeping). In the healthy
+        // case cancelledOrderAmount always equals exactly the gap between
+        // payment.amount and refundAmount recorded so far, because every
+        // order's price is accounted for exactly once, right here, the only
+        // place that increments refundAmount. This clamp only bites if that
+        // invariant has already drifted — and even then it can only shrink
+        // what we ask Toss to cancel, never grow it.
+        //
+        // Deliberately NOT paired with a live GET of Toss's own
+        // balanceAmount before every cancel: that would add a network round
+        // trip to every single order cancellation. Toss's /cancel endpoint
+        // itself already rejects a cancelAmount exceeding its real
+        // remaining balance, so an operator who separately cancelled
+        // something by hand in the Toss console (today's documented manual
+        // fallback, README's 운영 가이드) gets a *rejected* automated call
+        // here rather than a silently wrong one — the failure path in
+        // settleOrderRefundViaToss keeps that durably recorded for the same
+        // operator to reconcile, which is the safer, under-refund-not-
+        // over-refund outcome this change is required to prefer. Toss's
+        // authoritative balanceAmount is still consulted asynchronously,
+        // for exactly this kind of console-side drift, by the webhook route
+        // (see its PARTIAL_CANCELED/CANCELED handling) — duplicating that
+        // synchronously on every cancel here would be redundant defense at
+        // a real latency cost for a case that is already covered.
+        const owedSoFar = payment.refundAmount;
+        const localRemainingBalance = Math.max(0, payment.amount - owedSoFar);
+        const cancelAmount = Math.min(cancelledOrderAmount, localRemainingBalance);
+        if (cancelAmount < cancelledOrderAmount) {
+          console.error("TOSS_REFUND_AMOUNT_CLAMPED_LOCAL_BALANCE_DRIFT", {
+            paymentId: payment.id,
+            orderId,
+            cancelledOrderAmount,
+            localRemainingBalance,
+          });
+        }
+
+        const refundRequiredAt = new Date();
+        // Never let a fresh cancellation's optimistic label paper over an
+        // already-recorded, unresolved Toss failure on this same payment —
+        // see AUTO_REFUND_TOSS_FAILURE_REASON's definition for why that
+        // record has to survive every later cancellation until a human
+        // resolves it.
+        const hasUnresolvedAutoRefundFailure = payment.refundReason === AUTO_REFUND_TOSS_FAILURE_REASON;
         await tx.payment.update({
           where: { id: payment.id },
           data: {
-            refundRequiredAt: new Date(),
-            refundReason: isFullRefund
-              ? "ALL_ORDERS_ON_PAYMENT_CANCELLED"
-              : // Partial cancellation. Toss's partial-cancel call needs an
-                // exact cancelAmount (and, for card payments, a
-                // taxFreeAmount breakdown) that stays consistent with the
-                // orders still active on this payment — this codebase
-                // doesn't track per-order tax treatment, so computing that
-                // automatically risks an incorrect live charge adjustment.
-                // Recording the amount for a manual/admin-driven partial
-                // refund is the safer choice here; it is never
-                // auto-submitted to Toss.
-                "ORDER_CANCELED_AFTER_PAYMENT",
+            refundRequiredAt,
+            refundReason: hasUnresolvedAutoRefundFailure
+              ? AUTO_REFUND_TOSS_FAILURE_REASON
+              : isFullRefund
+                ? "ALL_ORDERS_ON_PAYMENT_CANCELLED"
+                : "ORDER_CANCELED_AFTER_PAYMENT",
             refundAmount: { increment: cancelledOrderAmount },
           },
         });
 
-        if (isFullRefund) {
-          fullRefundCandidate = { paymentId: payment.id, paymentKey: payment.paymentKey };
+        // Only ever attempt the Toss call for a positive amount — a
+        // clamped-to-zero cancelAmount means the guard above already
+        // decided there is nothing left to safely ask Toss for; the
+        // transaction's write above still leaves refundRequiredAt set for a
+        // human to look at that drift.
+        if (cancelAmount > 0) {
+          refundCandidate = {
+            paymentId: payment.id,
+            paymentKey: payment.paymentKey,
+            cancelAmount,
+            refundRequiredAt,
+            isFullRefund,
+          };
         }
       }
     }
@@ -600,11 +774,18 @@ export async function cancelOrder(
       where: { id: orderId },
       include: buyerOrderInclude,
     });
-    return { order: cancelledOrder, fullRefundCandidate };
+    return { order: cancelledOrder, refundCandidate };
   }); // default timeout is fine now that no external call runs inside the tx
 
-  if (fullRefundCandidate) {
-    await settleFullRefundViaToss(fullRefundCandidate.paymentId, fullRefundCandidate.paymentKey, orderId);
+  if (refundCandidate) {
+    await settleOrderRefundViaToss(
+      refundCandidate.paymentId,
+      refundCandidate.paymentKey,
+      orderId,
+      refundCandidate.cancelAmount,
+      refundCandidate.refundRequiredAt,
+      refundCandidate.isFullRefund,
+    );
   }
 
   return toBuyerOrderView(updated);

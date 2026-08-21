@@ -39,7 +39,7 @@
 // would be an external side effect Postgres cannot roll back if a later
 // statement in the same transaction then fails — exactly the mistake
 // cancelOrder's comment (src/lib/server/orders.ts) documents at length for
-// the Toss refund call, and exactly why settleFullRefundViaToss there runs
+// the Toss refund call, and exactly why settleOrderRefundViaToss there runs
 // only after that transaction has committed. Every call to `notifyUser` in
 // this codebase must likewise happen only after the relevant
 // prisma.$transaction has already resolved, never from within the callback
