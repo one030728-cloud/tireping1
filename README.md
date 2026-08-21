@@ -46,25 +46,6 @@ The seed script has two independent parts:
 
 `SEED_RESET_NON_CANONICAL=true` additionally deletes every non-demo user (and their orders/cart/wishlist); also refused when `NODE_ENV=production`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
 ## 상품 이미지 업로드 설정
 
 상품 이미지는 S3 호환 오브젝트 스토리지에 presigned URL로 업로드합니다. Render와 로컬 환경에 다음 변수를 설정해야 합니다.
@@ -80,3 +61,58 @@ S3_FORCE_PATH_STYLE=false
 ```
 
 `S3_PUBLIC_BASE_URL`은 업로드된 파일을 브라우저가 읽을 수 있는 공개 도메인(Cloudflare R2 커스텀 도메인 또는 S3/CloudFront 주소)이어야 합니다. 버킷 CORS에는 앱 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허용해야 합니다.
+
+## 운영 가이드
+
+실제 서비스를 운영하는 담당자를 위한 안내입니다. 소스 코드 주석에만 남아 있던 위험한 동작들을 정리했으니, 배포/장애 대응 전에 반드시 읽어 주세요.
+
+### 1. 부분 취소 환불은 자동이 아닙니다
+
+- 주문을 취소하면(`cancelOrder`, `src/lib/server/orders.ts`) 재고 복구와 주문 상태 변경은 즉시 일어나지만, **이미 결제된 주문의 환불은 두 가지 경로로 나뉩니다.**
+  - **전체 취소(해당 결제에 딸린 모든 주문이 취소된 경우)**: `settleFullRefundViaToss`가 자동으로 Toss 결제취소 API를 호출해 실제 환불까지 처리합니다.
+  - **부분 취소(같은 결제에 아직 취소되지 않은 다른 주문이 남아 있는 경우)**: Toss로 자동 환불 요청을 보내지 않습니다. 부분 취소는 취소 금액(`cancelAmount`)과 카드 결제의 경우 `taxFreeAmount` 같은 세부 항목을 정확히 맞춰 호출해야 하는데, 이 코드베이스는 주문별 과세 정보를 추적하지 않기 때문에 자동으로 계산해서 실제 청구를 조정하는 것은 위험 부담이 큽니다. 대신 `Payment` 레코드에 `refundRequiredAt`(환불 필요 시각), `refundReason`(사유), `refundAmount`(누적 환불 필요 금액)만 기록해 두고 **관리자가 수동으로** 처리하도록 남겨둡니다.
+- **관리자가 대기 중인 환불을 찾는 방법**: `/admin/orders` 페이지에서 `payment.refundRequiredAt`이 설정된 주문 카드 상단에 "환불 필요 · N원 (사유)" 배너가 표시됩니다. 이 배너가 보이는 주문은 아직 Toss에서 실제로 환불되지 않은 상태입니다.
+- **관리자가 해야 할 일**: 배너에 표시된 금액을 확인한 뒤 [Toss Payments 관리자 콘솔](https://admin.tosspayments.com)에 로그인하여 해당 결제 건에 대해 **수동으로 부분취소(환불)를 실행**해야 합니다. 콘솔에서 환불을 완료한 뒤에는 DB의 `Payment.refundRequiredAt` / `refundReason` / `refundAmount`가 자동으로 갱신되지 않으므로, 처리 완료 사실을 별도로 기록(예: 사내 스프레드시트, 티켓)해 두는 것을 권장합니다.
+
+### 2. 결제 확인 실패 시 상태들
+
+`POST /api/payments/toss/confirm`(`src/app/api/payments/toss/confirm/route.ts`)은 Toss에 결제 승인을 요청한 뒤 DB에 결과를 반영합니다. Toss 승인 자체는 성공했는데 그 뒤 DB 반영 과정에서 문제가 생기는 경우를 대비한 복구 로직이 있으며, 아래 상태들로 나타납니다.
+
+- **HTTP 202 `PAYMENT_CONFIRM_PENDING_RECONCILIATION`**: Toss 결제는 정상적으로 승인(카드 청구 완료)되었지만, 그 결과를 DB에 반영하는 트랜잭션이 실패했고 자동 취소도 실패했거나 시도할 수 없었던 상태입니다. **돈은 실제로 빠져나갔는데 시스템에는 아직 완전히 반영되지 않았을 수 있는 상태**이므로, 구매자에게는 "잠시 후 확인해달라"는 안내만 나가고 재결제를 유도하지 않습니다. 운영자는 해당 `paymentId`/`tossOrderId`를 Toss 콘솔의 결제 내역과 대조하여 실제 승인 여부와 금액을 확인하고, 필요하면 주문 상태를 수동으로 맞춰야 합니다.
+- **`failReason: ORDER_STATUS_SYNC_FAILED: ...`**: Toss 승인 결과(`paymentKey`, 승인 시각 등)는 DB에 성공적으로 기록됐지만, 그 뒤 주문들을 `입금완료`로 바꾸는 단계에서 오류가 났다는 뜻입니다. 즉 **결제 자체는 정상 기록되었고 결제 정보(Payment)는 신뢰할 수 있지만, 연결된 개별 주문(Order)의 상태가 아직 못 따라간 상태**입니다. 운영자는 해당 결제에 연결된 주문들을 확인해 `입금대기`로 남아있는 것이 있으면 수동으로 `입금완료`로 전환해야 합니다.
+- **`failReason: DB_SAVE_FAILED_AUTO_CANCELED`**: DB에 승인 결과를 기록하는 것 자체가 실패해서(즉 이 결제를 "정상 승인"으로 신뢰할 근거가 DB에 없어서) 시스템이 안전 장치로 Toss에 **자동 취소(환불)를 요청해 성공**한 경우입니다. 구매자 입장에서는 결제가 실패로 보이고 카드 청구도 취소되므로, 별도 조치 없이 재시도를 안내하면 됩니다. 다만 실제로 취소가 잘 됐는지 Toss 콘솔에서 한 번 확인하는 것을 권장합니다.
+- **`failReason: SUPERSEDED_BY_NEW_PAYMENT_PREPARE`**: (`toss/prepare` 경로에서 발생) 같은 주문들에 대해 새로운 결제 준비가 이루어지면서 이전 `Payment`가 대체되어 취소된 경우입니다. 구버전 결제창을 붙잡고 있던 브라우저 탭이 뒤늦게 승인 요청을 보내면 나타날 수 있는 정상적인 상태이며, 별도 조치가 필요 없습니다.
+- **로그 `TOSS_PAYMENT_CONFIRM_UNRECOVERABLE`**: 가장 심각한 상태입니다. Toss 승인은 성공했고(카드 청구 완료) DB에는 그 사실을 전혀 기록하지 못했으며, 안전장치로 시도한 Toss 자동 취소마저 실패한 경우에만 남습니다. **돈은 실제로 빠져나갔는데 시스템 어디에도 그 결제 기록이 없는 상태**이므로, 이 로그 라인이 보이면 반드시 사람이 개입해야 합니다. 로그에 남은 `paymentId`, `tossOrderId`, `paymentKey`, `amount`를 근거로 Toss 콘솔에서 실제 승인 내역을 확인하고, DB에 `Payment`/`Order` 레코드를 수동으로 복구하거나(정상 결제로 인정하는 경우) Toss 콘솔에서 수동으로 취소·환불(결제를 무효화하는 경우) 처리해야 합니다.
+
+### 3. Toss 웹훅이 없다는 점 (알려진 한계)
+
+이 앱은 Toss 웹훅(webhook)을 전혀 사용하지 않습니다. 결제 승인은 **오직 구매자의 브라우저가 결제 후 `successUrl`(`/orders/pay/success`)로 돌아와서 `POST /api/payments/toss/confirm`을 호출해야만** DB에 반영됩니다.
+
+**운영상의 결과**:
+
+- 구매자가 결제를 마친 뒤 브라우저를 강제 종료하거나, 네트워크가 끊기거나, 리다이렉트 전에 이탈하면 Toss 측에서는 결제가 완료되었더라도 이 앱의 DB에는 절대 반영되지 않습니다. (`PAYMENT_CONFIRM_PENDING_RECONCILIATION`/`TOSS_PAYMENT_CONFIRM_UNRECOVERABLE` 상태와 별개로, 애초에 confirm 요청 자체가 오지 않는 경우입니다.)
+- **Toss 관리자 콘솔에서 직접 수행한 취소/환불은 이 DB에 전혀 반영되지 않습니다.** 즉 Toss 콘솔과 이 앱의 `Payment`/`Order` 상태가 서로 어긋날 수 있으며, 이를 맞추는 것은 전적으로 수동 운영 업무입니다.
+- 결제 관련 이상(구매자 문의 등)이 있으면 이 앱의 상태만 믿지 말고 항상 Toss 콘솔의 실제 결제 내역을 함께 확인해야 합니다.
+
+### 4. 레이트리밋이 인메모리라는 점
+
+`src/lib/server/rateLimit.ts`의 로그인/회원가입 요청 제한(`InMemorySlidingWindowLimiter`)은 프로세스 메모리에만 상태를 저장합니다.
+
+- **재배포/재시작마다 초기화**됩니다. 즉 배포 직후에는 그 이전까지 쌓인 실패 횟수가 전부 사라집니다.
+- **인스턴스별로 독립적**입니다. 앱이 여러 인스턴스로 뜨는 환경(예: Render 오토스케일)에서는 공격자가 인스턴스 수만큼의 배수로 시도 횟수를 확보하게 됩니다. 현재는 외부 의존성(Redis 등)을 추가하지 않기 위한 의도적인 트레이드오프이며, 인스턴스를 여러 개로 늘릴 계획이 있다면 공유 저장소 기반으로 교체해야 합니다.
+
+### 5. 배포 주의사항
+
+- `render.yaml`의 `buildCommand`는 `npx prisma migrate deploy`를 빌드 과정 중에 실행합니다. **즉 마이그레이션이 먼저 적용되고, 그 다음에 애플리케이션이 빌드됩니다.** 만약 마이그레이션 적용 이후 빌드(`npm run build`)가 실패하면, **DB 스키마는 이미 새 버전으로 넘어갔는데 실제 배포된 애플리케이션 코드는 이전 버전인 상태**가 됩니다. 빌드 실패 시 이 사실을 인지하고, 스키마와 코드 버전이 어긋난 채로 서비스가 유지되고 있지 않은지(이전 배포가 여전히 서빙 중이라면 이전 코드가 새 스키마에 대해 정상 동작하는지) 반드시 확인해야 합니다.
+- 현재 `render.yaml`의 DB(`tirezone-db`)와 웹 서비스(`tirezone-app`) 모두 Render의 **`free` 플랜**으로 설정되어 있습니다.
+  - 무료 PostgreSQL은 일정 기간 후 만료(삭제)됩니다.
+  - 무료 웹 서비스는 트래픽이 없으면 슬립 상태가 되어 첫 요청에 콜드스타트 지연이 발생합니다.
+  - 실제 트래픽을 받기 전에 반드시 유료 플랜으로 업그레이드해야 합니다. **이 문서는 안내만 할 뿐, `render.yaml`의 플랜/커넥션 문자열 변경은 이 저장소를 소유한 담당자가 직접 결정하고 수정해야 하는 사안입니다** (외부 커넥션 문자열을 쓰는 현재 설정도 이전 커밋에서 의도적으로 선택된 것입니다).
+
+### 6. 비밀번호 재설정/알림 기능이 아직 없다는 점
+
+로그인 화면의 "아이디 찾기"/"비밀번호 재설정" 버튼은 현재 아무 동작도 하지 않습니다(placeholder). 즉:
+
+- 사용자가 비밀번호를 잊어버리면 이메일/SMS를 통한 자동 재설정 절차가 없습니다.
+- 계정 복구는 현재 **운영자가 DB를 직접 조작하는 수동 작업**으로만 가능합니다(예: Render Shell에서 스크립트를 실행하거나 Prisma Studio로 비밀번호 해시를 직접 갱신). 이 작업을 수행할 담당자와 절차를 미리 정해 두는 것을 권장합니다.
+- 사용자에게 이 기능이 아직 없다는 점을 고객센터/안내 문구 등으로 명확히 알려서, 문의가 들어왔을 때 수동으로 대응할 수 있도록 준비해야 합니다.
