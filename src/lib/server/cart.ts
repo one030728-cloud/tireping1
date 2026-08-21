@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { CartItem } from "@/lib/types";
 import { prisma } from "./prisma";
+import { resolveExtraShipping } from "./pricing";
 
 export const cartItemSchema = z.object({
   tireId: z.string().trim().min(1).max(200),
@@ -122,7 +123,10 @@ export async function addCartItem(userId: string, data: z.infer<typeof cartItemS
         dot: data.dot,
         price: data.price,
         quantity: data.quantity,
-        extraShipping: data.extraShipping,
+        // Server-derived, not data.extraShipping from the request body — see
+        // resolveExtraShipping (pricing.ts) for why the client's value is
+        // never trusted here.
+        extraShipping: resolveExtraShipping(),
         sellerCode: data.sellerCode,
         stock: data.stock ?? null,
         listingId: data.listingId ?? null,
@@ -134,7 +138,7 @@ export async function addCartItem(userId: string, data: z.infer<typeof cartItemS
         ratio: data.ratio,
         rim: data.rim,
         price: data.price,
-        extraShipping: data.extraShipping,
+        extraShipping: resolveExtraShipping(),
         stock: data.stock ?? null,
         listingId: data.listingId ?? null,
         quantity: { increment: data.quantity },

@@ -1,10 +1,11 @@
 import { BuyerStatus, ListingStatus, Prisma, SellerStatus, type ShippingStatus } from "@prisma/client";
 import { z } from "zod";
-import { isCancelledOrderStatus, nextOrderStatusForShipping } from "@/lib/order-status";
+import { SHIPPING_STATUS_LABEL, isCancelledOrderStatus, nextOrderStatusForShipping } from "@/lib/order-status";
 import { requireRole } from "./guard";
 import { prisma } from "./prisma";
 import { expireStaleUnpaidOrders } from "./orders";
-import { shippingSchema, serverErrorResponse, validationResponse } from "./seller";
+import { shippingRank, shippingSchema, serverErrorResponse, validationResponse } from "./seller";
+import { notifyUser } from "./notify";
 
 const adminSellerInclude = {
   user: {
@@ -50,6 +51,10 @@ const adminListingInclude = {
       id: true,
       code: true,
       status: true,
+      // userId is not part of toAdminListingView's output — it's read only
+      // by reviewAdminListing, to notify the seller's own User row after
+      // approving/rejecting a listing.
+      userId: true,
       user: { select: { businessName: true, ownerName: true } },
     },
   },
@@ -243,7 +248,7 @@ export async function getAdminSellers(status?: string) {
 }
 
 export async function approveAdminSeller(sellerId: string, adminId: string) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const seller = await tx.seller.findUnique({ where: { id: sellerId } });
     if (!seller) return { kind: "NOT_FOUND" as const };
     if (seller.status !== "PENDING") {
@@ -270,10 +275,21 @@ export async function approveAdminSeller(sellerId: string, adminId: string) {
     });
     return { kind: "OK" as const, seller: toAdminSellerView(updated) };
   });
+
+  // Notification fires only after the transaction above has committed —
+  // never from inside it, since an external send is a side effect Postgres
+  // cannot roll back (see notify.ts / cancelOrder's Toss-refund comment).
+  if (result.kind === "OK") {
+    await notifyUser(result.seller.user.id, "SELLER_APPROVED", {
+      subject: "판매자 승인이 완료되었습니다",
+      body: "판매자 가입이 승인되었습니다. 이제 상품을 등록하고 판매를 시작할 수 있습니다.",
+    });
+  }
+  return result;
 }
 
 export async function suspendAdminSeller(sellerId: string, adminId: string, reason: string) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const seller = await tx.seller.findUnique({ where: { id: sellerId } });
     if (!seller) return { kind: "NOT_FOUND" as const };
     if (seller.status === "SUSPENDED") {
@@ -307,10 +323,18 @@ export async function suspendAdminSeller(sellerId: string, adminId: string, reas
     });
     return { kind: "OK" as const, seller: toAdminSellerView(updated) };
   });
+
+  if (result.kind === "OK") {
+    await notifyUser(result.seller.user.id, "SELLER_SUSPENDED", {
+      subject: "판매자 계정이 정지되었습니다",
+      body: `판매자 계정이 정지되었습니다. 사유: ${reason}`,
+    });
+  }
+  return result;
 }
 
 export async function reinstateAdminSeller(sellerId: string, adminId: string) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const seller = await tx.seller.findUnique({
       where: { id: sellerId },
       include: { user: { select: { withdrawnAt: true } } },
@@ -376,6 +400,14 @@ export async function reinstateAdminSeller(sellerId: string, adminId: string) {
     });
     return { kind: "OK" as const, seller: toAdminSellerView(updated) };
   });
+
+  if (result.kind === "OK") {
+    await notifyUser(result.seller.user.id, "SELLER_REINSTATED", {
+      subject: "판매자 계정 정지가 해제되었습니다",
+      body: "판매자 계정 정지가 해제되었습니다. 다시 판매를 진행할 수 있습니다.",
+    });
+  }
+  return result;
 }
 
 export async function getAdminBuyers(status?: string) {
@@ -391,7 +423,7 @@ export async function getAdminBuyers(status?: string) {
 }
 
 export async function approveAdminBuyer(buyerId: string, adminId: string) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
     if (!buyer) return { kind: "NOT_FOUND" as const };
     if (buyer.status !== "PENDING") {
@@ -419,10 +451,18 @@ export async function approveAdminBuyer(buyerId: string, adminId: string) {
     });
     return { kind: "OK" as const, buyer: toAdminBuyerView(updated) };
   });
+
+  if (result.kind === "OK") {
+    await notifyUser(result.buyer.user.id, "BUYER_APPROVED", {
+      subject: "구매회원 가입이 승인되었습니다",
+      body: "구매회원 가입이 승인되었습니다. 이제 로그인하여 주문을 진행할 수 있습니다.",
+    });
+  }
+  return result;
 }
 
 export async function rejectAdminBuyer(buyerId: string, adminId: string, reason: string) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
     if (!buyer) return { kind: "NOT_FOUND" as const };
     if (buyer.status !== "PENDING") {
@@ -445,10 +485,18 @@ export async function rejectAdminBuyer(buyerId: string, adminId: string, reason:
     });
     return { kind: "OK" as const, buyer: toAdminBuyerView(updated) };
   });
+
+  if (result.kind === "OK") {
+    await notifyUser(result.buyer.user.id, "BUYER_REJECTED", {
+      subject: "구매회원 가입이 반려되었습니다",
+      body: `구매회원 가입이 반려되었습니다. 사유: ${reason}`,
+    });
+  }
+  return result;
 }
 
 export async function suspendAdminBuyer(buyerId: string, adminId: string, reason: string) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const buyer = await tx.buyer.findUnique({ where: { id: buyerId } });
     if (!buyer) return { kind: "NOT_FOUND" as const };
     if (buyer.status === "SUSPENDED") {
@@ -471,6 +519,14 @@ export async function suspendAdminBuyer(buyerId: string, adminId: string, reason
     });
     return { kind: "OK" as const, buyer: toAdminBuyerView(updated) };
   });
+
+  if (result.kind === "OK") {
+    await notifyUser(result.buyer.user.id, "BUYER_SUSPENDED", {
+      subject: "구매회원 계정이 정지되었습니다",
+      body: `구매회원 계정이 정지되었습니다. 사유: ${reason}`,
+    });
+  }
+  return result;
 }
 
 export async function getAdminListings(status?: string) {
@@ -500,7 +556,7 @@ export async function reviewAdminListing(
   adminId: string,
   data: z.infer<typeof adminReviewSchema>,
 ) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const listing = await tx.listing.findUnique({ where: { id: listingId } });
     if (!listing) return { kind: "NOT_FOUND" as const };
     if (listing.status !== "PENDING") {
@@ -530,8 +586,28 @@ export async function reviewAdminListing(
         reason: data.approve ? null : data.reason,
       },
     });
-    return { kind: "OK" as const, listing: toAdminListingView(updated) };
+    return { kind: "OK" as const, listing: toAdminListingView(updated), sellerUserId: updated.seller.userId };
   });
+
+  if (result.kind === "OK") {
+    // Notification fires only after the transaction above has committed —
+    // never from inside it (see notify.ts).
+    await notifyUser(
+      result.sellerUserId,
+      data.approve ? "LISTING_APPROVED" : "LISTING_REJECTED",
+      data.approve
+        ? {
+            subject: "상품 등록이 승인되었습니다",
+            body: "등록하신 상품이 승인되어 판매가 시작되었습니다.",
+          }
+        : {
+            subject: "상품 등록이 반려되었습니다",
+            body: `등록하신 상품이 반려되었습니다. 사유: ${data.reason}`,
+          },
+    );
+    return { kind: "OK" as const, listing: result.listing };
+  }
+  return result;
 }
 
 export async function getAdminOrders() {
@@ -554,7 +630,7 @@ export async function updateAdminShipping(
   adminId: string,
   data: z.infer<typeof adminShippingSchema>,
 ) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order) return { kind: "NOT_FOUND" as const };
 
@@ -600,6 +676,27 @@ export async function updateAdminShipping(
         reason: data.reason ?? null,
       },
     });
-    return { kind: "OK" as const, order: toAdminOrderView(updated) };
+    return {
+      kind: "OK" as const,
+      order: toAdminOrderView(updated),
+      buyerId: updated.buyerId,
+      // Only "advanced" (never a same-or-backwards admin correction) should
+      // trigger the buyer-facing notification — see shippingRank's export
+      // comment in seller.ts.
+      isAdvance: shippingRank[shippingStatus] > shippingRank[order.shippingStatus],
+      newShippingStatus: shippingStatus,
+    };
   });
+
+  if (result.kind === "OK" && result.isAdvance) {
+    await notifyUser(result.buyerId, "BUYER_ORDER_SHIPPED", {
+      subject: "배송 상태가 변경되었습니다",
+      body: `주문(${result.order.id})의 배송 상태가 '${SHIPPING_STATUS_LABEL[result.newShippingStatus]}'(으)로 변경되었습니다.`,
+    });
+  }
+
+  if (result.kind === "OK") {
+    return { kind: "OK" as const, order: result.order };
+  }
+  return result;
 }

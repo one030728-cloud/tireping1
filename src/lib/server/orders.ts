@@ -11,6 +11,8 @@ import {
   type OrderStatusValue,
 } from "@/lib/order-status";
 import { prisma } from "./prisma";
+import { notifyUser } from "./notify";
+import { resolveExtraShipping } from "./pricing";
 
 const orderItemSchema = z.object({
   id: z.string().trim().min(1).max(200),
@@ -134,6 +136,29 @@ export type BuyerOrderView = ReturnType<typeof toBuyerOrderView>;
 // for the specific orders it prepares — see prepare/route.ts.
 export const UNPAID_ORDER_TTL_MS = 30 * 60 * 1000;
 
+// Restores a cancelled/expired order's listing stock and reopens the listing
+// if that restoration takes it off SOLDOUT. Shared by cancelOrder,
+// expireStaleUnpaidOrders below, and the Toss webhook's reconciliation
+// (src/app/api/payments/toss/webhook/route.ts) — one rule, one place, so a
+// future change to how restocking works can't silently apply to only some of
+// the paths that cancel an order. Must run inside the same transaction as
+// the order-status flip that cancelled the order, using that same
+// transaction's already-loaded listing status (callers already have it from
+// their own `include: { listing: true }` read, so this deliberately takes it
+// as a parameter instead of re-querying).
+export async function restoreListingStockForCancelledOrder(
+  tx: Prisma.TransactionClient,
+  order: { listingId: string; quantity: number; listingStatus: string },
+) {
+  await tx.listing.update({
+    where: { id: order.listingId },
+    data: {
+      stock: { increment: order.quantity },
+      ...(order.listingStatus === "SOLDOUT" ? { status: "ACTIVE" } : {}),
+    },
+  });
+}
+
 // Expires every 입금대기 order matching `scope` whose paymentDeadline has
 // passed: flips it to 입금전취소, restores the listing's stock, and reopens
 // the listing if that stock restoration takes it off SOLDOUT. Callers scope
@@ -155,7 +180,7 @@ export async function expireStaleUnpaidOrders(scope: Prisma.OrderWhereInput) {
     // own row and its own listing, so nothing is gained by batching several
     // orders into one transaction, and keeping them separate means one
     // order's expiry being skipped never rolls back the others.
-    await prisma.$transaction(async (tx) => {
+    const expiredOrder = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id },
         include: { listing: true },
@@ -163,7 +188,7 @@ export async function expireStaleUnpaidOrders(scope: Prisma.OrderWhereInput) {
       // Already moved off 입금대기 (paid, cancelled, or expired by a
       // concurrent call) between the findMany above and this transaction —
       // nothing to do.
-      if (!order || order.status !== ORDER_STATUS.PAYMENT_PENDING) return;
+      if (!order || order.status !== ORDER_STATUS.PAYMENT_PENDING) return null;
 
       // Conditional updateMany guarded on the current status is what keeps
       // this safe against a concurrent Toss confirm: confirm only ever flips
@@ -178,17 +203,28 @@ export async function expireStaleUnpaidOrders(scope: Prisma.OrderWhereInput) {
           cancelReason: "결제 시간 초과로 자동 취소되었습니다.",
         },
       });
-      if (expired.count !== 1) return;
+      if (expired.count !== 1) return null;
 
-      // Mirrors the stock-restore/SOLDOUT-reopen in cancelOrder (~line 357).
-      await tx.listing.update({
-        where: { id: order.listingId },
-        data: {
-          stock: { increment: order.quantity },
-          ...(order.listing.status === "SOLDOUT" ? { status: "ACTIVE" } : {}),
-        },
+      await restoreListingStockForCancelledOrder(tx, {
+        listingId: order.listingId,
+        quantity: order.quantity,
+        listingStatus: order.listing.status,
       });
+
+      return order;
     });
+
+    // Fired only after the transaction above has committed — never from
+    // inside it, per the rule in notify.ts. This is the buyer-facing
+    // "order auto-cancelled by payment timeout" notification; notifyUser
+    // swallows its own errors, so a notification failure here can never
+    // undo the expiry that already committed.
+    if (expiredOrder) {
+      await notifyUser(expiredOrder.buyerId, "BUYER_ORDER_AUTO_CANCELLED", {
+        subject: "결제 시간 초과로 주문이 취소되었습니다",
+        body: `주문(${expiredOrder.id})이 결제 시간 초과로 자동 취소되었습니다. 다시 주문해 주세요.`,
+      });
+    }
   }
 }
 
@@ -310,7 +346,10 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
           sellerId: listing.sellerId,
           quantity: item.quantity,
           unitPrice: listing.price,
-          extraShipping: item.extraShipping,
+          // Server-derived, not item.extraShipping from the request body —
+          // see resolveExtraShipping (pricing.ts) for why the client's value
+          // is never trusted here.
+          extraShipping: resolveExtraShipping(),
           status: ORDER_STATUS.PAYMENT_PENDING,
           shippingStatus: "PREPARING",
           courier: null,
@@ -329,6 +368,22 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
     include: buyerOrderInclude,
     orderBy: { orderedAt: "desc" },
   });
+
+  // Seller-facing "new order received" notification, fired only after the
+  // transaction above has committed (never from inside it — see notify.ts).
+  // One order-creation request can span several sellers (a buyer's cart may
+  // mix listings from different sellers), so notify each affected seller
+  // once rather than once per order line.
+  const sellerIds = Array.from(new Set(orders.map((order) => order.sellerId)));
+  for (const sellerId of sellerIds) {
+    const seller = await prisma.seller.findUnique({ where: { id: sellerId }, select: { userId: true } });
+    if (!seller) continue;
+    await notifyUser(seller.userId, "SELLER_ORDER_RECEIVED", {
+      subject: "새 주문이 접수되었습니다",
+      body: "새로운 주문이 접수되었습니다. 판매자 페이지에서 주문 내역을 확인해 주세요.",
+    });
+  }
+
   return orders.map(toBuyerOrderView);
 }
 
@@ -357,9 +412,19 @@ async function cancelTossPaymentForRefund(
       headers: {
         Authorization: `Basic ${authorization}`,
         "Content-Type": "application/json",
-        // Toss dedupes cancel requests by this header, so a retried call
+        // Toss dedupes cancel requests by this header (confirmed:
+        // https://docs.tosspayments.com/reference/using-api/idempotency-key
+        // — honoured on all POST APIs, max 300 chars), so a retried call
         // after a network timeout (where we can't tell if the first call
-        // actually landed) can't double-refund the same cancellation.
+        // actually landed) can't double-refund the same cancellation; a
+        // repeat with the same key replays the first response rather than
+        // re-executing. That dedup window is only 15 days from first use —
+        // a retry of this exact cancellation attempted after 15 days would
+        // NOT be deduped and could double-cancel. Not a concern for the
+        // immediate retry this key is designed for (see the call site in
+        // settleFullRefundViaToss, which runs once right after the
+        // triggering DB transaction commits), but worth knowing before this
+        // key is ever reused for a long-delayed manual retry.
         "Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify({ cancelReason: reason }),
@@ -461,12 +526,10 @@ export async function cancelOrder(
       throw new OrderDomainError("ORDER_ALREADY_CANCELLED");
     }
 
-    await tx.listing.update({
-      where: { id: order.listingId },
-      data: {
-        stock: { increment: order.quantity },
-        ...(order.listing.status === "SOLDOUT" ? { status: "ACTIVE" } : {}),
-      },
+    await restoreListingStockForCancelledOrder(tx, {
+      listingId: order.listingId,
+      quantity: order.quantity,
+      listingStatus: order.listing.status,
     });
 
     // Cancelling an already-paid order (입금후취소) doesn't touch its Payment

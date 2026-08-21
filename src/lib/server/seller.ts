@@ -2,11 +2,18 @@ import { hash } from "bcryptjs";
 import { ListingStatus, Prisma, type ShippingStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { ORDER_STATUS, isCancelledOrderStatus, nextOrderStatusForShipping } from "@/lib/order-status";
+import {
+  ORDER_STATUS,
+  SHIPPING_STATUS_LABEL,
+  isCancelledOrderStatus,
+  nextOrderStatusForShipping,
+} from "@/lib/order-status";
 import { isValidBusinessRegNumber, normalizeBusinessRegNumber } from "@/lib/business-reg-number";
 import { prisma } from "./prisma";
 import { requireRole } from "./guard";
 import { expireStaleUnpaidOrders } from "./orders";
+import { isAllowedListingImageUrl } from "./storage";
+import { notifyUser } from "./notify";
 
 const nullableText = (max: number) =>
   z.preprocess(
@@ -40,7 +47,15 @@ export const listingSchema = z.object({
   tag: tagSchema,
   shippingNote: nullableText(500),
   courier: z.string().trim().min(1).max(80).optional(),
-  imageUrls: z.array(z.string().trim().url().max(2_000)).max(10).optional(),
+  // Not `.url()` — zod 4.4.3's `.url()` only checks that a string parses as
+  // *some* URL, which accepts `javascript:`/`data:` URIs and any external
+  // host. The actual restriction (this app's own storage origin only, with a
+  // grandfather exception for URLs already persisted on the listing being
+  // edited) can only be enforced at request time against runtime config
+  // (`S3_PUBLIC_BASE_URL`), not in this module-level schema — see
+  // isAllowedListingImageUrl (storage.ts) for why, and createSellerListing /
+  // updateSellerListing below for where that check actually runs.
+  imageUrls: z.array(z.string().trim().min(1).max(2_000)).max(10).optional(),
 });
 
 export const listingPatchSchema = listingSchema.partial();
@@ -171,6 +186,31 @@ export function validationResponse(error: unknown) {
   );
 }
 
+export class SellerDomainError extends Error {
+  constructor(
+    public readonly code: "LISTING_IMAGE_URL_NOT_ALLOWED",
+    public readonly status = 400,
+  ) {
+    super(code);
+    this.name = "SellerDomainError";
+  }
+}
+
+export function domainErrorResponse(error: unknown) {
+  if (!(error instanceof SellerDomainError)) return null;
+  if (error.code === "LISTING_IMAGE_URL_NOT_ALLOWED") {
+    return NextResponse.json(
+      {
+        error: error.code,
+        message:
+          "상품 이미지는 이미지 등록 기능으로 업로드한 파일만 사용할 수 있습니다. 외부 URL은 등록할 수 없습니다.",
+      },
+      { status: error.status },
+    );
+  }
+  return NextResponse.json({ error: error.code }, { status: error.status });
+}
+
 export function serverErrorResponse(error: unknown, message = "SELLER_REQUEST_FAILED") {
   console.error(message, error);
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -287,6 +327,13 @@ export async function createSellerListing(
   sellerId: string,
   data: z.infer<typeof listingSchema>,
 ) {
+  // A brand-new listing has no pre-existing images of its own, so every URL
+  // must already sit on this app's own storage origin — no grandfather
+  // exception applies here (contrast updateSellerListing below).
+  if (data.imageUrls?.some((url) => !isAllowedListingImageUrl(url))) {
+    throw new SellerDomainError("LISTING_IMAGE_URL_NOT_ALLOWED");
+  }
+
   const listing = await prisma.$transaction(async (tx) => {
     const product = await tx.product.upsert({
       where: productKey(data),
@@ -367,9 +414,22 @@ export async function updateSellerListing(
   const listing = await prisma.$transaction(async (tx) => {
     const existing = await tx.listing.findFirst({
       where: { id: listingId, sellerId },
-      include: { product: true },
+      include: { product: true, images: { select: { url: true } } },
     });
     if (!existing) return null;
+
+    if (data.imageUrls !== undefined) {
+      // Grandfather exception: a URL already persisted on *this* listing
+      // (e.g. saved before this restriction existed) may be kept as-is even
+      // if it isn't on this app's own storage origin — otherwise a seller
+      // editing such a listing could never save it again. Any URL not
+      // already on the listing must be on our own storage origin, same as
+      // createSellerListing.
+      const existingUrls = new Set(existing.images.map((image) => image.url));
+      if (data.imageUrls.some((url) => !isAllowedListingImageUrl(url, existingUrls))) {
+        throw new SellerDomainError("LISTING_IMAGE_URL_NOT_ALLOWED");
+      }
+    }
 
     const nextProduct = {
       manufacturer: data.manufacturer ?? existing.product.manufacturer,
@@ -579,7 +639,12 @@ export async function getSellerOrders(sellerId: string) {
   return orders.map(toOrderView);
 }
 
-const shippingRank: Record<ShippingStatus, number> = {
+// Exported so updateAdminShipping (admin.ts) can also tell "advanced" apart
+// from "reset backwards" without duplicating this table — admins are allowed
+// to reset shippingStatus to an earlier value (to correct a mistake), and
+// that path shouldn't fire the same buyer-facing "shipping advanced"
+// notification this rank table gates below.
+export const shippingRank: Record<ShippingStatus, number> = {
   PREPARING: 0,
   TRACKING_REGISTERED: 1,
   SHIPPED: 2,
@@ -640,6 +705,7 @@ export async function updateSellerShipping(
   // path from drifting apart, and it never moves order.status backwards.
   const advancedOrderStatus = nextOrderStatusForShipping(order.status, nextStatus);
 
+  const previousShippingStatus = order.shippingStatus;
   const updated = await prisma.order.update({
     where: { id: orderId },
     data: {
@@ -652,6 +718,20 @@ export async function updateSellerShipping(
     },
     include: sellerOrderInclude,
   });
+
+  // Buyer-facing "shipping status advanced" notification — only when the
+  // shipping status actually changed (a seller re-saving the same status
+  // with, say, a corrected tracking number shouldn't re-notify the buyer).
+  // No prisma.$transaction wraps this update, so there's no rollback concern
+  // here, but the notification still only fires after the update above has
+  // resolved, matching the "after commit" rule everywhere else (notify.ts).
+  if (nextStatus !== previousShippingStatus) {
+    await notifyUser(updated.buyerId, "BUYER_ORDER_SHIPPED", {
+      subject: "배송 상태가 변경되었습니다",
+      body: `주문(${updated.id})의 배송 상태가 '${SHIPPING_STATUS_LABEL[nextStatus]}'(으)로 변경되었습니다.`,
+    });
+  }
+
   return { kind: "OK" as const, order: toOrderView(updated) };
 }
 

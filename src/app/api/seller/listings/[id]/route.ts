@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   deleteSellerListing,
+  domainErrorResponse,
   getSellerListing,
   listingPatchSchema,
   requireSeller,
@@ -40,6 +41,8 @@ export async function PATCH(request: Request, { params }: Context) {
   } catch (error) {
     const invalid = validationResponse(error);
     if (invalid) return invalid;
+    const domain = domainErrorResponse(error);
+    if (domain) return domain;
     return serverErrorResponse(error, "SELLER_LISTING_UPDATE_FAILED");
   }
 }

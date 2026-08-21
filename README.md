@@ -31,6 +31,21 @@ The current Toss Payments SDK v2 distinguishes API individual integration keys (
 
 To test locally, start the app with `npm run dev`, sign in as a buyer, create an order, and select `결제하기` from the order list. Use the test keys from your own Toss Payments account. The payment success redirect confirms the payment on the server and changes linked orders to `입금완료`; the failure redirect returns to the order list so the payment can be retried.
 
+### Toss 웹훅 설정
+
+`POST /api/payments/toss/webhook`은 Toss가 결제 상태 변경(`PAYMENT_STATUS_CHANGED`, `CANCEL_STATUS_CHANGED`)을 알려오는 엔드포인트입니다. Toss는 웹훅 요청에 서명을 하지 않으므로([공식 문서](https://docs.tosspayments.com/guides/webhook) 확인), 인증은 등록된 URL에 심어둔 공유 비밀값(`TOSS_WEBHOOK_SECRET`)에만 의존합니다.
+
+```env
+TOSS_WEBHOOK_SECRET=<임의의 긴 무작위 문자열>
+```
+
+1. 위 값을 `.env.local`(로컬) 또는 Render 환경 변수(운영)에 설정합니다.
+2. [Toss Payments 개발자센터](https://developers.tosspayments.com)의 웹훅 등록 화면에서, 이 앱의 엔드포인트 URL을 **쿼리 파라미터에 그 값을 포함한 형태**로 등록합니다. 예: `https://<앱 도메인>/api/payments/toss/webhook?secret=<위에서 설정한 값>`.
+3. `TOSS_WEBHOOK_SECRET`이 설정되어 있지 않으면 이 엔드포인트는 항상 503을 반환하고 아무 것도 처리하지 않습니다(안전한 기본값).
+4. 비밀값을 교체하려면 환경 변수를 바꾸는 것만으로는 부족합니다 — 개발자센터에 등록된 URL 자체를 새 값으로 다시 등록해야 합니다.
+
+자세한 보안 모델(서명이 없는 이유, 그래서 요청 바디를 신뢰하지 않고 항상 Toss API로 재조회하는 이유)은 아래 운영 가이드 3번 항목을 참고하세요.
+
 ## Database seeding
 
 Database seeding is not run automatically during Render builds. To run it manually, open the **Shell** tab in the Render dashboard (or run locally) with:
@@ -84,15 +99,16 @@ S3_FORCE_PATH_STYLE=false
 - **`failReason: SUPERSEDED_BY_NEW_PAYMENT_PREPARE`**: (`toss/prepare` 경로에서 발생) 같은 주문들에 대해 새로운 결제 준비가 이루어지면서 이전 `Payment`가 대체되어 취소된 경우입니다. 구버전 결제창을 붙잡고 있던 브라우저 탭이 뒤늦게 승인 요청을 보내면 나타날 수 있는 정상적인 상태이며, 별도 조치가 필요 없습니다.
 - **로그 `TOSS_PAYMENT_CONFIRM_UNRECOVERABLE`**: 가장 심각한 상태입니다. Toss 승인은 성공했고(카드 청구 완료) DB에는 그 사실을 전혀 기록하지 못했으며, 안전장치로 시도한 Toss 자동 취소마저 실패한 경우에만 남습니다. **돈은 실제로 빠져나갔는데 시스템 어디에도 그 결제 기록이 없는 상태**이므로, 이 로그 라인이 보이면 반드시 사람이 개입해야 합니다. 로그에 남은 `paymentId`, `tossOrderId`, `paymentKey`, `amount`를 근거로 Toss 콘솔에서 실제 승인 내역을 확인하고, DB에 `Payment`/`Order` 레코드를 수동으로 복구하거나(정상 결제로 인정하는 경우) Toss 콘솔에서 수동으로 취소·환불(결제를 무효화하는 경우) 처리해야 합니다.
 
-### 3. Toss 웹훅이 없다는 점 (알려진 한계)
+### 3. Toss 웹훅 (`POST /api/payments/toss/webhook`)
 
-이 앱은 Toss 웹훅(webhook)을 전혀 사용하지 않습니다. 결제 승인은 **오직 구매자의 브라우저가 결제 후 `successUrl`(`/orders/pay/success`)로 돌아와서 `POST /api/payments/toss/confirm`을 호출해야만** DB에 반영됩니다.
+`POST /api/payments/toss/confirm`이 실행되지 않고 끝나는 경우(구매자가 결제 직후 브라우저를 닫거나, 이탈하거나, 네트워크가 끊긴 경우)와 Toss 콘솔에서 직접 수행한 취소/환불이 이 DB에 반영되지 않는 문제를 보완하기 위해 웹훅 엔드포인트를 두었습니다. 다만 아래 특성을 반드시 이해하고 있어야 합니다.
 
-**운영상의 결과**:
-
-- 구매자가 결제를 마친 뒤 브라우저를 강제 종료하거나, 네트워크가 끊기거나, 리다이렉트 전에 이탈하면 Toss 측에서는 결제가 완료되었더라도 이 앱의 DB에는 절대 반영되지 않습니다. (`PAYMENT_CONFIRM_PENDING_RECONCILIATION`/`TOSS_PAYMENT_CONFIRM_UNRECOVERABLE` 상태와 별개로, 애초에 confirm 요청 자체가 오지 않는 경우입니다.)
-- **Toss 관리자 콘솔에서 직접 수행한 취소/환불은 이 DB에 전혀 반영되지 않습니다.** 즉 Toss 콘솔과 이 앱의 `Payment`/`Order` 상태가 서로 어긋날 수 있으며, 이를 맞추는 것은 전적으로 수동 운영 업무입니다.
-- 결제 관련 이상(구매자 문의 등)이 있으면 이 앱의 상태만 믿지 말고 항상 Toss 콘솔의 실제 결제 내역을 함께 확인해야 합니다.
+- **Toss는 웹훅 요청에 서명을 하지 않습니다.** [공식 문서](https://docs.tosspayments.com/guides/webhook)에 서명 헤더나 HMAC 방식이 전혀 명시되어 있지 않으며, HTTPS 사용 권장 외의 보안 장치가 없습니다. 따라서 이 엔드포인트의 인증은 **등록된 URL에 심어둔 공유 비밀값(`TOSS_WEBHOOK_SECRET`, 위 "Toss 웹훅 설정" 참고)** 에만 의존합니다. `TOSS_WEBHOOK_SECRET`이 설정되어 있지 않으면 항상 503을 반환하고 아무 것도 처리하지 않습니다.
+- **이 엔드포인트의 실제 안전장치는 URL 비밀값이 아니라, 요청 바디를 절대 신뢰하지 않는다는 점입니다.** 웹훅 바디는 오직 "어떤 결제를 다시 확인해야 하는지" 판단하는 용도로만 쓰이고, 실제 상태(결제 승인 여부, 금액, 취소 여부)는 항상 `TOSS_SECRET_KEY`로 인증한 서버-to-서버 호출로 Toss API에서 다시 조회합니다(`GET https://api.tosspayments.com/v1/payments/{paymentKey}` 또는 `GET https://api.tosspayments.com/v1/payments/orders/{orderId}` — 둘 다 Toss API 레퍼런스로 확인됨). 즉 URL 비밀값이 유출되어 위조 요청이 들어오더라도, 그 요청이 실제로 존재하지 않거나 이 앱이 모르는 결제를 가리키면 아무 일도 일어나지 않습니다.
+- **Toss가 공개한 발신 IP 목록**(https://docs.tosspayments.com/reference/using-api/security): `13.124.18.147, 13.124.108.35, 3.36.173.151, 3.38.81.32, 115.92.221.121, 115.92.221.122, 115.92.221.123, 115.92.221.125, 115.92.221.126, 115.92.221.127`. 이 목록은 Toss 쪽에서 계속 바뀔 수 있다고 문서에 명시되어 있고, 이 앱이 Render 프록시 뒤에 있어 관측되는 IP가 실제로 이 목록과 일치하는지 이 저장소 안에서 검증할 방법이 없으므로, **차단 조건이 아니라 모니터링 용도로만** 사용합니다. `TOSS_WEBHOOK_ALLOWED_IPS` 환경 변수(콤마 구분)에 위 목록을 넣어두면, 목록에 없는 IP로 들어온 요청은 거부하지 않고 경고 로그(`TOSS_WEBHOOK_IP_NOT_IN_ALLOWLIST`)만 남깁니다.
+- **재시도 정책**(Toss 문서 기준): Toss는 10초 이내 200 응답을 기대하며, 그렇지 않으면 최대 7회, 1·4·16·64·256·1024·4096분 간격(총 약 3일 19시간)으로 재시도한 뒤 포기하고 이메일로 실패를 통지합니다. 이 앱은 정상 처리했거나 의도적으로 무시한 경우 200을, 재시도가 실제로 도움이 될 수 있는 경우(Toss 조회 API 실패, DB 오류 등)에만 5xx를 반환합니다.
+- **Toss의 결제 상태(`READY`/`IN_PROGRESS`/`WAITING_FOR_DEPOSIT`/`DONE`/`CANCELED`/`PARTIAL_CANCELED`/`ABORTED`/`EXPIRED`)는 이 앱의 `PaymentStatus`(`READY`/`DONE`/`FAILED`/`CANCELED`)보다 더 세분화되어 있습니다.** 특히 `PARTIAL_CANCELED`(부분 취소)는 로컬 `status`를 절대 `CANCELED`로 바꾸지 않습니다 — `status === "CANCELED" && refundRequiredAt === null`을 "환불완료"로 표시하는 입출금 화면(`settlement.ts`)에서, 부분 취소된 결제가 전액 환불된 것처럼 보이는 것을 막기 위함입니다. 대신 `refundRequiredAt`/`refundReason`/`refundAmount`만 기록해 위 2번 항목의 "부분 취소는 수동 처리" 원칙과 동일하게 관리자가 직접 처리하도록 남겨둡니다.
+- 이 웹훅이 있어도 **위 2번 항목의 수동 개입 상태들과 "부분 취소는 자동 환불하지 않는다"는 원칙은 그대로 유지됩니다.** 결제 관련 이상(구매자 문의 등)이 있으면 이 앱의 상태만 믿지 말고 항상 Toss 콘솔의 실제 결제 내역을 함께 확인해야 합니다.
 
 ### 4. 레이트리밋이 인메모리라는 점
 

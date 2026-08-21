@@ -145,3 +145,21 @@ export const findIdIpLimiter = new InMemorySlidingWindowLimiter({
   max: 20,
   blockMs: 15 * 60 * 1000,
 });
+
+// Toss webhook flood protection (see src/app/api/payments/toss/webhook/route.ts).
+// Toss does not sign webhook deliveries at all (confirmed against their docs
+// at https://docs.tosspayments.com/guides/webhook — no header, no HMAC, no
+// published source-IP allowlist), so nothing about a request's shape can
+// distinguish a genuine Toss retry from a forged flood; the URL secret is the
+// only gate. This limiter exists purely to bound how many outbound
+// Toss-lookup calls a forged flood from one source can trigger, not to
+// distinguish "legitimate" from "illegitimate" traffic. The threshold is
+// deliberately generous — Toss's own retry schedule alone can resend the same
+// event up to 7 times over ~3 days 19 hours, and this app's real order volume
+// should stay far below it — so normal Toss traffic is never blocked by
+// this, only a genuine flood.
+export const tossWebhookIpLimiter = new InMemorySlidingWindowLimiter({
+  windowMs: 5 * 60 * 1000,
+  max: 120,
+  blockMs: 5 * 60 * 1000,
+});

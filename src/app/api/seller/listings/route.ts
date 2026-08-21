@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   createSellerListing,
+  domainErrorResponse,
   getSellerListings,
   listingSchema,
   requireSeller,
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const invalid = validationResponse(error);
     if (invalid) return invalid;
+    const domain = domainErrorResponse(error);
+    if (domain) return domain;
     return serverErrorResponse(error, "SELLER_LISTING_CREATE_FAILED");
   }
 }

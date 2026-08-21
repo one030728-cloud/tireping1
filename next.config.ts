@@ -23,24 +23,35 @@ const isProduction = process.env.NODE_ENV === "production";
 // present anywhere in this repository, so its actual behavior (which
 // additional script/frame/connect origins it in turn loads for card
 // input, 3-D Secure/ARS popups, bank-app deep links, etc.) cannot be
-// determined by reading the package - only https://js.tosspayments.com
-// itself is confirmed from evidence gathered here.
+// determined by reading the package.
 //
-// Guessing at the rest of the Toss origin list and shipping it as an
-// enforcing policy risks silently breaking the payment flow, which is worse
-// than shipping no CSP at all - a buyer who can't complete checkout because
-// of a wrong `frame-src`/`connect-src` value has no visible error to act on.
-// So this ships as `Content-Security-Policy-Report-Only`: browsers evaluate
-// it and log violations without blocking anything, so it can be observed
-// against a real Toss test payment and tightened into an enforcing
-// `Content-Security-Policy` once that's verified. This could not be done in
-// this change (no Toss credentials or browser session available here).
+// The rest of the origin list is therefore taken from Toss's own published
+// requirements rather than guessed at:
+//   https://docs.tosspayments.com/reference/using-api/security
+// which lists the domains a merchant must allow through a firewall or proxy
+// for the payment window to work:
+//   api.tosspayments.com, event.tosspayments.com, pages.tosspayments.com,
+//   static.toss.im, polyfill-fe.toss.im, assets-fe.toss.im
+// plus js.tosspayments.com for the loader confirmed above. That page states
+// firewall/port requirements and does NOT break the list down per CSP
+// directive, so each origin below is allowed in every directive it could
+// plausibly be needed in (script/frame/connect/img) rather than being
+// guessed into exactly one.
 //
-// - `js.tosspayments.com` is allowed for scripts and (conservatively) frames,
-//   based on the evidence above.
-// - `api.tosspayments.com` is only ever called from the server
-//   (src/app/api/payments/toss/*/route.ts), never from the browser, so it is
-//   intentionally left out of `connect-src`.
+// This still ships as `Content-Security-Policy-Report-Only`. Toss documents
+// which hosts must be reachable, not which CSP directive each is fetched
+// under, and the payment window is remote code that can change - so a wrong
+// `frame-src`/`connect-src` guess would break checkout with no visible error
+// for the buyer. Report-Only lets browsers evaluate and report violations
+// without blocking anything. Run one real Toss payment, read the violation
+// reports, then switch this key to `Content-Security-Policy`. That could not
+// be done here (no Toss credentials or browser session available).
+//
+// - `api.tosspayments.com` is called from the server
+//   (src/app/api/payments/toss/*/route.ts), where CSP does not apply, but it
+//   is in Toss's browser-reachable list too so it is kept in `connect-src`.
+// - The payment window itself runs in a cross-origin frame and enforces its
+//   own CSP; ours only governs which origins this page may frame.
 // - `img-src` allows `https:` broadly (in addition to `'self'` and `data:`)
 //   because listing photos are served from an operator-configured
 //   `S3_PUBLIC_BASE_URL` (Cloudflare R2 or any CDN, see README) that is not
@@ -52,14 +63,26 @@ const isProduction = process.env.NODE_ENV === "production";
 // - `'unsafe-eval'` is added only in development, matching the documented
 //   guidance that React's dev-mode error reconstruction needs it and that
 //   neither React nor Next.js need it in production.
+// Every origin Toss documents as required, in one place so the directives
+// below cannot drift apart from each other.
+const TOSS_ORIGINS = [
+  "https://js.tosspayments.com",
+  "https://api.tosspayments.com",
+  "https://event.tosspayments.com",
+  "https://pages.tosspayments.com",
+  "https://static.toss.im",
+  "https://polyfill-fe.toss.im",
+  "https://assets-fe.toss.im",
+].join(" ");
+
 const cspDirectives = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' https://js.tosspayments.com${isProduction ? "" : " 'unsafe-eval'"}`,
+  `script-src 'self' 'unsafe-inline' ${TOSS_ORIGINS}${isProduction ? "" : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://js.tosspayments.com",
-  "frame-src 'self' https://js.tosspayments.com",
+  `connect-src 'self' ${TOSS_ORIGINS}`,
+  `frame-src 'self' ${TOSS_ORIGINS}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
