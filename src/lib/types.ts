@@ -129,21 +129,6 @@ export interface FullOrder {
   deliveredAt?: string | null;
 }
 
-export interface DepositRecord {
-  orderId: string;
-  itemLabel: string;
-  paidAmount: number | null;
-  refundAmount: number | null;
-  date: string;
-}
-
-export interface TaxRecord {
-  month: string;
-  supplyAmount: number;
-  vat: number;
-  total: number;
-}
-
 export interface WishSeller {
   id: string;
   type: string;

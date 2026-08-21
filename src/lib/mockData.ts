@@ -1,6 +1,5 @@
 import type {
   CatalogRow,
-  DepositRecord,
   EventItem,
   FactoryTireGroup,
   FullOrder,
@@ -836,65 +835,6 @@ export const CANCEL_STATUS_COUNTS = {
   반품완료: 0,
   재고없음: 0,
   상품미도착: 0,
-};
-
-export const DEPOSITS: DepositRecord[] = [
-  {
-    orderId: "247137",
-    itemLabel: "솔루스 TA31",
-    paidAmount: 120000,
-    refundAmount: null,
-    date: "2026-07-02 13:16",
-  },
-  {
-    orderId: "278357",
-    itemLabel: "솔루스 TA31 175/65 14",
-    paidAmount: null,
-    refundAmount: 119980,
-    date: "2026-07-02 13:07",
-  },
-  {
-    orderId: "247095",
-    itemLabel: "솔루스 TA31",
-    paidAmount: 119980,
-    refundAmount: null,
-    date: "2026-07-02 11:39",
-  },
-  {
-    orderId: "238333",
-    itemLabel: "Dynapro HPX (RA43)",
-    paidAmount: 672960,
-    refundAmount: null,
-    date: "2026-05-25 13:41",
-  },
-  {
-    orderId: "233115",
-    itemLabel: "Ventus S2 AS (H462)",
-    paidAmount: 567600,
-    refundAmount: null,
-    date: "2026-04-27 19:22",
-  },
-  {
-    orderId: "232762",
-    itemLabel: "KINERGY ST AS (H318)",
-    paidAmount: 116780,
-    refundAmount: null,
-    date: "2026-04-25 13:31",
-  },
-];
-
-export const TAX_RECORDS: Record<
-  string,
-  { month: string; supplyAmount: number; vat: number; total: number }[]
-> = {
-  "2026": [
-    { month: "2026-04", supplyAmount: 622163, vat: 62217, total: 684380 },
-    { month: "2026-05", supplyAmount: 611781, vat: 61179, total: 672960 },
-  ],
-  "2025": [
-    { month: "2025-01", supplyAmount: 287255, vat: 28725, total: 315980 },
-    { month: "2025-02", supplyAmount: 129327, vat: 12933, total: 142260 },
-  ],
 };
 
 export const GOODS: GoodsItem[] = [
