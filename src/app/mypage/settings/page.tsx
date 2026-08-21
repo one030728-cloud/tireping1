@@ -169,10 +169,17 @@ function SettingsContent() {
         }),
       });
       if (!response.ok) throw new Error(await readError(response, "계좌 정보 저장에 실패했습니다."));
-      const body = (await response.json()) as { profile: AccountProfile };
+      const body = (await response.json()) as { profile: AccountProfile; verified: boolean };
       setProfile(body.profile);
       setForm(formFromProfile(body.profile));
-      setMessage("계좌 정보가 저장되었습니다. 실명조회는 관리자 확인 대기 상태입니다.");
+      // Reflect what the server actually reported rather than assuming —
+      // today's provider always answers unverified (see bankVerification.ts),
+      // but this stays correct once a real 실명조회 provider is wired in.
+      setMessage(
+        body.verified
+          ? "계좌 정보가 저장되었고 예금주 실명조회가 확인되었습니다."
+          : "계좌 정보가 저장되었습니다. 실명조회는 관리자 확인 대기 상태입니다.",
+      );
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : "계좌 정보 저장에 실패했습니다.");
     } finally {

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { CANCEL_STATUS } from "@/lib/order-status";
 import type { AccountProfile } from "@/lib/account-types";
+import { bankVerificationProvider, type BankVerificationResult } from "./bankVerification";
 import { prisma } from "./prisma";
 
 const nullableText = (max: number) =>
@@ -145,7 +146,14 @@ export async function updateAccountProfile(
 export async function saveBankAccount(
   userId: string,
   data: z.infer<typeof bankAccountSchema>,
-) {
+): Promise<{ profile: AccountProfile; verification: BankVerificationResult }> {
+  // Ask the configured provider first (see bankVerification.ts) — today that
+  // is always the "not configured" provider, so `verification.verified` is
+  // always false and `verifiedAt` always null, but the write below no longer
+  // hard-codes that; it just persists whatever the provider actually
+  // reported, so swapping in a real provider later requires no change here.
+  const verification = await bankVerificationProvider.verify(data);
+
   const user = await prisma.$transaction((tx) =>
     tx.user.update({
       where: { id: userId },
@@ -153,20 +161,22 @@ export async function saveBankAccount(
         bankName: data.bankName,
         bankAccountNumber: data.bankAccountNumber,
         bankAccountHolder: data.bankAccountHolder,
-        // 1차 정책: 외부 실명조회 없이 항상 미인증 상태로 저장한다.
-        bankAccountVerifiedAt: null,
+        bankAccountVerifiedAt: verification.verifiedAt,
       },
       select: accountSelect,
     }),
   );
-  return toAccountProfile(user);
+  return { profile: toAccountProfile(user), verification };
 }
 
 const cancelledStatuses = Object.values(CANCEL_STATUS);
 
 export async function withdrawAccount(userId: string, role: Role, sellerId: string | null) {
   const result = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({ where: { id: userId }, select: { withdrawnAt: true } });
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { withdrawnAt: true, loginId: true },
+    });
     if (!user) throw new AccountDomainError("ACCOUNT_NOT_FOUND", 404);
     if (user.withdrawnAt) throw new AccountDomainError("ACCOUNT_ALREADY_WITHDRAWN");
 
@@ -200,7 +210,56 @@ export async function withdrawAccount(userId: string, role: Role, sellerId: stri
 
     return tx.user.update({
       where: { id: userId },
-      data: { withdrawnAt: new Date() },
+      data: {
+        withdrawnAt: new Date(),
+        // Tombstone both unique identifiers so this business can sign up
+        // again under a fresh account. Both loginId and businessRegNumber
+        // stay NOT NULL columns (no schema-wide nullability change forced by
+        // one withdrawal path), so each is rewritten to a value derived from
+        // this row's own id: guaranteed unique against every other row
+        // (tombstoned or not) and, for businessRegNumber, guaranteed to never
+        // collide with a real checksum-valid 10-digit number (all-digits) —
+        // see the @unique comment on User.businessRegNumber in schema.prisma.
+        // auth.ts's authorize() looks up the *original* loginId the caller
+        // typed via findUnique, so once it no longer matches this row at all
+        // it can never authenticate against this (already withdrawnAt-gated)
+        // account — this only changes what re-registers, not login behavior.
+        loginId: `${user.loginId}#withdrawn#${userId}`,
+        businessRegNumber: `WITHDRAWN#${userId}`,
+
+        // PII scrub. This is a commercial marketplace with tax and dispute
+        // obligations, so Order/Payment rows (and the FKs pointing at this
+        // User) are left completely alone — only the contact/financial detail
+        // on the User row itself, which nothing downstream needs once the
+        // account is gone, gets cleared:
+        //   - businessRegNumber: tombstoned above, not merely retained —
+        //     leaving a real registration number sitting here forever is
+        //     exactly what this task flags as wrong.
+        //   - ownerName, mobilePhone: NOT NULL columns, so replaced with an
+        //     inert placeholder rather than left holding a real name/phone.
+        //   - email, officePhone, contact1/2, postalCode, address, bankName,
+        //     bankAccountNumber, bankAccountHolder, bankAccountVerifiedAt:
+        //     nullable, cleared outright.
+        // Retained on purpose: businessName (not in the PII list this task
+        // calls out — it's a company name, not a personal identifier, and
+        // stays attached to historical Order / seller-order-view records so
+        // past order history still shows which business the order was
+        // with), businessType/businessCategory (industry classification, not
+        // personally identifying), role, createdAt, and every Order/Payment/
+        // CartItem/WishlistEntry row (foreign keys untouched).
+        ownerName: "탈퇴한 회원",
+        email: null,
+        mobilePhone: "",
+        officePhone: null,
+        contact1: null,
+        contact2: null,
+        postalCode: null,
+        address: null,
+        bankName: null,
+        bankAccountNumber: null,
+        bankAccountHolder: null,
+        bankAccountVerifiedAt: null,
+      },
       select: { withdrawnAt: true },
     });
   });

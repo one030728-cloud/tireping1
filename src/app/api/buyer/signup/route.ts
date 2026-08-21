@@ -4,6 +4,7 @@ import {
   createBuyerApplication,
 } from "@/lib/server/buyer";
 import { serverErrorResponse, validationResponse } from "@/lib/server/seller";
+import { duplicateSignupFieldResponse } from "@/lib/server/signupErrors";
 import { signupIpLimiter } from "@/lib/server/rateLimit";
 import { getClientIp } from "@/lib/server/requestIp";
 
@@ -25,6 +26,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const invalid = validationResponse(error);
     if (invalid) return invalid;
+    const duplicate = duplicateSignupFieldResponse(error);
+    if (duplicate) return duplicate;
     return serverErrorResponse(error, "BUYER_SIGNUP_FAILED");
   }
 }

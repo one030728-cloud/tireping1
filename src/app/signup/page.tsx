@@ -59,10 +59,12 @@ export default function BuyerSignupPage() {
         body: JSON.stringify(form),
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string; field?: string | null; message?: string }
+          | null;
         setError(
           body?.error === "DUPLICATE_RESOURCE"
-            ? "이미 사용 중인 아이디입니다."
+            ? body.message ?? "이미 사용 중인 아이디입니다."
             : "가입 신청을 등록하지 못했습니다. 입력값을 확인해 주세요.",
         );
         return;

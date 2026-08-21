@@ -18,8 +18,19 @@ export async function POST(request: Request) {
 
   try {
     const payload = bankAccountSchema.parse(await request.json());
-    const profile = await saveBankAccount(auth.session.user.id, payload);
-    return NextResponse.json({ profile, verified: false, status: "PENDING_ADMIN_REVIEW" });
+    const { profile, verification } = await saveBankAccount(auth.session.user.id, payload);
+    // This route is named `verify` for the eventual real 실명조회 integration
+    // (see bankVerification.ts), but today it never performs one — respond
+    // honestly: always report unverified/pending, driven by what the
+    // (currently "not configured") provider actually returned rather than a
+    // hard-coded literal, so this stays correct the moment a real provider is
+    // swapped in.
+    return NextResponse.json({
+      profile,
+      verified: verification.verified,
+      status: verification.verified ? "VERIFIED" : "PENDING_ADMIN_REVIEW",
+      reason: verification.reason,
+    });
   } catch (error) {
     const invalid = validationResponse(error);
     if (invalid) return invalid;

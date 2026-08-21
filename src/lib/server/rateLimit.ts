@@ -111,3 +111,37 @@ export const signupIpLimiter = new InMemorySlidingWindowLimiter({
   max: 5,
   blockMs: 60 * 60 * 1000,
 });
+
+// Password-reset request protection: same two-axis shape as login, because
+// "guess loginId + businessRegNumber pairs" is structurally the same
+// brute-force problem as "guess loginId + password" — one axis per
+// identifier, either can block, exactly mirroring loginIdLimiter/
+// loginIpLimiter above (see requestPasswordReset in passwordReset.ts).
+export const passwordResetIdentifierLimiter = new InMemorySlidingWindowLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  blockMs: 10 * 60 * 1000,
+});
+
+export const passwordResetIpLimiter = new InMemorySlidingWindowLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  blockMs: 15 * 60 * 1000,
+});
+
+// 아이디 찾기 protection: businessRegNumber + mobilePhone is a smaller guess
+// space per attempt than a password, so this gets the same two-axis
+// treatment even though findMaskedLoginId's result isn't itself a secret
+// (see findId.ts) — the pair still confirms which businessRegNumber has an
+// account at all if left unlimited.
+export const findIdIdentifierLimiter = new InMemorySlidingWindowLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  blockMs: 10 * 60 * 1000,
+});
+
+export const findIdIpLimiter = new InMemorySlidingWindowLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  blockMs: 15 * 60 * 1000,
+});

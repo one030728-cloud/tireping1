@@ -3,6 +3,7 @@ import { ListingStatus, Prisma, type ShippingStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ORDER_STATUS, isCancelledOrderStatus, nextOrderStatusForShipping } from "@/lib/order-status";
+import { isValidBusinessRegNumber, normalizeBusinessRegNumber } from "@/lib/business-reg-number";
 import { prisma } from "./prisma";
 import { requireRole } from "./guard";
 import { expireStaleUnpaidOrders } from "./orders";
@@ -55,7 +56,15 @@ export const sellerSignupSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/)
     .transform((value) => value.toUpperCase()),
   businessName: z.string().trim().min(1).max(120),
-  businessRegNumber: z.string().trim().min(1).max(40),
+  // Normalise before validating so "123-45-67890" and "1234567890" are
+  // treated (and stored) as the same value, and enforce the official
+  // checksum — see business-reg-number.ts. This is scoped to
+  // sellerSignupSchema only (this file's other schemas are owned elsewhere).
+  businessRegNumber: z
+    .string()
+    .trim()
+    .transform(normalizeBusinessRegNumber)
+    .refine(isValidBusinessRegNumber, { message: "사업자등록번호 형식이 올바르지 않습니다." }),
   ownerName: z.string().trim().min(1).max(80),
   mobilePhone: z.string().trim().min(7).max(30),
   courier: z.string().trim().min(1).max(80),

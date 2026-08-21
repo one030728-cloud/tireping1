@@ -54,7 +54,17 @@ model User {
   withdrawnAt          DateTime?
 
   businessName         String
-  businessRegNumber    String
+  // Uniqueness is scoped to real, still-registerable numbers only: withdrawAccount
+  // (see src/lib/server/account.ts) rewrites this to a tombstone value of the
+  // form "WITHDRAWN#<userId>" before soft-deleting the account, so a plain
+  // unique index (rather than a partial one limited to active rows) is enough
+  // — the tombstoned value can never collide with a real checksum-valid
+  // 10-digit registration number (which is all-digits) or with another
+  // user's tombstone (each is suffixed with that user's own cuid). This also
+  // frees the original number for a genuinely different business to register
+  // once the withdrawn account no longer holds it. See businessRegNumber.ts
+  // for the format + checksum validation applied at signup.
+  businessRegNumber    String    @unique
   businessType         String?
   businessCategory     String?
   ownerName            String
@@ -77,6 +87,27 @@ model User {
   payments      Payment[]
   cartItems     CartItem[]
   wishlist      WishlistEntry[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+// Account recovery (아이디 찾기 / 비밀번호 재설정) — see src/lib/server/passwordReset.ts
+// for the full design rationale. Only a hash of the one-time token is ever
+// stored, mirroring why User.passwordHash exists instead of a plaintext
+// password: a stolen row from this table must not be directly usable to take
+// over the account.
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  user       User      @relation(fields: [userId], references: [id])
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  // Set once the token is redeemed (or superseded by a newer request for the
+  // same user); a non-null value means "can never be used again" regardless
+  // of expiresAt, which is what makes single-use enforcement possible.
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Seller {

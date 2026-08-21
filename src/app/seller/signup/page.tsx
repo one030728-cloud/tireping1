@@ -63,8 +63,14 @@ export default function SellerSignupPage() {
       body: JSON.stringify(form),
     });
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error === "DUPLICATE_RESOURCE" ? "아이디 또는 판매자 코드가 이미 사용 중입니다." : "가입 신청을 등록하지 못했습니다. 입력값을 확인해 주세요.");
+      const body = (await response.json().catch(() => null)) as
+        | { error?: string; field?: string | null; message?: string }
+        | null;
+      setError(
+        body?.error === "DUPLICATE_RESOURCE"
+          ? body.message ?? "아이디 또는 판매자 코드가 이미 사용 중입니다."
+          : "가입 신청을 등록하지 못했습니다. 입력값을 확인해 주세요.",
+      );
       setSubmitting(false);
       return;
     }

@@ -6,10 +6,6 @@ import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
-function notSupported() {
-  alert("데모 버전에서는 지원하지 않는 기능입니다.");
-}
-
 function defaultPathForRole(role?: "BUYER" | "SELLER" | "ADMIN") {
   return role === "SELLER" ? "/seller" : role === "ADMIN" ? "/admin" : "/main";
 }
@@ -121,13 +117,13 @@ function LoginForm() {
           </button>
 
           <div className="flex items-center justify-center gap-2 text-xs text-muted mt-1">
-            <button type="button" onClick={notSupported} className="hover:text-brand">
+            <Link href="/find-id" className="hover:text-brand">
               아이디 찾기
-            </button>
+            </Link>
             <span>·</span>
-            <button type="button" onClick={notSupported} className="hover:text-brand">
+            <Link href="/reset-password" className="hover:text-brand">
               비밀번호 재설정
-            </button>
+            </Link>
             <span>·</span>
             <Link href="/signup" className="hover:text-brand">
               회원가입
