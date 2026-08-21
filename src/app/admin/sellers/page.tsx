@@ -68,6 +68,17 @@ function SellersContent() {
     setSellers((current) => current.map((seller) => seller.id === id ? { ...seller, status: "SUSPENDED", suspendReason: reason } : seller));
   }
 
+  async function reinstate(id: string) {
+    if (!window.confirm("이 가맹점의 정지를 해제하고 활성 상태로 되돌리시겠습니까?")) return;
+    setError(null);
+    const response = await fetch(`/api/admin/sellers/${id}/reinstate`, { method: "POST" });
+    if (!response.ok) {
+      setError("가맹점 복구에 실패했습니다.");
+      return;
+    }
+    setSellers((current) => current.map((seller) => seller.id === id ? { ...seller, status: "ACTIVE", suspendReason: null } : seller));
+  }
+
   if (loading) return <LoadingState />;
 
   return (
@@ -92,7 +103,7 @@ function SellersContent() {
                   <td className="py-3 px-4 tabular-nums">{seller.listingCount}</td>
                   <td className="py-3 px-4"><span className={`text-xs font-semibold ${seller.status === "SUSPENDED" ? "text-accent" : seller.status === "PENDING" ? "text-yellow-600" : "text-brand"}`}>{statusLabels[seller.status]}</span>{seller.suspendReason && <p className="text-xs text-accent mt-1 max-w-40 truncate" title={seller.suspendReason}>{seller.suspendReason}</p>}</td>
                   <td className="py-3 px-4 text-xs text-muted">{new Date(seller.user.createdAt).toLocaleDateString("ko-KR")}</td>
-                  <td className="py-3 px-4"><div className="flex items-center gap-2">{seller.status === "PENDING" && <button onClick={() => void approve(seller.id)} className="btn-primary h-8 px-2.5 text-xs">승인</button>}{seller.status !== "SUSPENDED" && <button onClick={() => void suspend(seller.id)} className="btn-outline h-8 px-2.5 text-xs text-accent border-accent">정지</button>}</div></td>
+                  <td className="py-3 px-4"><div className="flex items-center gap-2">{seller.status === "PENDING" && <button onClick={() => void approve(seller.id)} className="btn-primary h-8 px-2.5 text-xs">승인</button>}{seller.status === "SUSPENDED" ? <button onClick={() => void reinstate(seller.id)} className="btn-outline h-8 px-2.5 text-xs">복구</button> : <button onClick={() => void suspend(seller.id)} className="btn-outline h-8 px-2.5 text-xs text-accent border-accent">정지</button>}</div></td>
                 </tr>
               ))}
             </tbody>

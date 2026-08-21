@@ -1,13 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SearchX } from "lucide-react";
 import LoadingState from "@/components/LoadingState";
 import { MANUFACTURERS } from "@/lib/mockData";
 import type { CatalogRow } from "@/lib/types";
-import { parseTireSize } from "@/lib/tireSearch";
 import { useAuth } from "@/lib/auth";
 
 type SortKey = "registered" | "popular" | "lowest" | "highest" | "discount";
@@ -20,23 +19,23 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "discount", label: "DC율 높은순" },
 ];
 
-function sortRows(rows: CatalogRow[], sort: SortKey): CatalogRow[] {
-  const copy = [...rows];
-  switch (sort) {
-    case "popular":
-      return copy.sort((a, b) => (b.tag === "BEST" ? 1 : 0) - (a.tag === "BEST" ? 1 : 0));
-    case "lowest":
-      return copy.sort((a, b) => a.lowPrice - b.lowPrice);
-    case "highest":
-      return copy.sort((a, b) => b.highPrice - a.highPrice);
-    case "discount":
-      return copy.sort((a, b) => b.discountRate - a.discountRate);
-    default:
-      return copy.sort((a, b) => b.registeredOrder - a.registeredOrder);
-  }
-}
-
+// Kept in sync with PAGE_SIZE in src/app/api/products/route.ts — this is
+// only used here to turn the server-reported `total` into a page count.
 const PAGE_SIZE = 12;
+
+// Debounces a value so text-input filters don't fire a request on every
+// keystroke. Mirrors the previous instant client-side filtering closely
+// enough (short delay) while keeping the request volume bounded.
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+
+  return debounced;
+}
 
 function ProductsContent() {
   const { user } = useAuth();
@@ -53,20 +52,69 @@ function ProductsContent() {
   const [dot, setDot] = useState("");
   const [sort, setSort] = useState<SortKey>("registered");
   const [page, setPage] = useState(1);
-  const [catalog, setCatalog] = useState<CatalogRow[]>([]);
+  const [rows, setRows] = useState<CatalogRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+
+  const debouncedSize = useDebouncedValue(size, 350);
+  const debouncedModel = useDebouncedValue(model, 350);
+  const debouncedProductCode = useDebouncedValue(productCode, 350);
+  const debouncedWidth = useDebouncedValue(width, 350);
+  const debouncedRatio = useDebouncedValue(ratio, 350);
+  const debouncedRim = useDebouncedValue(rim, 350);
+  const debouncedDot = useDebouncedValue(dot, 350);
+
+  // Reset to page 1 whenever a filter or sort actually changes (i.e. once
+  // the debounced value settles), not on every keystroke. This follows
+  // React's "adjust state during render" pattern instead of an effect:
+  // setPage is called directly in the render body, guarded by comparing
+  // against the previous filtersKey, so React re-renders with page reset to
+  // 1 before anything commits or fetches — no extra render/fetch cycle.
+  const filtersKey = JSON.stringify([
+    debouncedSize,
+    manufacturer,
+    debouncedModel,
+    debouncedProductCode,
+    debouncedWidth,
+    debouncedRatio,
+    debouncedRim,
+    debouncedDot,
+    tag,
+    sort,
+  ]);
+  const [appliedFiltersKey, setAppliedFiltersKey] = useState(filtersKey);
+  if (filtersKey !== appliedFiltersKey) {
+    setAppliedFiltersKey(filtersKey);
+    setPage(1);
+  }
 
   useEffect(() => {
     let cancelled = false;
 
-    fetch("/api/products", { cache: "no-store" })
+    const query = new URLSearchParams();
+    if (debouncedSize) query.set("size", debouncedSize);
+    if (manufacturer) query.set("manufacturer", manufacturer);
+    if (debouncedModel) query.set("model", debouncedModel);
+    if (debouncedProductCode) query.set("productCode", debouncedProductCode);
+    if (debouncedWidth) query.set("width", debouncedWidth);
+    if (debouncedRatio) query.set("ratio", debouncedRatio);
+    if (debouncedRim) query.set("rim", debouncedRim);
+    if (debouncedDot) query.set("dot", debouncedDot);
+    if (tag) query.set("tag", tag);
+    query.set("sort", sort);
+    query.set("page", String(page));
+
+    fetch(`/api/products?${query.toString()}`, { cache: "no-store" })
       .then((response) => {
         if (!response.ok) throw new Error("상품 목록을 불러오지 못했습니다.");
-        return response.json() as Promise<{ products: CatalogRow[] }>;
+        return response.json() as Promise<{ products: CatalogRow[]; total: number }>;
       })
       .then((data) => {
-        if (!cancelled) setCatalog(data.products);
+        if (cancelled) return;
+        setRows(data.products);
+        setTotal(data.total);
+        setLoadError(false);
       })
       .catch(() => {
         if (!cancelled) setLoadError(true);
@@ -78,38 +126,23 @@ function ProductsContent() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    debouncedSize,
+    manufacturer,
+    debouncedModel,
+    debouncedProductCode,
+    debouncedWidth,
+    debouncedRatio,
+    debouncedRim,
+    debouncedDot,
+    tag,
+    sort,
+    page,
+  ]);
 
-  const results = useMemo(() => {
-    const parsedSize = parseTireSize(size);
-    const hasInvalidSize = size.trim().length > 0 && !parsedSize;
-    const filtered = catalog.filter((r) => {
-      if (hasInvalidSize) return false;
-      if (tag && r.tag !== tag) return false;
-      if (manufacturer && r.manufacturer !== manufacturer) return false;
-      if (model && !r.model.toLowerCase().includes(model.toLowerCase())) return false;
-      if (productCode && !r.productCode.toLowerCase().includes(productCode.toLowerCase()))
-        return false;
-      if (width && r.width !== Number(width)) return false;
-      if (ratio && r.ratio !== Number(ratio)) return false;
-      if (rim && r.rim !== Number(rim)) return false;
-      if (dot && r.dot !== dot) return false;
-      if (parsedSize && r.width !== parsedSize.width) return false;
-      if (parsedSize && r.ratio !== parsedSize.ratio) return false;
-      if (parsedSize && r.rim !== parsedSize.rim) return false;
-      return true;
-    });
-    return sortRows(filtered, sort);
-  }, [catalog, tag, manufacturer, model, productCode, width, ratio, rim, dot, size, sort]);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const pageCount = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
-  const pageRows = results.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  function resetPage() {
-    setPage(1);
-  }
-
-  if (loading) return <LoadingState />;
+  if (loading && rows.length === 0 && !loadError) return <LoadingState />;
 
   if (loadError) {
     return (
@@ -132,19 +165,13 @@ function ProductsContent() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <input
             value={size}
-            onChange={(e) => {
-              setSize(e.target.value);
-              resetPage();
-            }}
+            onChange={(e) => setSize(e.target.value)}
             placeholder="사이즈 검색 예) 245 45 18"
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand col-span-2 sm:col-span-1"
           />
           <select
             value={manufacturer}
-            onChange={(e) => {
-              setManufacturer(e.target.value);
-              resetPage();
-            }}
+            onChange={(e) => setManufacturer(e.target.value)}
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           >
             <option value="">제조사</option>
@@ -156,19 +183,13 @@ function ProductsContent() {
           </select>
           <input
             value={model}
-            onChange={(e) => {
-              setModel(e.target.value);
-              resetPage();
-            }}
+            onChange={(e) => setModel(e.target.value)}
             placeholder="제품명"
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
           <input
             value={productCode}
-            onChange={(e) => {
-              setProductCode(e.target.value);
-              resetPage();
-            }}
+            onChange={(e) => setProductCode(e.target.value)}
             placeholder="제품번호(형용코드)"
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
@@ -176,40 +197,28 @@ function ProductsContent() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <input
             value={width}
-            onChange={(e) => {
-              setWidth(e.target.value);
-              resetPage();
-            }}
+            onChange={(e) => setWidth(e.target.value)}
             placeholder="단면폭"
             inputMode="numeric"
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
           <input
             value={ratio}
-            onChange={(e) => {
-              setRatio(e.target.value);
-              resetPage();
-            }}
+            onChange={(e) => setRatio(e.target.value)}
             placeholder="편평비"
             inputMode="numeric"
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
           <input
             value={rim}
-            onChange={(e) => {
-              setRim(e.target.value);
-              resetPage();
-            }}
+            onChange={(e) => setRim(e.target.value)}
             placeholder="인치"
             inputMode="numeric"
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
           <input
             value={dot}
-            onChange={(e) => {
-              setDot(e.target.value);
-              resetPage();
-            }}
+            onChange={(e) => setDot(e.target.value)}
             placeholder="DOT 예) 2025"
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
@@ -218,16 +227,13 @@ function ProductsContent() {
 
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <p className="text-sm text-muted">
-          총 <b className="text-foreground">{results.length}</b>개 상품
+          총 <b className="text-foreground">{total}</b>개 상품
         </p>
         <div className="flex items-center gap-3 text-xs">
           {SORTS.map((s) => (
             <button
               key={s.key}
-              onClick={() => {
-                setSort(s.key);
-                resetPage();
-              }}
+              onClick={() => setSort(s.key)}
               className={`font-medium ${sort === s.key ? "text-brand" : "text-muted hover:text-foreground"}`}
             >
               {s.label}
@@ -236,7 +242,7 @@ function ProductsContent() {
         </div>
       </div>
 
-      {pageRows.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="card text-center text-muted py-16 text-sm">
           <SearchX size={32} className="mx-auto mb-3 text-border" strokeWidth={1.5} />
           조건에 맞는 타이어가 없습니다.
@@ -260,7 +266,7 @@ function ProductsContent() {
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((r) => (
+                {rows.map((r) => (
                   <tr key={r.id} className="border-b border-border last:border-0 hover:bg-surface-2">
                     <td className="py-3 px-4">{r.manufacturer}</td>
                     <td className="py-3 px-4">
@@ -296,7 +302,7 @@ function ProductsContent() {
           </div>
 
           <div className="lg:hidden flex flex-col gap-3">
-            {pageRows.map((r) => (
+            {rows.map((r) => (
               <Link
                 key={r.id}
                 href={`/products/${r.detailId}${r.detailDot ? `?dot=${r.detailDot}` : ""}`}

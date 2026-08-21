@@ -55,6 +55,14 @@ export default function AdminSellerDetailPage() {
     setSeller((current) => current ? { ...current, status: "SUSPENDED", suspendReason: reason } : current);
   }
 
+  async function reinstate() {
+    if (!seller) return;
+    if (!window.confirm("이 가맹점의 정지를 해제하고 활성 상태로 되돌리시겠습니까?")) return;
+    const response = await fetch(`/api/admin/sellers/${seller.id}/reinstate`, { method: "POST" });
+    if (!response.ok) { setError("복구 처리에 실패했습니다."); return; }
+    setSeller((current) => current ? { ...current, status: "ACTIVE", suspendReason: null } : current);
+  }
+
   if (loading) return <LoadingState />;
   if (error || !seller) return <div className="px-4 py-16 text-center"><p className="text-accent mb-4">{error ?? "판매자를 찾을 수 없습니다."}</p><Link href="/admin/sellers" className="text-brand font-semibold">판매자 목록으로</Link></div>;
 
@@ -63,7 +71,7 @@ export default function AdminSellerDetailPage() {
       <Link href="/admin/sellers" className="text-sm text-muted hover:text-brand">← 판매자 목록</Link>
       <div className="flex flex-wrap items-start justify-between gap-3 mt-3 mb-5">
         <div><h1 className="text-xl font-extrabold">{seller.user.businessName}</h1><p className="text-sm text-muted mt-1">{seller.code} · {seller.user.ownerName}</p></div>
-        <div className="flex gap-2">{seller.status === "PENDING" && <button onClick={() => void approve()} className="btn-primary h-10 px-4">승인</button>}{seller.status !== "SUSPENDED" && <button onClick={() => void suspend()} className="btn-outline h-10 px-4 text-accent border-accent">정지</button>}</div>
+        <div className="flex gap-2">{seller.status === "PENDING" && <button onClick={() => void approve()} className="btn-primary h-10 px-4">승인</button>}{seller.status === "SUSPENDED" ? <button onClick={() => void reinstate()} className="btn-outline h-10 px-4">복구</button> : <button onClick={() => void suspend()} className="btn-outline h-10 px-4 text-accent border-accent">정지</button>}</div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5 mb-5">

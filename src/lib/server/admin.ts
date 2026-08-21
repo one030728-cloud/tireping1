@@ -290,10 +290,8 @@ export async function suspendAdminSeller(sellerId: string, adminId: string, reas
     // correctness — but flipping the listings to HIDDEN keeps the seller's
     // own listing dashboard honest while they're suspended, instead of
     // showing listings as "판매중" that no buyer can actually see or order.
-    // There's no seller "reinstate from SUSPENDED" flow in this codebase
-    // (approveAdminSeller only accepts PENDING -> ACTIVE), so there is
-    // nothing to restore HIDDEN -> ACTIVE from yet; add that alongside a
-    // future unsuspend action rather than guessing at its policy here.
+    // See reinstateAdminSeller below for the HIDDEN -> ACTIVE/SOLDOUT restore
+    // path taken when this suspension is later lifted.
     await tx.listing.updateMany({
       where: { sellerId, status: "ACTIVE" },
       data: { status: "HIDDEN" },
@@ -305,6 +303,75 @@ export async function suspendAdminSeller(sellerId: string, adminId: string, reas
         targetType: "Seller",
         targetId: sellerId,
         reason,
+      },
+    });
+    return { kind: "OK" as const, seller: toAdminSellerView(updated) };
+  });
+}
+
+export async function reinstateAdminSeller(sellerId: string, adminId: string) {
+  return prisma.$transaction(async (tx) => {
+    const seller = await tx.seller.findUnique({
+      where: { id: sellerId },
+      include: { user: { select: { withdrawnAt: true } } },
+    });
+    if (!seller) return { kind: "NOT_FOUND" as const };
+    if (seller.status !== "SUSPENDED") {
+      return { kind: "INVALID_STATUS" as const, status: seller.status };
+    }
+
+    const updated = await tx.seller.update({
+      where: { id: sellerId },
+      data: { status: "ACTIVE", suspendReason: null },
+      include: adminSellerInclude,
+    });
+
+    // Restore the listings suspendAdminSeller hid.
+    //
+    // LIMITATION: Listing has no hiddenReason/hiddenAt column (and this
+    // function may not add one — schema.prisma is off limits), so a HIDDEN
+    // listing can't say *why* it's HIDDEN. We can't literally read back
+    // "did suspension hide this one", so this restore leans on an invariant
+    // of the current codebase instead of guessing:
+    //
+    // Today there are exactly two places that ever set a listing to HIDDEN —
+    // this suspend/reinstate pair, and withdrawAccount (a seller's own,
+    // permanent withdrawal, which is independent of Seller.status and never
+    // un-does itself). There is no seller-facing "hide my own listing"
+    // action anywhere in this codebase. So for a seller whose user has NOT
+    // withdrawn, every listing that is currently HIDDEN must have been
+    // hidden by a prior suspension, and restoring all of them here is
+    // correct, not a guess. If a future feature adds a seller-initiated hide
+    // action, this invariant breaks and a real hiddenReason/hiddenAt column
+    // should replace this reasoning rather than extending it.
+    //
+    // For a withdrawn seller, a HIDDEN listing could instead (or also) have
+    // been hidden by that withdrawal, and there is no way to tell which.
+    // Reinstating such a seller doesn't let them sell again anyway —
+    // requireSeller still blocks a withdrawn user from logging in — so we
+    // leave their listings untouched rather than risk resurrecting
+    // withdrawal-hidden ones as ACTIVE/SOLDOUT.
+    //
+    // Restored status mirrors reviewAdminListing/updateSellerListing's own
+    // ACTIVE-vs-SOLDOUT rule: a listing with no stock left comes back as
+    // SOLDOUT, not ACTIVE.
+    if (!seller.user.withdrawnAt) {
+      await tx.listing.updateMany({
+        where: { sellerId, status: "HIDDEN", stock: { gt: 0 } },
+        data: { status: "ACTIVE" },
+      });
+      await tx.listing.updateMany({
+        where: { sellerId, status: "HIDDEN", stock: 0 },
+        data: { status: "SOLDOUT" },
+      });
+    }
+
+    await tx.adminActionLog.create({
+      data: {
+        adminId,
+        action: "SELLER_REINSTATE",
+        targetType: "Seller",
+        targetId: sellerId,
       },
     });
     return { kind: "OK" as const, seller: toAdminSellerView(updated) };
