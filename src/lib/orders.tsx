@@ -36,6 +36,7 @@ interface OrdersContextValue {
   loading: boolean;
   addOrders: (items: CartItem[]) => Promise<FullOrder[]>;
   cancelOrder: (id: string, reason?: string) => Promise<FullOrder>;
+  confirmPurchase: (id: string) => Promise<FullOrder>;
   refreshOrders: () => Promise<FullOrder[]>;
   orderStatusCounts: OrderStatusCounts;
   cancelStatusCounts: CancelStatusCounts;
@@ -186,6 +187,19 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     return cancelledOrder;
   }, []);
 
+  const confirmPurchase = useCallback(async (id: string) => {
+    const response = await fetch(`/api/orders/${encodeURIComponent(id)}/confirm`, {
+      method: "POST",
+    });
+    const body = await readOrderResponse(response);
+    if (!body?.order) throw new OrderRequestError("ORDER_RESPONSE_INVALID");
+    const confirmedOrder = toFullOrder(body.order);
+    setOrders((current) =>
+      current.map((order) => (order.id === confirmedOrder.id ? confirmedOrder : order)),
+    );
+    return confirmedOrder;
+  }, []);
+
   const visibleOrders = ordersOwnerId === userId && userRole === "BUYER" ? orders : [];
   const visibleOrderStatusCounts = ORDER_STATUS_KEYS.reduce((acc, key) => {
     acc[key] = visibleOrders.filter((order) => order.status === key).length;
@@ -204,6 +218,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
           (userRole === "BUYER" ? loading || ordersOwnerId !== userId : false),
         addOrders,
         cancelOrder,
+        confirmPurchase,
         refreshOrders,
         orderStatusCounts: visibleOrderStatusCounts,
         cancelStatusCounts: visibleCancelStatusCounts,

@@ -234,6 +234,15 @@ model Order {
   shippedAt      DateTime?
   deliveredAt    DateTime?
   orderedAt      DateTime       @default(now())
+  // Deadline for lazy expiry of an unpaid (입금대기) order — see
+  // UNPAID_ORDER_TTL_MS in src/lib/server/orders.ts. Set to orderedAt + TTL at
+  // creation and refreshed to now + TTL by /api/payments/toss/prepare, so a
+  // buyer who opens the Toss payment sheet just before the original deadline
+  // isn't expired mid-checkout. Rows that predate this column were backfilled
+  // to orderedAt + TTL by the migration, but only while still 입금대기 — a
+  // NULL here therefore means "not awaiting payment", and expiry only ever
+  // reads this field while status is PAYMENT_PENDING anyway.
+  paymentDeadline DateTime?
   paymentId      String?
   payment        Payment?       @relation(fields: [paymentId], references: [id])
 
@@ -241,6 +250,7 @@ model Order {
   @@index([sellerId])
   @@index([listingId])
   @@index([paymentId])
+  @@index([status, paymentDeadline])
 }
 
 model CartItem {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import LoadingState from "@/components/LoadingState";
+import { ORDER_STATUS, isCancelledOrderStatus } from "@/lib/order-status";
 import type { SellerOrderView, SellerShippingStatus } from "@/lib/seller-types";
 
 const shippingLabels: Record<SellerShippingStatus, string> = {
@@ -76,7 +77,28 @@ export default function SellerOrdersPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error === "TRACKING_NUMBER_REQUIRED" ? "송장번호를 먼저 입력해 주세요." : "배송 상태를 변경하지 못했습니다.");
+      const message =
+        body?.error === "TRACKING_NUMBER_REQUIRED"
+          ? "송장번호를 먼저 입력해 주세요."
+          : body?.error === "ORDER_UNPAID"
+            ? "입금 확인 전에는 배송 처리를 할 수 없습니다."
+            : body?.error === "ORDER_CANCELLED"
+              ? "취소된 주문은 배송 처리를 할 수 없습니다."
+              : "배송 상태를 변경하지 못했습니다.";
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+    await loadOrders();
+    setBusyId(null);
+  }
+
+  async function confirmOrder(order: SellerOrderView) {
+    setBusyId(order.id);
+    setError(null);
+    const response = await fetch(`/api/seller/orders/${order.id}/confirm`, { method: "POST" });
+    if (!response.ok) {
+      setError("주문 확인 처리에 실패했습니다.");
       setBusyId(null);
       return;
     }
@@ -100,6 +122,16 @@ export default function SellerOrdersPage() {
         <div className="flex flex-col gap-4">
           {orders.map((order) => {
             const action = nextAction[order.shippingStatus];
+            // order.status tracks payment/cancellation, not shipping — a
+            // seller must not be able to advance shipping on an order that
+            // was never paid for (still 입금대기) or is already cancelled
+            // (입금전취소/입금후취소), since marking it 발송완료 would then
+            // permanently block the buyer from cancelling it (cancelOrder
+            // refuses once shippingStatus is SHIPPED/DELIVERED for a
+            // non-admin actor). Mirrors the guard in updateSellerShipping.
+            const unpaid = order.status === ORDER_STATUS.PAYMENT_PENDING;
+            const cancelled = isCancelledOrderStatus(order.status);
+            const shippingBlocked = unpaid || cancelled;
             return (
               <article key={order.id} className="card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4 mb-4">
@@ -110,7 +142,30 @@ export default function SellerOrdersPage() {
                       {order.product.width}/{order.product.ratio} R {order.product.rim} · DOT {order.product.dot} · {order.quantity}개
                     </p>
                   </div>
-                  <span className="text-sm font-semibold text-brand">{shippingLabels[order.shippingStatus]}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`text-xs font-semibold ${shippingBlocked ? "text-accent" : "text-muted"}`}>
+                      {order.status}
+                    </span>
+                    <span className="text-sm font-semibold text-brand">{shippingLabels[order.shippingStatus]}</span>
+                    {/*
+                      주문확인 has no shipping trigger (see
+                      SHIPPING_STATUS_TO_ORDER_STATUS in order-status.ts), so
+                      it's its own explicit action here, only valid from
+                      입금완료 - matching confirmSellerOrder's server-side
+                      check. Skipping straight to a shipping action below
+                      (e.g. registering tracking) without confirming first is
+                      allowed; it just advances order.status past 주문확인.
+                    */}
+                    {order.status === ORDER_STATUS.PAYMENT_COMPLETED && (
+                      <button
+                        onClick={() => void confirmOrder(order)}
+                        disabled={busyId === order.id}
+                        className="btn-primary h-8 px-3 text-xs mt-1"
+                      >
+                        {busyId === order.id ? "처리 중..." : "주문확인"}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-4 text-sm">
@@ -133,19 +188,25 @@ export default function SellerOrdersPage() {
                         onChange={(event) => setCouriers((current) => ({ ...current, [order.id]: event.target.value }))}
                         placeholder="택배사"
                         className="seller-input"
-                        disabled={!action}
+                        disabled={!action || shippingBlocked}
                       />
                       <input
                         value={tracking[order.id] ?? ""}
                         onChange={(event) => setTracking((current) => ({ ...current, [order.id]: event.target.value }))}
                         placeholder="송장번호"
                         className="seller-input"
-                        disabled={!action}
+                        disabled={!action || shippingBlocked}
                       />
-                      {action && (
-                        <button onClick={() => void updateShipping(order)} disabled={busyId === order.id} className="btn-primary h-10 text-sm">
-                          {busyId === order.id ? "처리 중..." : action.label}
-                        </button>
+                      {shippingBlocked ? (
+                        <p className="text-xs text-accent">
+                          {unpaid ? "입금 확인 전에는 배송 처리를 할 수 없습니다." : "취소된 주문은 배송 처리를 할 수 없습니다."}
+                        </p>
+                      ) : (
+                        action && (
+                          <button onClick={() => void updateShipping(order)} disabled={busyId === order.id} className="btn-primary h-10 text-sm">
+                            {busyId === order.id ? "처리 중..." : action.label}
+                          </button>
+                        )
                       )}
                     </div>
                   </div>

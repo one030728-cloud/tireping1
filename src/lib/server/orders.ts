@@ -2,7 +2,14 @@ import { Prisma, type ShippingStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { CartItem } from "@/lib/types";
-import { CANCEL_STATUS, isCancelledOrderStatus, ORDER_STATUS, SHIPPING_STATUS_LABEL } from "@/lib/order-status";
+import {
+  CANCEL_STATUS,
+  isCancelledOrderStatus,
+  ORDER_STATUS,
+  orderStatusRank,
+  SHIPPING_STATUS_LABEL,
+  type OrderStatusValue,
+} from "@/lib/order-status";
 import { prisma } from "./prisma";
 
 const orderItemSchema = z.object({
@@ -52,7 +59,8 @@ export class OrderDomainError extends Error {
       | "ORDER_ALREADY_CANCELLED"
       | "ORDER_NOT_FOUND"
       | "CANCEL_AFTER_SHIPPING"
-      | "CANCEL_REASON_REQUIRED",
+      | "CANCEL_REASON_REQUIRED"
+      | "PURCHASE_CONFIRM_INVALID_STATUS",
     public readonly status = 409,
   ) {
     super(code);
@@ -112,7 +120,81 @@ function toBuyerOrderView(order: BuyerOrderRecord) {
 
 export type BuyerOrderView = ReturnType<typeof toBuyerOrderView>;
 
+// Same lazy-expiry idea as CART_ITEM_TTL_MS in src/lib/server/cart.ts: this
+// Render deployment is a plain web service with no cron/worker, so an unpaid
+// (입금대기) order can't be expired by a background job. Instead every read
+// path that lists orders (buyer/seller/admin) prunes stale 입금대기 rows in
+// its own scope first. Without this, an approved buyer (or anyone abandoning
+// checkout) can call POST /api/orders repeatedly and permanently hold
+// Listing.stock hostage, since nothing else ever gives it back.
+//
+// The deadline is tracked per-order (Order.paymentDeadline) rather than as a
+// flat "orderedAt + TTL" computed here, because /api/payments/toss/prepare
+// can run well after order creation and must be able to extend the deadline
+// for the specific orders it prepares — see prepare/route.ts.
+export const UNPAID_ORDER_TTL_MS = 30 * 60 * 1000;
+
+// Expires every 입금대기 order matching `scope` whose paymentDeadline has
+// passed: flips it to 입금전취소, restores the listing's stock, and reopens
+// the listing if that stock restoration takes it off SOLDOUT. Callers scope
+// this to the relevant user/seller (buyer/seller order lists) so one user's
+// read never touches another user's rows; getAdminOrders passes an empty
+// scope ({}) since the admin order list is intentionally global.
+export async function expireStaleUnpaidOrders(scope: Prisma.OrderWhereInput) {
+  const candidates = await prisma.order.findMany({
+    where: {
+      ...scope,
+      status: ORDER_STATUS.PAYMENT_PENDING,
+      paymentDeadline: { lt: new Date() },
+    },
+    select: { id: true },
+  });
+
+  for (const { id } of candidates) {
+    // One transaction per order: each expiry only ever touches that order's
+    // own row and its own listing, so nothing is gained by batching several
+    // orders into one transaction, and keeping them separate means one
+    // order's expiry being skipped never rolls back the others.
+    await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id },
+        include: { listing: true },
+      });
+      // Already moved off 입금대기 (paid, cancelled, or expired by a
+      // concurrent call) between the findMany above and this transaction —
+      // nothing to do.
+      if (!order || order.status !== ORDER_STATUS.PAYMENT_PENDING) return;
+
+      // Conditional updateMany guarded on the current status is what keeps
+      // this safe against a concurrent Toss confirm: confirm only ever flips
+      // PAYMENT_PENDING -> PAYMENT_COMPLETED inside its own transaction and
+      // re-reads order state there (see toss/confirm/route.ts), so whichever
+      // of the two writes commits first wins and the other's updateMany
+      // simply matches 0 rows instead of clobbering the winner.
+      const expired = await tx.order.updateMany({
+        where: { id, status: ORDER_STATUS.PAYMENT_PENDING },
+        data: {
+          status: CANCEL_STATUS.PAYMENT_BEFORE,
+          cancelReason: "결제 시간 초과로 자동 취소되었습니다.",
+        },
+      });
+      if (expired.count !== 1) return;
+
+      // Mirrors the stock-restore/SOLDOUT-reopen in cancelOrder (~line 357).
+      await tx.listing.update({
+        where: { id: order.listingId },
+        data: {
+          stock: { increment: order.quantity },
+          ...(order.listing.status === "SOLDOUT" ? { status: "ACTIVE" } : {}),
+        },
+      });
+    });
+  }
+}
+
 export async function getBuyerOrders(buyerId: string) {
+  await expireStaleUnpaidOrders({ buyerId });
+
   const orders = await prisma.order.findMany({
     where: { buyerId },
     orderBy: { orderedAt: "desc" },
@@ -181,6 +263,13 @@ async function findActiveListing(tx: Prisma.TransactionClient, item: OrderItemIn
 }
 
 export async function createBuyerOrders(buyerId: string, data: z.infer<typeof createOrderSchema>) {
+  // Expire this buyer's own stale 입금대기 orders first, so their stock is
+  // back in the pool before we check availability for the new order below —
+  // otherwise a buyer who repeatedly abandons checkout would see listings as
+  // sold out that are only "sold out" because their own expired orders never
+  // released the stock.
+  await expireStaleUnpaidOrders({ buyerId });
+
   const createdIds = await prisma.$transaction(async (tx) => {
     const ids: string[] = [];
 
@@ -226,6 +315,7 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
           shippingStatus: "PREPARING",
           courier: null,
           trackingNumber: null,
+          paymentDeadline: new Date(Date.now() + UNPAID_ORDER_TTL_MS),
         },
       });
       ids.push(order.id);
@@ -332,10 +422,27 @@ export async function cancelOrder(
     if (isCancelledOrderStatus(order.status)) {
       throw new OrderDomainError("ORDER_ALREADY_CANCELLED");
     }
-    if (
-      actor.kind !== "ADMIN" &&
-      (order.shippingStatus === "SHIPPED" || order.shippingStatus === "DELIVERED")
-    ) {
+    // Both axes have to be checked, because each one catches a case the other
+    // misses:
+    //  - order.status (rank) is the axis that can never regress once
+    //    advanced, whereas an admin may reset shippingStatus to an earlier
+    //    value without limit (see updateAdminShipping). Gating on status
+    //    alone stops an admin correcting a shippingStatus mistake from
+    //    accidentally reopening cancellation on an order that truly shipped,
+    //    and blocks cancellation at 구매확정 for free (rank 6 > 배송중's 4).
+    //  - shippingStatus still has to be checked because order.status was NOT
+    //    kept in lock-step with shipping before the 연동 change: every order
+    //    that already exists carries status 입금완료 (rank 1) no matter how
+    //    far its shipping got. The status backfill migration realigns the
+    //    rows it safely can, but anything it deliberately skips (e.g. an
+    //    unpaid-yet-shipped order) would otherwise become cancellable here
+    //    despite having physically shipped — restoring stock for a tire that
+    //    already left the warehouse.
+    const shippedByStatusRank =
+      orderStatusRank[order.status as OrderStatusValue] >= orderStatusRank[ORDER_STATUS.SHIPPING];
+    const shippedByShippingStatus =
+      order.shippingStatus === "SHIPPED" || order.shippingStatus === "DELIVERED";
+    if (actor.kind !== "ADMIN" && (shippedByStatusRank || shippedByShippingStatus)) {
       throw new OrderDomainError("CANCEL_AFTER_SHIPPING");
     }
 
@@ -438,6 +545,39 @@ export async function cancelOrder(
   }
 
   return toBuyerOrderView(updated);
+}
+
+// Task 2 — 구매확정: buyer-initiated, moves a 배송완료 order to 구매확정. Only
+// valid from 배송완료 and only for the order's own buyer (mirrors the
+// ownership check in cancelOrder's belongsToActor). Once this succeeds,
+// cancelOrder's guard above refuses to cancel the order for any non-admin
+// actor — rank(구매확정) sits above rank(배송중).
+export async function confirmPurchase(orderId: string, buyerId: string) {
+  const order = await prisma.$transaction(async (tx) => {
+    const existing = await tx.order.findUnique({ where: { id: orderId } });
+    if (!existing || existing.buyerId !== buyerId) {
+      throw new OrderDomainError("ORDER_NOT_FOUND", 404);
+    }
+    if (existing.status !== ORDER_STATUS.SHIPPING_COMPLETED) {
+      throw new OrderDomainError("PURCHASE_CONFIRM_INVALID_STATUS");
+    }
+
+    // Conditional updateMany guarded on the current status — same pattern as
+    // cancelOrder/expireStaleUnpaidOrders — so a confirm racing a concurrent
+    // cancel or shipping override can't clobber the other; whichever commits
+    // first wins and the other matches 0 rows instead of overwriting it.
+    const confirmed = await tx.order.updateMany({
+      where: { id: orderId, status: ORDER_STATUS.SHIPPING_COMPLETED },
+      data: { status: ORDER_STATUS.PURCHASE_CONFIRMED },
+    });
+    if (confirmed.count !== 1) {
+      throw new OrderDomainError("PURCHASE_CONFIRM_INVALID_STATUS");
+    }
+
+    return tx.order.findUniqueOrThrow({ where: { id: orderId }, include: buyerOrderInclude });
+  });
+
+  return toBuyerOrderView(order);
 }
 
 export function shippingStatusValue(status: ShippingStatus) {

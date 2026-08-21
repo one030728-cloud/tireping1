@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ORDER_STATUS } from "@/lib/order-status";
 import { prisma } from "@/lib/server/prisma";
 import { requireRole } from "@/lib/server/guard";
+import { UNPAID_ORDER_TTL_MS } from "@/lib/server/orders";
 
 export const runtime = "nodejs";
 
@@ -94,7 +95,15 @@ export async function POST(request: Request) {
           buyerId: auth.session.user.id,
           status: ORDER_STATUS.PAYMENT_PENDING,
         },
-        data: { paymentId: createdPayment.id },
+        data: {
+          paymentId: createdPayment.id,
+          // Refresh the lazy-expiry deadline (see UNPAID_ORDER_TTL_MS in
+          // src/lib/server/orders.ts) to now + TTL. Without this, a buyer who
+          // opens the Toss payment sheet near the end of the original
+          // deadline could have their order expired by expireStaleUnpaidOrders
+          // while the payment sheet is still open, out from under them.
+          paymentDeadline: new Date(Date.now() + UNPAID_ORDER_TTL_MS),
+        },
       });
 
       if (updatedOrders.count !== orderIds.length) {

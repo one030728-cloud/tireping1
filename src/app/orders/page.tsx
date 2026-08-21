@@ -7,12 +7,13 @@ import { CheckCircle2, PackageSearch } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
 import { OrderRequestError, useOrders } from "@/lib/orders";
-import { CANCEL_STATUS, ORDER_STATUS } from "@/lib/order-status";
+import { ORDER_STATUS, orderStatusRank, type OrderStatusValue } from "@/lib/order-status";
 import { getStatusStyle } from "@/lib/status";
 
 function OrdersContent() {
-  const { orders, cancelOrder } = useOrders();
+  const { orders, cancelOrder, confirmPurchase } = useOrders();
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const justOrdered = searchParams.get("justOrdered") === "1";
 
@@ -30,6 +31,18 @@ function OrdersContent() {
       );
     } finally {
       setCancellingId(null);
+    }
+  }
+
+  async function handleConfirmPurchase(id: string) {
+    if (!window.confirm("구매를 확정하시겠습니까? 확정 후에는 취소할 수 없습니다.")) return;
+    setConfirmingId(id);
+    try {
+      await confirmPurchase(id);
+    } catch {
+      window.alert("구매 확정에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setConfirmingId(null);
     }
   }
 
@@ -80,18 +93,38 @@ function OrdersContent() {
                     결제하기
                   </Link>
                 )}
-                {o.shippingStatus !== "SHIPPED" &&
-                  o.shippingStatus !== "DELIVERED" &&
-                  !Object.values(CANCEL_STATUS).includes(o.status as (typeof CANCEL_STATUS)[keyof typeof CANCEL_STATUS]) && (
-                    <button
-                      type="button"
-                      onClick={() => void handleCancel(o.id)}
-                      disabled={cancellingId === o.id}
-                      className="text-xs text-muted underline underline-offset-2 hover:text-accent disabled:opacity-50"
-                    >
-                      {cancellingId === o.id ? "취소 중..." : "주문 취소"}
-                    </button>
-                  )}
+                {o.status === ORDER_STATUS.SHIPPING_COMPLETED && (
+                  <button
+                    type="button"
+                    onClick={() => void handleConfirmPurchase(o.id)}
+                    disabled={confirmingId === o.id}
+                    className="text-xs text-brand underline underline-offset-2 hover:text-brand/80 disabled:opacity-50"
+                  >
+                    {confirmingId === o.id ? "확정 중..." : "구매확정"}
+                  </button>
+                )}
+                {/*
+                  Previously gated on shippingStatus !== SHIPPED/DELIVERED
+                  plus a separate CANCEL_STATUS check. order.status now
+                  advances in lock-step with shipping (see
+                  nextOrderStatusForShipping in order-status.ts) and never
+                  regresses, so a single rank comparison covers both cases:
+                  a cancelled status has no entry in orderStatusRank (the
+                  lookup is undefined, so the comparison is false and the
+                  button stays hidden), and once order.status reaches 배송중
+                  or later - including 구매확정 - the button also hides,
+                  matching what cancelOrder's server-side guard now enforces.
+                */}
+                {orderStatusRank[o.status as OrderStatusValue] < orderStatusRank[ORDER_STATUS.SHIPPING] && (
+                  <button
+                    type="button"
+                    onClick={() => void handleCancel(o.id)}
+                    disabled={cancellingId === o.id}
+                    className="text-xs text-muted underline underline-offset-2 hover:text-accent disabled:opacity-50"
+                  >
+                    {cancellingId === o.id ? "취소 중..." : "주문 취소"}
+                  </button>
+                )}
               </div>
             </div>
           ))}

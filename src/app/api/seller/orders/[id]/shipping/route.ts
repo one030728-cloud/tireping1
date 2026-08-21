@@ -23,6 +23,12 @@ export async function PATCH(
     if (result.kind === "NOT_FOUND") {
       return NextResponse.json({ error: "ORDER_NOT_FOUND" }, { status: 404 });
     }
+    if (result.kind === "ORDER_CANCELLED") {
+      return NextResponse.json({ error: "ORDER_CANCELLED" }, { status: 409 });
+    }
+    if (result.kind === "ORDER_UNPAID") {
+      return NextResponse.json({ error: "ORDER_UNPAID" }, { status: 409 });
+    }
     if (result.kind === "INVALID_TRANSITION") {
       return NextResponse.json({ error: "INVALID_SHIPPING_TRANSITION" }, { status: 409 });
     }

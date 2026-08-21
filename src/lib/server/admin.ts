@@ -1,7 +1,9 @@
 import { BuyerStatus, ListingStatus, Prisma, SellerStatus, type ShippingStatus } from "@prisma/client";
 import { z } from "zod";
+import { isCancelledOrderStatus, nextOrderStatusForShipping } from "@/lib/order-status";
 import { requireRole } from "./guard";
 import { prisma } from "./prisma";
+import { expireStaleUnpaidOrders } from "./orders";
 import { shippingSchema, serverErrorResponse, validationResponse } from "./seller";
 
 const adminSellerInclude = {
@@ -466,6 +468,13 @@ export async function reviewAdminListing(
 }
 
 export async function getAdminOrders() {
+  // Unlike getBuyerOrders/getSellerOrders, the admin order list is
+  // intentionally global (every buyer/seller's orders), so this expiry pass
+  // isn't scoped to a single user — pass an empty filter to expire stale
+  // 입금대기 orders across the whole table. See expireStaleUnpaidOrders in
+  // src/lib/server/orders.ts for why this lazy expiry exists at all.
+  await expireStaleUnpaidOrders({});
+
   const orders = await prisma.order.findMany({
     orderBy: { orderedAt: "desc" },
     include: adminOrderInclude,
@@ -482,11 +491,32 @@ export async function updateAdminShipping(
     const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order) return { kind: "NOT_FOUND" as const };
 
+    // Deliberately no unpaid/cancelled guard here (unlike updateSellerShipping):
+    // this codebase already carves admins out of the equivalent restriction in
+    // cancelOrder (`actor.kind !== "ADMIN"`), so admins are trusted to
+    // override shipping state on a cancelled or unpaid order too — e.g. to
+    // correct a mistake a seller already made under the guard below.
     const shippingStatus = data.shippingStatus as ShippingStatus;
+
+    // order.status must still never be resurrected on a cancelled order, even
+    // though shippingStatus itself is allowed to change above. Unlike
+    // updateSellerShipping (which never reaches this point on a cancelled
+    // order at all, thanks to its earlier guard), this path has no such
+    // guard, so it checks isCancelledOrderStatus explicitly here rather than
+    // relying on nextOrderStatusForShipping's rank lookup happening to return
+    // null for an unranked status — that's an implementation detail of the
+    // shared helper, not a contract this must-never-happen invariant should
+    // depend on. The shipping write itself (below) still goes through
+    // unconditionally either way, preserving the admin override.
+    const advancedOrderStatus = isCancelledOrderStatus(order.status)
+      ? null
+      : nextOrderStatusForShipping(order.status, shippingStatus);
+
     const updated = await tx.order.update({
       where: { id: orderId },
       data: {
         shippingStatus,
+        ...(advancedOrderStatus ? { status: advancedOrderStatus } : {}),
         ...(data.courier !== undefined ? { courier: data.courier || null } : {}),
         ...(data.trackingNumber !== undefined ? { trackingNumber: data.trackingNumber || null } : {}),
         ...(shippingStatus === "SHIPPED" && !order.shippedAt ? { shippedAt: new Date() } : {}),

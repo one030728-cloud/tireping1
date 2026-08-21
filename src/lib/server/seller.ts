@@ -2,8 +2,10 @@ import { hash } from "bcryptjs";
 import { ListingStatus, Prisma, type ShippingStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ORDER_STATUS, isCancelledOrderStatus, nextOrderStatusForShipping } from "@/lib/order-status";
 import { prisma } from "./prisma";
 import { requireRole } from "./guard";
+import { expireStaleUnpaidOrders } from "./orders";
 
 const nullableText = (max: number) =>
   z.preprocess(
@@ -555,6 +557,11 @@ export async function createSellerApplication(data: z.infer<typeof sellerSignupS
 }
 
 export async function getSellerOrders(sellerId: string) {
+  // Scoped to this seller only, mirroring getBuyerOrders — see
+  // expireStaleUnpaidOrders in src/lib/server/orders.ts for why this lazy
+  // expiry exists at all (no cron/worker in this deployment).
+  await expireStaleUnpaidOrders({ sellerId });
+
   const orders = await prisma.order.findMany({
     where: { sellerId },
     orderBy: { orderedAt: "desc" },
@@ -581,6 +588,20 @@ export async function updateSellerShipping(
   });
   if (!order) return { kind: "NOT_FOUND" as const };
 
+  // order.status only ever reflects payment/cancellation, never shipping, so
+  // it has to be checked separately from the shippingRank transition below.
+  // Without this a seller could mark an order that was never paid for (still
+  // 입금대기) or one that's already cancelled (입금전취소/입금후취소) as
+  // 발송완료 — and cancelOrder then refuses to cancel a SHIPPED/DELIVERED
+  // order for non-admin actors, so that permanently locks the buyer out of
+  // cancelling an order they never actually paid for.
+  if (isCancelledOrderStatus(order.status)) {
+    return { kind: "ORDER_CANCELLED" as const };
+  }
+  if (order.status === ORDER_STATUS.PAYMENT_PENDING) {
+    return { kind: "ORDER_UNPAID" as const };
+  }
+
   const nextStatus = data.shippingStatus as ShippingStatus;
   if (shippingRank[nextStatus] < shippingRank[order.shippingStatus]) {
     return { kind: "INVALID_TRANSITION" as const };
@@ -600,15 +621,52 @@ export async function updateSellerShipping(
     return { kind: "TRACKING_REQUIRED" as const };
   }
 
+  // The guards above already refused a cancelled or still-입금대기 order, so
+  // order.status here is guaranteed to be a ranked, non-cancelled
+  // ORDER_STATUS value - nextOrderStatusForShipping is safe to call directly
+  // without an extra isCancelledOrderStatus check here (contrast
+  // updateAdminShipping in admin.ts, which has no such guard above it and so
+  // must check explicitly). This is the single shared shipping->status
+  // mapping (order-status.ts) that keeps this path and the admin override
+  // path from drifting apart, and it never moves order.status backwards.
+  const advancedOrderStatus = nextOrderStatusForShipping(order.status, nextStatus);
+
   const updated = await prisma.order.update({
     where: { id: orderId },
     data: {
       shippingStatus: nextStatus,
+      ...(advancedOrderStatus ? { status: advancedOrderStatus } : {}),
       courier: courier ?? null,
       trackingNumber: trackingNumber ?? null,
       ...(nextStatus === "SHIPPED" && !order.shippedAt ? { shippedAt: new Date() } : {}),
       ...(nextStatus === "DELIVERED" && !order.deliveredAt ? { deliveredAt: new Date() } : {}),
     },
+    include: sellerOrderInclude,
+  });
+  return { kind: "OK" as const, order: toOrderView(updated) };
+}
+
+// Explicit seller action for 주문확인 (Task: this ORDER_STATUS value has no
+// shipping-status trigger - see SHIPPING_STATUS_TO_ORDER_STATUS in
+// order-status.ts - so unlike the other transitions it needs its own entry
+// point rather than riding along with updateSellerShipping). Only valid from
+// 입금완료: a seller shouldn't be able to "confirm" an order that hasn't been
+// paid for yet, and once shipping has already started (or 주문확인 already
+// happened) this is a no-op that would otherwise silently do nothing while
+// looking like it succeeded.
+export async function confirmSellerOrder(sellerId: string, orderId: string) {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, sellerId },
+    include: sellerOrderInclude,
+  });
+  if (!order) return { kind: "NOT_FOUND" as const };
+  if (order.status !== ORDER_STATUS.PAYMENT_COMPLETED) {
+    return { kind: "INVALID_STATUS" as const, status: order.status };
+  }
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: { status: ORDER_STATUS.ORDER_CONFIRMED },
     include: sellerOrderInclude,
   });
   return { kind: "OK" as const, order: toOrderView(updated) };
