@@ -93,7 +93,7 @@ function DepositsContent() {
                     {d.refundAmount > 0 ? (
                       <>
                         <p>{d.refundAmount.toLocaleString()}원</p>
-                        <p className={d.refundStatus === "COMPLETED" ? "text-muted" : "text-accent"}>
+                        <p className={d.refundStatus === "PENDING" ? "text-accent" : "text-muted"}>
                           {d.refundStatusLabel}
                         </p>
                       </>

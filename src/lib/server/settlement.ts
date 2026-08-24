@@ -61,14 +61,32 @@ type BuyerPaymentRecord = Prisma.PaymentGetPayload<{
 //     moved (or has only partly moved).
 function toDepositEntry(payment: BuyerPaymentRecord): DepositEntry {
   const hasRefund = payment.refundAmount > 0;
-  const refundCompleted = hasRefund && payment.refundRequiredAt === null && payment.status === "CANCELED";
+  // Settled means "Toss actually returned this money", and it comes in two
+  // shapes that must not be collapsed into one another:
+  //   - the whole payment was reversed  -> status CANCELED, reason FULLY_...
+  //   - some orders were reversed while others stay live -> status remains
+  //     DONE (there is still an active charge), reason PARTIALLY_...
+  // Both clear refundRequiredAt, which is what distinguishes them from a
+  // refund that is merely owed or that failed. Reporting a settled partial
+  // refund as PENDING would tell a buyer whose money is already back that it
+  // is still being processed — forever, since such a payment never becomes
+  // CANCELED. See settleOrderRefundViaToss in orders.ts for who writes these.
+  const settled = hasRefund && payment.refundRequiredAt === null;
   const refundStatus: DepositEntry["refundStatus"] = !hasRefund
     ? "NONE"
-    : refundCompleted
-      ? "COMPLETED"
-      : "PENDING";
+    : !settled
+      ? "PENDING"
+      : payment.status === "CANCELED"
+        ? "COMPLETED"
+        : "PARTIAL";
   const refundStatusLabel =
-    refundStatus === "NONE" ? "-" : refundStatus === "COMPLETED" ? "환불완료" : "환불예정(처리중)";
+    refundStatus === "NONE"
+      ? "-"
+      : refundStatus === "COMPLETED"
+        ? "환불완료"
+        : refundStatus === "PARTIAL"
+          ? "부분환불 완료"
+          : "환불예정(처리중)";
 
   return {
     paymentId: payment.id,
@@ -110,13 +128,16 @@ async function getDeposits(buyerId: string) {
   });
 
   const deposits = payments.map(toDepositEntry);
-  // 합계 only counts refunds that actually completed — a refund that is
-  // merely owed (PENDING) hasn't left the buyer's paid total yet, so
-  // netting it out here would understate what was actually charged.
-  const depositsTotal = deposits.reduce(
-    (sum, d) => sum + d.paidAmount - (d.refundStatus === "COMPLETED" ? d.refundAmount : 0),
-    0,
-  );
+  // 합계 nets out every refund whose money has actually moved, which is both
+  // COMPLETED (whole payment reversed) and PARTIAL (some orders reversed,
+  // others still live). PENDING is deliberately excluded — a refund that is
+  // only owed has not left anything yet, so subtracting it would understate
+  // what the buyer was really charged. Counting COMPLETED alone would make
+  // the opposite error and overstate the total for anyone who has had a
+  // partial refund settled.
+  const settledRefund = (d: DepositEntry) =>
+    d.refundStatus === "COMPLETED" || d.refundStatus === "PARTIAL" ? d.refundAmount : 0;
+  const depositsTotal = deposits.reduce((sum, d) => sum + d.paidAmount - settledRefund(d), 0);
   return { deposits, depositsTotal };
 }
 
