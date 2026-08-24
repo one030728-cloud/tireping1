@@ -65,15 +65,30 @@ const isProduction = process.env.NODE_ENV === "production";
 //   neither React nor Next.js need it in production.
 // Every origin Toss documents as required, in one place so the directives
 // below cannot drift apart from each other.
-const TOSS_ORIGINS = [
-  "https://js.tosspayments.com",
-  "https://api.tosspayments.com",
-  "https://event.tosspayments.com",
-  "https://pages.tosspayments.com",
-  "https://static.toss.im",
-  "https://polyfill-fe.toss.im",
-  "https://assets-fe.toss.im",
-].join(" ");
+// Wildcarded per Toss-operated domain rather than enumerated host by host.
+//
+// The enumerated list was tried first, built from Toss's own published
+// requirements (https://docs.tosspayments.com/reference/using-api/security:
+// api / event / pages .tosspayments.com, static / polyfill-fe / assets-fe
+// .toss.im) plus js.tosspayments.com for the SDK loader. Running one real
+// test payment end to end then produced report-only violations for three
+// hosts that list does not mention:
+//
+//   log.tosspayments.com                     (connect-src, on SDK load)
+//   apigw-sandbox.tosspayments.com           (connect-src, opening checkout)
+//   payment-gateway-sandbox.tosspayments.com (frame-src, THE PAYMENT WINDOW)
+//
+// The third one is the checkout iframe itself: an enforcing policy built
+// from the documented list would have blocked the payment window outright,
+// and the buyer would have seen nothing explaining why. Two of the three are
+// also `-sandbox` hosts, so live keys will contact yet another set of names
+// that cannot be observed until the account goes live.
+//
+// Enumerating hostnames is therefore a losing game here — each miss is a
+// silently broken checkout. A wildcard still constrains loading to domains
+// Toss operates, which is the actual security boundary worth enforcing,
+// while surviving hostnames that only appear in production.
+const TOSS_ORIGINS = ["https://*.tosspayments.com", "https://*.toss.im"].join(" ");
 
 const cspDirectives = [
   "default-src 'self'",
