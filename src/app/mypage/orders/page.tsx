@@ -77,6 +77,22 @@ function ReturnRequestEntry({ order }: { order: FullOrder }) {
   );
 }
 
+// 리뷰 작성 진입점. 작성 가능 조건은 서버(review.ts의 isOrderReviewable)와
+// 동일한 "배송완료 이상 + 미취소"이고, 그 판정이 canRequestReturn과 정확히
+// 같은 식이라 재사용한다 — 둘 다 "물건이 손에 들어온 뒤"라는 같은 바닥을
+// 공유하기 때문이지 우연이 아니다. 서버가 어차피 독립적으로 재검증한다.
+function ReviewEntry({ order }: { order: FullOrder }) {
+  if (!canRequestReturn(order)) return null;
+  return (
+    <Link
+      href={`/reviews/new?orderId=${encodeURIComponent(order.id)}`}
+      className="text-xs text-brand underline underline-offset-2 hover:text-brand/80"
+    >
+      리뷰 작성
+    </Link>
+  );
+}
+
 function OrderActions({
   order,
   cancellingId,
@@ -438,6 +454,7 @@ function OrdersContent() {
                           onConfirm={(id) => void handleConfirmPurchase(id)}
                         />
                         <ReturnRequestEntry order={o} />
+                        <ReviewEntry order={o} />
                       </div>
                     </td>
                   </tr>
@@ -531,6 +548,7 @@ function OrdersContent() {
                     onConfirm={(id) => void handleConfirmPurchase(id)}
                   />
                   <ReturnRequestEntry order={o} />
+                  <ReviewEntry order={o} />
                 </div>
               </div>
             ))}
