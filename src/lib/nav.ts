@@ -11,6 +11,7 @@ export const SIDEBAR_LINKS = [
 export const MYPAGE_LINKS = [
   { href: "/mypage/status", label: "주문 / 배송 현황" },
   { href: "/mypage/orders", label: "주문내역 / 배송조회" },
+  { href: "/mypage/addresses", label: "배송지 관리" },
   { href: "/mypage/deposits", label: "입출금 내역" },
   { href: "/mypage/extra-fees", label: "추가비용 내역" },
   { href: "/mypage/tax", label: "세금계산서 내역" },

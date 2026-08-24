@@ -163,3 +163,15 @@ export const tossWebhookIpLimiter = new InMemorySlidingWindowLimiter({
   max: 120,
   blockMs: 5 * 60 * 1000,
 });
+
+// 1:1 문의 / 상품 문의 등록 남용 방지. Creating an inquiry always requires a
+// session (see requireRole in the route), so — unlike login/signup/password
+// reset — there is no meaningful unauthenticated axis to guard here; a
+// single axis keyed by userId is enough, matching signupIpLimiter's "count
+// every submission, not just failures" rule below (the thing being capped is
+// submission volume/spam against the support queue, not validation failures).
+export const inquiryCreateLimiter = new InMemorySlidingWindowLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 8,
+  blockMs: 10 * 60 * 1000,
+});

@@ -1,18 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import { CartRequestError, useCart } from "@/lib/cart";
-import { OrderRequestError, useOrders } from "@/lib/orders";
 
 function CartContent() {
   const { items, removeItem, updateQuantity, clear } = useCart();
-  const { addOrders } = useOrders();
-  const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
 
   const total = items.reduce((sum, i) => sum + i.price * i.quantity + i.extraShipping, 0);
 
@@ -35,28 +29,6 @@ function CartContent() {
           ? "장바구니 상품을 찾지 못했습니다. 새로고침 후 다시 시도해 주세요."
           : "장바구니를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
       window.alert(message);
-    }
-  }
-
-  async function handleOrder() {
-    setSubmitting(true);
-    try {
-      await addOrders(items);
-      try {
-        await clear();
-      } catch {
-        window.alert("주문은 완료되었지만 장바구니를 비우지 못했습니다. 주문내역을 확인해 주세요.");
-      }
-      router.push("/mypage/orders?justOrdered=1");
-    } catch (error) {
-      const code = error instanceof OrderRequestError ? error.code : "ORDER_REQUEST_FAILED";
-      window.alert(
-        code === "ORDER_STOCK_INSUFFICIENT"
-          ? "재고가 부족한 상품이 있어 주문할 수 없습니다."
-          : "주문 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-      );
-    } finally {
-      setSubmitting(false);
     }
   }
 
@@ -223,13 +195,9 @@ function CartContent() {
             >
               전체삭제
             </button>
-            <button
-              onClick={() => void handleOrder()}
-              disabled={submitting}
-              className="btn-primary flex-1 h-12"
-            >
+            <Link href="/checkout" className="btn-primary flex-1 h-12 flex items-center justify-center">
               주문하기
-            </button>
+            </Link>
           </div>
         </>
       )}

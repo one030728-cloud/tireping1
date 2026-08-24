@@ -127,6 +127,18 @@ export interface FullOrder {
   trackingNumber?: string | null;
   shippedAt?: string | null;
   deliveredAt?: string | null;
+  // Task 2/3 — per-order shipping fee snapshot and shipping-address snapshot.
+  // Nullable only for orders that predate these columns (see schema.prisma's
+  // comment on Order.recipientName); every order created via /checkout
+  // always has them, aside from addressDetail/deliveryNote which are
+  // genuinely optional.
+  shippingFee?: number;
+  recipientName?: string | null;
+  recipientPhone?: string | null;
+  postalCode?: string | null;
+  address?: string | null;
+  addressDetail?: string | null;
+  deliveryNote?: string | null;
 }
 
 export interface WishSeller {

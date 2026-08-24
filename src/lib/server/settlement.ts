@@ -160,6 +160,7 @@ async function getTaxAggregate(buyerId: string) {
       unitPrice: true,
       quantity: true,
       extraShipping: true,
+      shippingFee: true,
       orderedAt: true,
       payment: { select: { approvedAt: true } },
     },
@@ -167,7 +168,12 @@ async function getTaxAggregate(buyerId: string) {
 
   const monthlyTotals = new Map<string, number>();
   for (const order of paidOrders) {
-    const total = order.unitPrice * order.quantity + order.extraShipping;
+    // shippingFee 를 반드시 포함해야 한다. 이 화면이 보여주는 월별 공급가액·
+    // 부가세는 "구매자가 실제로 청구받은 금액"의 집계여야 하는데, 배송비는
+    // 결제·환불·판매자 정산 어디에서나 청구액의 일부로 계산된다(prepare 의
+    // 결제 금액, cancelOrder 의 환불 금액, payout 의 gross). 여기서만 빼면
+    // 세무 참고용으로 쓰는 숫자가 실제 청구액보다 배송비만큼 적게 나온다.
+    const total = order.unitPrice * order.quantity + order.extraShipping + order.shippingFee;
     const paidAt = order.payment?.approvedAt ?? order.orderedAt;
     const month = paidAt.toISOString().slice(0, 7); // "YYYY-MM"
     monthlyTotals.set(month, (monthlyTotals.get(month) ?? 0) + total);

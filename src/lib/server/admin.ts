@@ -192,6 +192,25 @@ function toAdminListingView(listing: AdminListingRecord) {
   };
 }
 
+// Task 4 — same reasoning as resolveOrderShipping in seller.ts (which this
+// mirrors exactly): the admin screen used to read the buyer's live
+// User.postalCode/address here too. Prefer the order's own snapshot, and
+// fall back to the live buyer record only for the fields that can still be
+// null after the backfill migration (in practice just postalCode/address —
+// recipientName/recipientPhone were backfilled from User's NOT NULL
+// ownerName/mobilePhone). addressDetail/deliveryNote have no User-side
+// equivalent and simply stay null on pre-migration orders.
+function resolveOrderShipping(order: AdminOrderRecord) {
+  return {
+    recipientName: order.recipientName ?? order.buyer.ownerName,
+    recipientPhone: order.recipientPhone ?? order.buyer.mobilePhone,
+    postalCode: order.postalCode ?? order.buyer.postalCode,
+    address: order.address ?? order.buyer.address,
+    addressDetail: order.addressDetail,
+    deliveryNote: order.deliveryNote,
+  };
+}
+
 function toAdminOrderView(order: AdminOrderRecord) {
   return {
     id: order.id,
@@ -204,7 +223,8 @@ function toAdminOrderView(order: AdminOrderRecord) {
     quantity: order.quantity,
     unitPrice: order.unitPrice,
     extraShipping: order.extraShipping,
-    total: order.unitPrice * order.quantity + order.extraShipping,
+    shippingFee: order.shippingFee,
+    total: order.unitPrice * order.quantity + order.extraShipping + order.shippingFee,
     orderedAt: order.orderedAt.toISOString(),
     shippedAt: order.shippedAt?.toISOString() ?? null,
     deliveredAt: order.deliveredAt?.toISOString() ?? null,
@@ -222,7 +242,16 @@ function toAdminOrderView(order: AdminOrderRecord) {
       code: order.listing.seller.code,
       businessName: order.listing.seller.user.businessName,
     },
-    buyer: order.buyer,
+    // businessName/ownerName/mobilePhone identify WHO placed the order and
+    // are always read live — `shipping` below is the per-order snapshot of
+    // where it actually ships, which is the thing this task fixes.
+    buyer: {
+      businessName: order.buyer.businessName,
+      ownerName: order.buyer.ownerName,
+      mobilePhone: order.buyer.mobilePhone,
+      officePhone: order.buyer.officePhone,
+    },
+    shipping: resolveOrderShipping(order),
     payment: order.payment
       ? {
           id: order.payment.id,

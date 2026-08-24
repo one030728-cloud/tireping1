@@ -26,6 +26,17 @@ const tagSchema = z.preprocess(
   z.enum(["EVENT", "BEST"]).nullable().optional(),
 );
 
+// Same empty-string-means-null convention as nullableText above, for a
+// numeric field: freeShippingThreshold has no natural "unset" value of its
+// own (0 is a legitimate, meaningful threshold), so the form sends "" and
+// this maps that to null ("무료배송 기준 없음") rather than to 0 ("무료배송
+// 기준 0원", i.e. always free).
+const nullableNumber = (max: number) =>
+  z.preprocess(
+    (value) => (value === "" || value === undefined ? null : value),
+    z.coerce.number().int().min(0).max(max).nullable().optional(),
+  );
+
 export const listingSchema = z.object({
   manufacturer: z.string().trim().min(1).max(80),
   model: z.string().trim().min(1).max(160),
@@ -47,6 +58,13 @@ export const listingSchema = z.object({
   tag: tagSchema,
   shippingNote: nullableText(500),
   courier: z.string().trim().min(1).max(80).optional(),
+  // Task 2 — 배송비. Seller-wide settings, edited from the same listing form
+  // as courier/shippingNote (see the tx.seller.update block below) rather
+  // than a separate seller-settings screen — this codebase doesn't have one,
+  // and courier/shippingNote already established this exact pattern of
+  // seller-wide fields living on the per-listing form.
+  shippingFee: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  freeShippingThreshold: nullableNumber(100_000_000),
   // Not `.url()` — zod 4.4.3's `.url()` only checks that a string parses as
   // *some* URL, which accepts `javascript:`/`data:` URIs and any external
   // host. The actual restriction (this app's own storage origin only, with a
@@ -112,6 +130,8 @@ const sellerListingInclude = {
       shippingNote: true,
       location: true,
       intro: true,
+      shippingFee: true,
+      freeShippingThreshold: true,
     },
   },
   images: { orderBy: { sortOrder: "asc" } },
@@ -255,6 +275,31 @@ function toListingView(listing: SellerListingRecord) {
   };
 }
 
+// Task 4 — the seller screen used to read the buyer's live User.postalCode/
+// address here (order.buyer.postalCode/address, straight from the include
+// below) — exactly the bug the ShippingAddress/Order-snapshot feature
+// exists to fix (see schema.prisma's comment on Order.recipientName): a
+// buyer editing their profile silently rewrote where an already-shipped
+// order had gone. This now prefers the order's own snapshot and falls back
+// to the live buyer record only for a field that snapshot doesn't have —
+// which in practice means only pre-migration orders, and only for
+// postalCode/address at that (recipientName/recipientPhone were backfilled
+// from User.ownerName/mobilePhone, both NOT NULL columns, so they're never
+// actually null in practice; postalCode/address can still be null if the
+// buyer's own profile address was already empty at backfill time).
+// addressDetail/deliveryNote have no User-side equivalent at all, so there is
+// nothing to fall back to and they simply stay null on old orders.
+function resolveOrderShipping(order: SellerOrderRecord) {
+  return {
+    recipientName: order.recipientName ?? order.buyer.ownerName,
+    recipientPhone: order.recipientPhone ?? order.buyer.mobilePhone,
+    postalCode: order.postalCode ?? order.buyer.postalCode,
+    address: order.address ?? order.buyer.address,
+    addressDetail: order.addressDetail,
+    deliveryNote: order.deliveryNote,
+  };
+}
+
 function toOrderView(order: SellerOrderRecord) {
   return {
     id: order.id,
@@ -267,7 +312,8 @@ function toOrderView(order: SellerOrderRecord) {
     quantity: order.quantity,
     unitPrice: order.unitPrice,
     extraShipping: order.extraShipping,
-    total: order.unitPrice * order.quantity + order.extraShipping,
+    shippingFee: order.shippingFee,
+    total: order.unitPrice * order.quantity + order.extraShipping + order.shippingFee,
     orderedAt: order.orderedAt.toISOString(),
     shippedAt: order.shippedAt?.toISOString() ?? null,
     deliveredAt: order.deliveredAt?.toISOString() ?? null,
@@ -280,7 +326,17 @@ function toOrderView(order: SellerOrderRecord) {
       dot: order.listing.dot,
       sellerCode: order.listing.seller.code,
     },
-    buyer: order.buyer,
+    // businessName/ownerName/mobilePhone here identify WHO placed the order
+    // (the buyer's account) and are always read live — unlike shipping,
+    // there's no snapshot concept for "who bought this". Where to actually
+    // send the package is `shipping` below, which is the per-order snapshot.
+    buyer: {
+      businessName: order.buyer.businessName,
+      ownerName: order.buyer.ownerName,
+      mobilePhone: order.buyer.mobilePhone,
+      officePhone: order.buyer.officePhone,
+    },
+    shipping: resolveOrderShipping(order),
   };
 }
 
@@ -371,12 +427,21 @@ export async function createSellerListing(
       },
     });
 
-    if (data.courier !== undefined || data.shippingNote !== undefined) {
+    if (
+      data.courier !== undefined ||
+      data.shippingNote !== undefined ||
+      data.shippingFee !== undefined ||
+      data.freeShippingThreshold !== undefined
+    ) {
       await tx.seller.update({
         where: { id: sellerId },
         data: {
           ...(data.courier !== undefined ? { courier: data.courier } : {}),
           ...(data.shippingNote !== undefined ? { shippingNote: data.shippingNote } : {}),
+          ...(data.shippingFee !== undefined ? { shippingFee: data.shippingFee } : {}),
+          ...(data.freeShippingThreshold !== undefined
+            ? { freeShippingThreshold: data.freeShippingThreshold }
+            : {}),
         },
       });
     }
@@ -532,12 +597,21 @@ export async function updateSellerListing(
       }
     }
 
-    if (data.courier !== undefined || data.shippingNote !== undefined) {
+    if (
+      data.courier !== undefined ||
+      data.shippingNote !== undefined ||
+      data.shippingFee !== undefined ||
+      data.freeShippingThreshold !== undefined
+    ) {
       await tx.seller.update({
         where: { id: sellerId },
         data: {
           ...(data.courier !== undefined ? { courier: data.courier } : {}),
           ...(data.shippingNote !== undefined ? { shippingNote: data.shippingNote } : {}),
+          ...(data.shippingFee !== undefined ? { shippingFee: data.shippingFee } : {}),
+          ...(data.freeShippingThreshold !== undefined
+            ? { freeShippingThreshold: data.freeShippingThreshold }
+            : {}),
         },
       });
     }

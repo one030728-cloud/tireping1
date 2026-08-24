@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import LoadingState from "@/components/LoadingState";
 import { useAuth } from "@/lib/auth";
+import { formatDate } from "@/lib/formatDate";
+import type { InquiryView } from "@/lib/inquiry-types";
 import { CUSTOMER_LINKS } from "@/lib/nav";
 import { FAQ_CATEGORIES, FAQ_ITEMS, NOTICES, UPDATE_LOGS } from "@/lib/mockData";
 
@@ -123,23 +125,87 @@ function FaqBoard() {
   );
 }
 
+// FAQ_CATEGORIES 라벨을 그대로 재사용한다 — Inquiry.category 는 DB enum이
+// 아니라 자유 문자열이라서(스키마 참고) 이 목록과의 결합은 UI 쪽 관례일
+// 뿐이지만, 문의 유형 선택지를 두 군데서 따로 관리하지 않기 위함이다.
+const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  FAQ_CATEGORIES.map((c) => [c.id, c.label]),
+);
+
+const INQUIRY_STATUS_LABEL: Record<string, string> = {
+  OPEN: "답변대기",
+  ANSWERED: "답변완료",
+  CLOSED: "종료",
+};
+
 function QnaBoard() {
+  const [category, setCategory] = useState("");
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [inquiries, setInquiries] = useState<InquiryView[] | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/inquiries", { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error("문의 내역을 불러오지 못했습니다.");
+        return response.json() as Promise<{ inquiries: InquiryView[] }>;
+      })
+      .then((data) => {
+        if (!cancelled) setInquiries(data.inquiries);
+      })
+      .catch((reason: Error) => {
+        if (!cancelled) setListError(reason.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setSubmitError(null);
+    setSubmitted(false);
+    try {
+      const response = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category, title, content }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setSubmitError(
+          body?.error === "TOO_MANY_REQUESTS"
+            ? "문의를 너무 많이 등록했습니다. 잠시 후 다시 시도해 주세요."
+            : "문의 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        );
+        return;
+      }
+      const data = (await response.json()) as { inquiry: InquiryView };
+      setInquiries((current) => [data.inquiry, ...(current ?? [])]);
+      setSubmitted(true);
+      setCategory("");
+      setTitle("");
+      setContent("");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <>
       <h1 className="text-xl font-extrabold mb-1">1:1 문의</h1>
       <p className="text-sm text-muted mb-5">궁금하신 내용을 남겨주시면 순차적으로 답변드립니다.</p>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setSubmitted(true);
-        }}
-        className="card p-5 flex flex-col gap-3"
-      >
+      <form onSubmit={(event) => void handleSubmit(event)} className="card p-5 flex flex-col gap-3">
         <select
-          defaultValue=""
+          value={category}
+          onChange={(event) => setCategory(event.target.value)}
           required
           className="h-11 px-3 rounded-lg border border-border text-sm sm:w-56 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
         >
@@ -153,26 +219,67 @@ function QnaBoard() {
           ))}
         </select>
         <input
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
           required
           placeholder="제목"
           className="h-11 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
         />
         <textarea
+          value={content}
+          onChange={(event) => setContent(event.target.value)}
           required
           rows={6}
           placeholder="문의 내용을 입력해주세요."
           className="px-3 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand resize-none"
         />
-        <button type="submit" className="btn-primary h-11 self-end px-6 gap-1.5">
-          <Send size={15} /> 문의 등록
+        <button type="submit" disabled={submitting} className="btn-primary h-11 self-end px-6 gap-1.5 disabled:opacity-60">
+          <Send size={15} /> {submitting ? "등록 중..." : "문의 등록"}
         </button>
-        {submitted && (
+        {submitError && <p className="text-sm text-accent font-medium">{submitError}</p>}
+        {submitted && !submitError && (
           <p className="text-sm text-success font-medium">문의가 등록되었습니다. 순차적으로 답변드리겠습니다.</p>
         )}
       </form>
 
       <h2 className="font-bold mt-8 mb-3">나의 문의 내역</h2>
-      <div className="card py-14 text-center text-muted text-sm">등록된 문의 내역이 없습니다.</div>
+      {listError ? (
+        <p className="text-sm text-accent">{listError}</p>
+      ) : inquiries === null ? (
+        <LoadingState />
+      ) : inquiries.length === 0 ? (
+        <div className="card py-14 text-center text-muted text-sm">등록된 문의 내역이 없습니다.</div>
+      ) : (
+        <div className="card divide-y divide-border">
+          {inquiries.map((inquiry) => (
+            <div key={inquiry.id} className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold text-sm">
+                  {inquiry.listingId && <span className="text-brand mr-1.5">[상품문의]</span>}
+                  {inquiry.title}
+                </p>
+                <span
+                  className={`text-xs font-semibold shrink-0 ${
+                    inquiry.status === "ANSWERED" ? "text-success" : "text-muted"
+                  }`}
+                >
+                  {INQUIRY_STATUS_LABEL[inquiry.status] ?? inquiry.status}
+                </span>
+              </div>
+              <p className="text-xs text-muted mt-1">
+                {CATEGORY_LABELS[inquiry.category] ?? inquiry.category} · {formatDate(inquiry.createdAt)}
+              </p>
+              <p className="text-sm text-muted mt-2 whitespace-pre-wrap">{inquiry.content}</p>
+              {inquiry.answer && (
+                <div className="mt-3 pl-3 border-l-2 border-brand/30 text-sm">
+                  <p className="text-brand font-semibold text-xs mb-1">답변</p>
+                  <p className="text-foreground/90 whitespace-pre-wrap">{inquiry.answer}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

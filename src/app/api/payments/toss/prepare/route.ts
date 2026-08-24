@@ -52,8 +52,13 @@ export async function POST(request: Request) {
     );
   }
 
+  // shippingFee (Task 2) is charged exactly like extraShipping already was —
+  // both are per-order price components snapshotted server-side, never
+  // supplied by the client — so both fold into the amount actually charged
+  // via Toss. See src/lib/server/pricing.ts and createBuyerOrders
+  // (src/lib/server/orders.ts) for where shippingFee is resolved.
   const amount = orders.reduce(
-    (total, order) => total + order.unitPrice * order.quantity + order.extraShipping,
+    (total, order) => total + order.unitPrice * order.quantity + order.extraShipping + order.shippingFee,
     0,
   );
   if (amount <= 0) {

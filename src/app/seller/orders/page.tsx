@@ -171,11 +171,13 @@ export default function SellerOrdersPage() {
                     <p className="text-xs text-muted mb-1">구매자</p>
                     <p className="font-medium">{order.buyer.businessName} / {order.buyer.ownerName}</p>
                     <p className="text-muted mt-1">{order.buyer.mobilePhone}</p>
-                    <p className="text-muted">{order.buyer.postalCode ?? ""} {order.buyer.address ?? "주소 미입력"}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted mb-1">주문 금액</p>
                     <p className="font-bold tabular-nums">{order.total.toLocaleString()}원</p>
+                    {order.shippingFee > 0 && (
+                      <p className="text-muted mt-0.5">(배송비 {order.shippingFee.toLocaleString()}원 포함)</p>
+                    )}
                     <p className="text-muted mt-1">{formatDate(order.orderedAt)}</p>
                   </div>
                   <div>
@@ -208,6 +210,26 @@ export default function SellerOrdersPage() {
                       )}
                     </div>
                   </div>
+                </div>
+
+                {/* Task 4 — the order's own shipping snapshot, not the
+                    buyer's live profile: a business with several branches may
+                    have this order going somewhere other than their account
+                    address, and that must stay fixed even if the profile
+                    address changes later. See resolveOrderShipping in
+                    src/lib/server/seller.ts. */}
+                <div className="mt-4 rounded-lg bg-surface-2 p-3 text-sm">
+                  <p className="text-xs text-muted mb-1">배송지</p>
+                  <p className="font-medium">
+                    {order.shipping.recipientName} · {order.shipping.recipientPhone}
+                  </p>
+                  <p className="text-muted mt-0.5">
+                    {order.shipping.postalCode ? `[${order.shipping.postalCode}] ` : ""}
+                    {order.shipping.address ?? "주소 미입력"} {order.shipping.addressDetail ?? ""}
+                  </p>
+                  {order.shipping.deliveryNote && (
+                    <p className="text-muted mt-0.5">배송 요청사항: {order.shipping.deliveryNote}</p>
+                  )}
                 </div>
               </article>
             );

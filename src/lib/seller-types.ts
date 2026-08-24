@@ -39,6 +39,8 @@ export interface SellerListingView {
     shippingNote: string | null;
     location: string | null;
     intro: string | null;
+    shippingFee: number;
+    freeShippingThreshold: number | null;
   };
   images: { id: string; url: string; sortOrder: number }[];
 }
@@ -48,6 +50,22 @@ export type SellerShippingStatus =
   | "TRACKING_REGISTERED"
   | "SHIPPED"
   | "DELIVERED";
+
+// Snapshot address for one order — the order's own recipient/address fields,
+// already resolved against the live buyer record for any field that's still
+// null on a pre-migration order (see resolveOrderShipping in
+// src/lib/server/seller.ts). postalCode/address stay nullable because that
+// fallback can itself be null (a buyer whose profile address was empty);
+// recipientName/recipientPhone never actually are, but are left non-nullable
+// here since the fallback source (User.ownerName/mobilePhone) is NOT NULL.
+export interface OrderShippingView {
+  recipientName: string;
+  recipientPhone: string;
+  postalCode: string | null;
+  address: string | null;
+  addressDetail: string | null;
+  deliveryNote: string | null;
+}
 
 export interface SellerOrderView {
   id: string;
@@ -60,6 +78,7 @@ export interface SellerOrderView {
   quantity: number;
   unitPrice: number;
   extraShipping: number;
+  shippingFee: number;
   total: number;
   orderedAt: string;
   shippedAt: string | null;
@@ -78,7 +97,6 @@ export interface SellerOrderView {
     ownerName: string;
     mobilePhone: string;
     officePhone: string | null;
-    postalCode: string | null;
-    address: string | null;
   };
+  shipping: OrderShippingView;
 }

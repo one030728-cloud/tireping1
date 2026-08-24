@@ -39,6 +39,8 @@ interface FormState {
   tag: string;
   courier: string;
   shippingNote: string;
+  shippingFee: string;
+  freeShippingThreshold: string;
 }
 
 const emptyForm: FormState = {
@@ -62,6 +64,8 @@ const emptyForm: FormState = {
   tag: "",
   courier: "",
   shippingNote: "",
+  shippingFee: "0",
+  freeShippingThreshold: "",
 };
 
 function formFromListing(listing: SellerListingView): FormState {
@@ -86,6 +90,9 @@ function formFromListing(listing: SellerListingView): FormState {
     tag: listing.tag ?? "",
     courier: listing.seller.courier,
     shippingNote: listing.seller.shippingNote ?? "",
+    shippingFee: String(listing.seller.shippingFee),
+    freeShippingThreshold:
+      listing.seller.freeShippingThreshold === null ? "" : String(listing.seller.freeShippingThreshold),
   };
 }
 
@@ -359,7 +366,25 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
             <div className="grid sm:grid-cols-2 gap-3">
               <TextField label="택배사" field="courier" form={form} setField={setField} required />
               <TextField label="배송 안내 문구" field="shippingNote" form={form} setField={setField} />
+              <NumberField label="배송비" field="shippingFee" form={form} setField={setField} required />
+              <Field label="무료배송 기준금액">
+                <input
+                  type="number"
+                  min="0"
+                  value={form.freeShippingThreshold}
+                  onChange={(event) => setField("freeShippingThreshold", event.target.value)}
+                  placeholder="미입력 시 무료배송 없음"
+                  className="seller-input"
+                />
+              </Field>
             </div>
+            {/* 배송비/무료배송 기준은 상품이 아니라 판매자 단위 설정이다 — 택배사/
+                배송 안내 문구와 마찬가지로 이 상품 폼을 저장할 때 함께 반영되며,
+                이 판매자의 다른 모든 상품에도 동일하게 적용된다. */}
+            <p className="text-xs text-muted mt-3">
+              배송비는 이 판매점의 모든 상품에 공통 적용됩니다. 무료배송 기준금액을 채우면 한 번의 주문에서
+              이 판매점 상품 합계가 그 금액 이상일 때 배송비가 무료로 적용됩니다.
+            </p>
           </section>
 
           <section className="card p-5">

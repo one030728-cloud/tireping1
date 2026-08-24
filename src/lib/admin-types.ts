@@ -94,6 +94,17 @@ export interface AdminListingView {
 
 export type AdminShippingStatus = "PREPARING" | "TRACKING_REGISTERED" | "SHIPPED" | "DELIVERED";
 
+// Same shape as (and mirrors) src/lib/seller-types.ts's OrderShippingView —
+// see resolveOrderShipping in src/lib/server/admin.ts for the fallback rule.
+export interface AdminOrderShippingView {
+  recipientName: string;
+  recipientPhone: string;
+  postalCode: string | null;
+  address: string | null;
+  addressDetail: string | null;
+  deliveryNote: string | null;
+}
+
 export interface AdminOrderView {
   id: string;
   listingId: string;
@@ -105,6 +116,7 @@ export interface AdminOrderView {
   quantity: number;
   unitPrice: number;
   extraShipping: number;
+  shippingFee: number;
   total: number;
   orderedAt: string;
   shippedAt: string | null;
@@ -128,9 +140,8 @@ export interface AdminOrderView {
     ownerName: string;
     mobilePhone: string;
     officePhone: string | null;
-    postalCode: string | null;
-    address: string | null;
   };
+  shipping: AdminOrderShippingView;
   payment: {
     id: string;
     status: "READY" | "DONE" | "FAILED" | "CANCELED";

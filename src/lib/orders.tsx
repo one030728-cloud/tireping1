@@ -12,6 +12,17 @@ import { CANCEL_STATUS, ORDER_STATUS } from "./order-status";
 import type { CancelStatusCounts, CartItem, FullOrder, Manufacturer, OrderStatusCounts } from "./types";
 import { useAuth } from "./auth";
 
+// Task 3 — the shipping snapshot every checkout submission must carry. Shape
+// mirrors shippingSnapshotSchema (src/lib/server/orders.ts) exactly.
+export interface OrderAddressInput {
+  recipientName: string;
+  recipientPhone: string;
+  postalCode: string;
+  address: string;
+  addressDetail?: string | null;
+  deliveryNote?: string | null;
+}
+
 const ORDER_STATUS_KEYS = [
   ORDER_STATUS.PAYMENT_PENDING,
   ORDER_STATUS.PAYMENT_COMPLETED,
@@ -34,7 +45,7 @@ const CANCEL_STATUS_KEYS = [
 interface OrdersContextValue {
   orders: FullOrder[];
   loading: boolean;
-  addOrders: (items: CartItem[]) => Promise<FullOrder[]>;
+  addOrders: (items: CartItem[], address: OrderAddressInput) => Promise<FullOrder[]>;
   cancelOrder: (id: string, reason?: string) => Promise<FullOrder>;
   confirmPurchase: (id: string) => Promise<FullOrder>;
   refreshOrders: () => Promise<FullOrder[]>;
@@ -64,9 +75,16 @@ interface BuyerOrderApi {
   unitPrice: number;
   quantity: number;
   extraShipping: number;
+  shippingFee: number;
   total: number;
   sellerCode: string;
   orderedAt: string;
+  recipientName: string | null;
+  recipientPhone: string | null;
+  postalCode: string | null;
+  address: string | null;
+  addressDetail: string | null;
+  deliveryNote: string | null;
 }
 
 export class OrderRequestError extends Error {
@@ -94,9 +112,16 @@ function toFullOrder(order: BuyerOrderApi): FullOrder {
     unitPrice: order.unitPrice,
     quantity: order.quantity,
     extraShipping: order.extraShipping,
+    shippingFee: order.shippingFee,
     total: order.total,
     sellerCode: order.sellerCode,
     orderedAt: order.orderedAt,
+    recipientName: order.recipientName,
+    recipientPhone: order.recipientPhone,
+    postalCode: order.postalCode,
+    address: order.address,
+    addressDetail: order.addressDetail,
+    deliveryNote: order.deliveryNote,
     cancelReason: order.cancelReason,
     shippingStatus: order.shippingStatus,
     shippingStatusLabel: order.shippingStatusLabel,
@@ -156,11 +181,11 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     };
   }, [authLoading, refreshOrders, userId, userRole]);
 
-  const addOrders = useCallback(async (items: CartItem[]) => {
+  const addOrders = useCallback(async (items: CartItem[], address: OrderAddressInput) => {
     const response = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ items, address }),
     });
     const body = await readOrderResponse(response);
     const createdOrders = (body?.orders ?? []).map(toFullOrder);

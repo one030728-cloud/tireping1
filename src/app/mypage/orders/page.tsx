@@ -135,6 +135,26 @@ function ShippingInfo({
   );
 }
 
+// Task 3/4 — the per-order shipping snapshot this buyer themselves chose at
+// checkout (recipientName/recipientPhone/postalCode/address/addressDetail),
+// plus any 배송 요청사항. Absent (all null) only for orders placed before
+// this feature existed.
+function RecipientInfo({ order }: { order: FullOrder }) {
+  if (!order.recipientName && !order.address) return null;
+  return (
+    <div className="text-xs leading-5">
+      <p className="font-medium">
+        {order.recipientName} {order.recipientPhone && `· ${order.recipientPhone}`}
+      </p>
+      <p className="text-muted">
+        {order.postalCode ? `[${order.postalCode}] ` : ""}
+        {order.address ?? ""} {order.addressDetail ?? ""}
+      </p>
+      {order.deliveryNote && <p className="text-muted">요청사항: {order.deliveryNote}</p>}
+    </div>
+  );
+}
+
 function OrdersContent() {
   const { orders, loading, cancelOrder, confirmPurchase } = useOrders();
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -301,7 +321,7 @@ function OrdersContent() {
           {/* Desktop: detailed table, horizontal scroll (columns keep growing
               with shipping/tracking/action data, so min-w is generous). */}
           <div className="hidden lg:block card p-4 overflow-x-auto">
-            <table className="min-w-[1480px] w-full text-xs border-collapse">
+            <table className="min-w-[1600px] w-full text-xs border-collapse">
               <thead>
                 <tr className="text-left text-muted border-b border-border">
                   <th className="py-2 pr-3 font-medium w-8"></th>
@@ -313,6 +333,7 @@ function OrdersContent() {
                   <th className="py-2 pr-3 font-medium">단가</th>
                   <th className="py-2 pr-3 font-medium">수량</th>
                   <th className="py-2 pr-3 font-medium">추가배송비</th>
+                  <th className="py-2 pr-3 font-medium">배송비</th>
                   <th className="py-2 pr-3 font-medium">합계금액</th>
                   <th className="py-2 pr-3 font-medium">판매점</th>
                   <th className="py-2 pr-3 font-medium">배송정보</th>
@@ -356,10 +377,14 @@ function OrdersContent() {
                     <td className="py-3 pr-3">{o.unitPrice.toLocaleString()}원</td>
                     <td className="py-3 pr-3">{o.quantity}개</td>
                     <td className="py-3 pr-3">{o.extraShipping.toLocaleString()}원</td>
+                    <td className="py-3 pr-3">{(o.shippingFee ?? 0).toLocaleString()}원</td>
                     <td className="py-3 pr-3 font-semibold">{o.total.toLocaleString()}원</td>
                     <td className="py-3 pr-3">{o.sellerCode}</td>
-                    <td className="py-3 pr-3 min-w-[220px]">
+                    <td className="py-3 pr-3 min-w-[260px]">
                       <ShippingInfo order={o} copiedId={copiedId} onCopy={(order) => void handleCopyTracking(order)} />
+                      <div className="mt-1.5 pt-1.5 border-t border-border">
+                        <RecipientInfo order={o} />
+                      </div>
                     </td>
                     <td className="py-3 pr-3 whitespace-nowrap">{formatDate(o.orderedAt)}</td>
                     <td className="py-3 pr-3">
@@ -430,6 +455,9 @@ function OrdersContent() {
                   <p className="text-muted">
                     추가배송비 <span className="text-foreground">{o.extraShipping.toLocaleString()}원</span>
                   </p>
+                  <p className="text-muted">
+                    배송비 <span className="text-foreground">{(o.shippingFee ?? 0).toLocaleString()}원</span>
+                  </p>
                 </div>
 
                 <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
@@ -439,13 +467,14 @@ function OrdersContent() {
                   </span>
                 </div>
 
-                {(o.shippingStatusLabel || o.courier || o.trackingNumber) && (
-                  <div className="mt-3 rounded-lg bg-surface-2 p-3">
+                {(o.shippingStatusLabel || o.courier || o.trackingNumber || o.recipientName) && (
+                  <div className="mt-3 rounded-lg bg-surface-2 p-3 flex flex-col gap-2">
                     <ShippingInfo
                       order={o}
                       copiedId={copiedId}
                       onCopy={(order) => void handleCopyTracking(order)}
                     />
+                    <RecipientInfo order={o} />
                   </div>
                 )}
 

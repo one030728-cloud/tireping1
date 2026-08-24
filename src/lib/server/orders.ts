@@ -12,7 +12,7 @@ import {
 } from "@/lib/order-status";
 import { prisma } from "./prisma";
 import { notifyUser } from "./notify";
-import { resolveExtraShipping } from "./pricing";
+import { resolveExtraShipping, resolveSellerShippingFee } from "./pricing";
 
 const orderItemSchema = z.object({
   id: z.string().trim().min(1).max(200),
@@ -31,8 +31,34 @@ const orderItemSchema = z.object({
   listingId: z.string().trim().min(1).max(200).optional(),
 });
 
+const nullableText = (max: number) =>
+  z.preprocess(
+    (value) => (value === "" || value === undefined ? null : value),
+    z.string().trim().max(max).nullable().optional(),
+  );
+
+// Task 3 — 주문서: the shipping snapshot every order created from checkout
+// must carry. Required fields mirror ShippingAddress's own required columns
+// (schema.prisma) exactly, so "pick a saved address" and "type a new one"
+// produce the same validated shape; addressDetail/deliveryNote are the only
+// optional pieces, matching their nullable Order columns. This is what makes
+// "reject an order with no address rather than silently writing nulls"
+// (Task 3) enforced by zod at the API boundary, before createBuyerOrders
+// ever runs — a null address on an Order row is only ever produced by the
+// pre-checkout migration backfill (see schema.prisma's comment on
+// Order.recipientName), never by this code path.
+export const shippingSnapshotSchema = z.object({
+  recipientName: z.string().trim().min(1).max(60),
+  recipientPhone: z.string().trim().min(1).max(30),
+  postalCode: z.string().trim().min(1).max(20),
+  address: z.string().trim().min(1).max(300),
+  addressDetail: nullableText(200),
+  deliveryNote: nullableText(500),
+});
+
 export const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1).max(100),
+  address: shippingSnapshotSchema,
 });
 
 export const cancelOrderSchema = z.object({
@@ -114,9 +140,20 @@ function toBuyerOrderView(order: BuyerOrderRecord) {
     unitPrice: order.unitPrice,
     quantity: order.quantity,
     extraShipping: order.extraShipping,
-    total: order.unitPrice * order.quantity + order.extraShipping,
+    shippingFee: order.shippingFee,
+    total: order.unitPrice * order.quantity + order.extraShipping + order.shippingFee,
     sellerCode: order.listing.seller.code,
     orderedAt: order.orderedAt.toISOString(),
+    // Shipping snapshot (Task 3). Nullable only for orders that predate this
+    // column — see schema.prisma's comment on Order.recipientName. Every
+    // order created through /checkout always has these populated (except
+    // addressDetail/deliveryNote, which are genuinely optional).
+    recipientName: order.recipientName,
+    recipientPhone: order.recipientPhone,
+    postalCode: order.postalCode,
+    address: order.address,
+    addressDetail: order.addressDetail,
+    deliveryNote: order.deliveryNote,
   };
 }
 
@@ -245,7 +282,11 @@ type OrderItemInput = z.infer<typeof orderItemSchema>;
 // or withdrawn seller can no longer log in to ship, so their listings must be
 // excluded here even if a client bypasses the public catalog and posts an
 // order request directly.
-const sellerInGoodStanding = {
+// Exported so checkout.ts's read-only shipping-fee preview (Task 3) can
+// apply the exact same "who even counts as a seller" rule when looking up
+// Seller.shippingFee/freeShippingThreshold for the buyer's current cart —
+// one rule, one place, instead of a second definition that could drift.
+export const sellerInGoodStanding = {
   status: "ACTIVE" as const,
   user: { withdrawnAt: null },
 };
@@ -307,7 +348,16 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
   await expireStaleUnpaidOrders({ buyerId });
 
   const createdIds = await prisma.$transaction(async (tx) => {
-    const ids: string[] = [];
+    // Pass 1 — resolve, validate and decrement stock for every item, in
+    // exactly the order and with exactly the guards this always had:
+    // findActiveListing's seller-in-good-standing lookup, the minOrder
+    // check, the conditional updateMany stock decrement, and the SOLDOUT
+    // flip. Order-row creation is deliberately deferred to pass 2 below —
+    // see the Task 2 comment there for why. Splitting "validate + decrement"
+    // from "create the row" doesn't change atomicity or the final committed
+    // state: everything still runs inside this one transaction, so a throw
+    // anywhere still rolls back every write made so far, exactly as before.
+    const resolvedItems: { item: OrderItemInput; listing: NonNullable<Awaited<ReturnType<typeof findActiveListing>>> }[] = [];
 
     for (const item of data.items) {
       const listing = await findActiveListing(tx, item);
@@ -339,6 +389,48 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
         });
       }
 
+      resolvedItems.push({ item, listing });
+    }
+
+    // Task 2 — 배송비. Shipping is charged once per seller per checkout, not
+    // once per line item, so the fee has to be resolved from each seller's
+    // *combined* goods subtotal across every item of theirs in this
+    // checkout — which is only known once every item above has resolved to
+    // a real listing. goodsAmount uses listing.price (the DB's own price at
+    // order time), never item.price from the request body, for the same
+    // reason unitPrice below always has: the client cannot be trusted with
+    // any price component.
+    const sellerSubtotals = new Map<string, number>();
+    for (const { item, listing } of resolvedItems) {
+      const lineGoodsAmount = listing.price * item.quantity;
+      sellerSubtotals.set(listing.sellerId, (sellerSubtotals.get(listing.sellerId) ?? 0) + lineGoodsAmount);
+    }
+
+    const sellerPolicies = await tx.seller.findMany({
+      where: { id: { in: Array.from(sellerSubtotals.keys()) } },
+      select: { id: true, shippingFee: true, freeShippingThreshold: true },
+    });
+    const sellerFees = new Map<string, number>(
+      sellerPolicies.map((seller) => [
+        seller.id,
+        resolveSellerShippingFee(seller, sellerSubtotals.get(seller.id) ?? 0),
+      ]),
+    );
+
+    // Pass 2 — create the Order rows. A per-seller fee has to land on
+    // per-listing Order rows without being multiplied by however many
+    // listings that seller happens to have in this cart: the first Order row
+    // created for a given seller (in item order) absorbs that seller's whole
+    // resolved fee, and every later row for the same seller in this same
+    // checkout gets 0. So for any seller with N orders from one checkout,
+    // sum(shippingFee) = fee + 0*(N-1) = fee exactly once — never fee*N.
+    const sellerCharged = new Set<string>();
+    const ids: string[] = [];
+
+    for (const { item, listing } of resolvedItems) {
+      const isFirstOrderForSeller = !sellerCharged.has(listing.sellerId);
+      if (isFirstOrderForSeller) sellerCharged.add(listing.sellerId);
+
       const order = await tx.order.create({
         data: {
           buyerId,
@@ -350,11 +442,25 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
           // see resolveExtraShipping (pricing.ts) for why the client's value
           // is never trusted here.
           extraShipping: resolveExtraShipping(),
+          // Server-derived from Seller rows above (resolveSellerShippingFee),
+          // never from the request body — see pricing.ts.
+          shippingFee: isFirstOrderForSeller ? (sellerFees.get(listing.sellerId) ?? 0) : 0,
           status: ORDER_STATUS.PAYMENT_PENDING,
           shippingStatus: "PREPARING",
           courier: null,
           trackingNumber: null,
           paymentDeadline: new Date(Date.now() + UNPAID_ORDER_TTL_MS),
+          // Shipping snapshot (Task 3) — zod already guarantees data.address
+          // is present and its required fields non-empty (createOrderSchema),
+          // so every order created here always carries a real address; only
+          // rows that predate this column are ever null (backfilled by the
+          // migration from the buyer's User record at that time).
+          recipientName: data.address.recipientName,
+          recipientPhone: data.address.recipientPhone,
+          postalCode: data.address.postalCode,
+          address: data.address.address,
+          addressDetail: data.address.addressDetail ?? null,
+          deliveryNote: data.address.deliveryNote ?? null,
         },
       });
       ids.push(order.id);
@@ -688,7 +794,7 @@ export async function cancelOrder(
     if (nextStatus === CANCEL_STATUS.PAYMENT_AFTER && order.paymentId) {
       const payment = await tx.payment.findUnique({ where: { id: order.paymentId } });
       if (payment && payment.status === "DONE") {
-        const cancelledOrderAmount = order.unitPrice * order.quantity + order.extraShipping;
+        const cancelledOrderAmount = order.unitPrice * order.quantity + order.extraShipping + order.shippingFee;
         const remainingActiveOrders = await tx.order.count({
           where: {
             paymentId: payment.id,

@@ -382,12 +382,14 @@ export async function POST(request: Request) {
         // way, rather than silently losing track of it.
         const currentOrders = await tx.order.findMany({
           where: { paymentId: localPayment.id },
-          select: { id: true, status: true, unitPrice: true, quantity: true, extraShipping: true },
+          select: { id: true, status: true, unitPrice: true, quantity: true, extraShipping: true, shippingFee: true },
         });
         const staleOrders = currentOrders.filter((order) => order.status !== ORDER_STATUS.PAYMENT_COMPLETED);
         if (staleOrders.length > 0) {
+          // shippingFee folds in here the same way extraShipping already did
+          // — see the comment in toss/prepare/route.ts's own amount calc.
           const staleAmount = staleOrders.reduce(
-            (total, order) => total + order.unitPrice * order.quantity + order.extraShipping,
+            (total, order) => total + order.unitPrice * order.quantity + order.extraShipping + order.shippingFee,
             0,
           );
           console.error("TOSS_WEBHOOK_STALE_ORDERS", {

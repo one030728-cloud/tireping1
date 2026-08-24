@@ -61,7 +61,8 @@ export type NotificationEvent =
   | "LISTING_REJECTED"
   | "SELLER_ORDER_RECEIVED"
   | "BUYER_ORDER_SHIPPED"
-  | "BUYER_ORDER_AUTO_CANCELLED";
+  | "BUYER_ORDER_AUTO_CANCELLED"
+  | "INQUIRY_ANSWERED";
 
 export interface NotificationMessage {
   /** Short line suitable for a push/SMS title or an email subject. */

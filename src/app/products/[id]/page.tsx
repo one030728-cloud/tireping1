@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -8,9 +8,11 @@ import { ChevronLeft, Star } from "lucide-react";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import LoadingState from "@/components/LoadingState";
 import { CartRequestError, useCart } from "@/lib/cart";
-import { OrderRequestError, useOrders } from "@/lib/orders";
 import { useWishlist, WishlistRequestError } from "@/lib/wishlist";
 import { useAuth } from "@/lib/auth";
+import { formatDate } from "@/lib/formatDate";
+import type { InquiryView } from "@/lib/inquiry-types";
+import type { ReviewOverview } from "@/lib/review-types";
 import type { Manufacturer, Seller } from "@/lib/types";
 
 interface ProductView {
@@ -97,7 +99,6 @@ function ProductDetailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { addItem } = useCart();
-  const { addOrders } = useOrders();
   const { isWished, toggleWish } = useWishlist();
   const { user } = useAuth();
   const dot = searchParams.get("dot");
@@ -105,6 +106,11 @@ function ProductDetailContent() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [reviewOverview, setReviewOverview] = useState<ReviewOverview | null>(null);
+  const [myInquiries, setMyInquiries] = useState<InquiryView[] | null>(null);
+  const [inquiryContent, setInquiryContent] = useState("");
+  const [inquirySubmitting, setInquirySubmitting] = useState(false);
+  const [inquiryError, setInquiryError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,10 +139,117 @@ function ProductDetailContent() {
     };
   }, [params.id, dot]);
 
+  // 판매점별 비교 표에 나오는 판매점(리스팅) 하나하나에 대응하는 listingId 모음.
+  // 리뷰 집계·상품 문의 모두 이 id 집합을 기준으로 조회한다.
+  const listingIds = useMemo(
+    () => (product ? product.sellers.map((seller) => seller.id).filter((id): id is string => Boolean(id)) : []),
+    [product],
+  );
+
+  useEffect(() => {
+    if (listingIds.length === 0) return;
+    let cancelled = false;
+    fetch(`/api/reviews/by-listing?listingIds=${encodeURIComponent(listingIds.join(","))}`, { cache: "no-store" })
+      .then((response) => (response.ok ? (response.json() as Promise<ReviewOverview>) : null))
+      .then((data) => {
+        if (!cancelled && data) setReviewOverview(data);
+      })
+      .catch(() => {
+        // Rating badges are a bonus on top of the product page, not required
+        // to browse/buy — a failed fetch here silently leaves them showing
+        // "리뷰 없음" rather than blocking the whole page like loadError does.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listingIds]);
+
+  useEffect(() => {
+    // myInquiries is only ever rendered inside the `user ?` branch below, so
+    // there is nothing to reset here when logged out — the stale value (if
+    // any) is simply never shown until a real fetch for the current session
+    // populates it again.
+    if (!user || listingIds.length === 0) return;
+    let cancelled = false;
+    fetch(`/api/inquiries?listingIds=${encodeURIComponent(listingIds.join(","))}`, { cache: "no-store" })
+      .then((response) => (response.ok ? (response.json() as Promise<{ inquiries: InquiryView[] }>) : null))
+      .then((data) => {
+        if (!cancelled && data) setMyInquiries(data.inquiries);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, listingIds]);
+
+  async function handleInquirySubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!user || !product || listingIds.length === 0) return;
+    setInquirySubmitting(true);
+    setInquiryError(null);
+    try {
+      const response = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "product",
+          // 상품 문의는 상품 맥락 자체가 제목이라 별도 제목 입력을 받지 않고
+          // 여기서 채운다 — 사용자에게는 문의 내용만 입력받는다.
+          title: `[상품문의] ${product.manufacturer} ${product.model}`,
+          content: inquiryContent,
+          listingId: listingIds[0],
+        }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setInquiryError(
+          body?.error === "TOO_MANY_REQUESTS"
+            ? "문의 등록이 너무 잦습니다. 잠시 후 다시 시도해 주세요."
+            : "문의 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+        );
+        return;
+      }
+      const data = (await response.json()) as { inquiry: InquiryView };
+      setMyInquiries((current) => [data.inquiry, ...(current ?? [])]);
+      setInquiryContent("");
+    } finally {
+      setInquirySubmitting(false);
+    }
+  }
+
   const lowestPrice = useMemo(
     () => (product ? Math.min(...product.sellers.map((s) => s.price)) : 0),
     [product],
   );
+
+  // Review.sellerId (a cuid) -> the seller.code shown throughout this page,
+  // so the review feed below can label each review by the same "판매점"
+  // identifier the comparison table uses instead of an internal id.
+  const sellerCodeBySellerId = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!product || !reviewOverview) return map;
+    for (const seller of product.sellers) {
+      const summary = seller.id ? reviewOverview.summaryByListingId[seller.id] : undefined;
+      if (summary) map.set(summary.sellerId, seller.code);
+    }
+    return map;
+  }, [product, reviewOverview]);
+
+  // seller.id 는 ProductView 상의 listingId다 — 리뷰는 리스팅이 아니라
+  // "판매자" 단위로 집계되므로(review.ts 참고) 이 배지도 그 집계를 그대로
+  // 보여준다. 아직 집계를 못 불러왔거나 리뷰가 0건이면 "리뷰 없음".
+  function ratingBadge(listingId: string | undefined) {
+    const summary = listingId ? reviewOverview?.summaryByListingId[listingId] : undefined;
+    if (!summary || summary.reviewCount === 0) {
+      return <span className="text-muted font-normal">리뷰 없음</span>;
+    }
+    return (
+      <span className="inline-flex items-center gap-0.5 text-muted font-normal">
+        <Star size={11} className="text-accent shrink-0" fill="currentColor" />
+        {summary.averageRating.toFixed(1)} ({summary.reviewCount})
+      </span>
+    );
+  }
 
   if (loading) return <LoadingState />;
 
@@ -175,21 +288,20 @@ function ProductDetailContent() {
     };
 
     try {
-      if (buyNow) {
-        await addOrders([{ ...item, id: `${item.tireId}-${item.sellerCode}-${Date.now()}` }]);
-        router.push("/mypage/orders?justOrdered=1");
-      } else {
-        await addItem(item);
-        router.push("/cart");
-      }
+      // Order creation now always requires a shipping address snapshot (see
+      // OrderAddressInput / addOrders in src/lib/orders.tsx, added by the
+      // checkout/shipping-address work landing alongside this task) — this
+      // page has no address UI of its own, so "바로구매" can no longer create
+      // the order directly the way it used to. It still adds the item to the
+      // cart (same as "장바구니 담기"), but now sends the buyer straight to
+      // /checkout to supply an address and finish, instead of /cart.
+      await addItem(item);
+      router.push(buyNow ? "/checkout" : "/cart");
     } catch (error) {
-      const code =
-        error instanceof OrderRequestError || error instanceof CartRequestError
-          ? error.code
-          : "ORDER_REQUEST_FAILED";
+      const code = error instanceof CartRequestError ? error.code : "CART_REQUEST_FAILED";
       window.alert(
         code === "ORDER_STOCK_INSUFFICIENT"
-          ? "재고가 부족한 상품이 있어 주문할 수 없습니다."
+          ? "재고가 부족한 상품이 있어 담을 수 없습니다."
           : "요청 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
       );
     }
@@ -318,6 +430,7 @@ function ProductDetailContent() {
                       최저가
                     </span>
                   )}
+                  <span className="block text-[11px] mt-1">{ratingBadge(seller.id)}</span>
                 </td>
                 <td className="py-3 px-4 text-brand font-bold tabular-nums">
                   {seller.discountRate}%
@@ -414,6 +527,7 @@ function ProductDetailContent() {
               </span>
               <span className="text-xs text-muted">{seller.courier}</span>
             </div>
+            <p className="text-xs mb-1">{ratingBadge(seller.id)}</p>
             <div className="flex items-baseline gap-2 mb-1 tabular-nums">
               <span className="text-brand font-bold">{seller.discountRate}%</span>
               <span className="text-lg font-extrabold">
@@ -462,6 +576,107 @@ function ProductDetailContent() {
           </div>
         ))}
       </div>
+
+      <div className="flex items-center justify-between mb-3 mt-8">
+        <h3 className="font-bold">판매점 리뷰</h3>
+        {user?.role === "BUYER" && (
+          <Link href="/reviews/new" className="text-xs text-brand font-semibold hover:underline">
+            리뷰 작성하러 가기 →
+          </Link>
+        )}
+      </div>
+      {reviewOverview && reviewOverview.recentReviews.length > 0 ? (
+        <div className="card divide-y divide-border mb-8">
+          {reviewOverview.recentReviews.map((review) => (
+            <div key={review.id} className="p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-0.5">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <Star
+                      key={i}
+                      size={13}
+                      className={i < review.rating ? "text-accent" : "text-border"}
+                      fill={i < review.rating ? "currentColor" : "none"}
+                    />
+                  ))}
+                </span>
+                <span className="text-xs text-muted shrink-0">{formatDate(review.createdAt)}</span>
+              </div>
+              <p className="text-sm mt-2 whitespace-pre-wrap">{review.content}</p>
+              <p className="text-xs text-muted mt-2">
+                {review.buyerLabel} · {sellerCodeBySellerId.get(review.sellerId) ?? "판매점"}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="card py-10 text-center text-sm text-muted mb-8">아직 등록된 리뷰가 없습니다.</div>
+      )}
+
+      <h3 className="font-bold mb-3">상품 문의</h3>
+      {user ? (
+        <>
+          <form onSubmit={(event) => void handleInquirySubmit(event)} className="card p-4 flex flex-col gap-2 mb-4">
+            <textarea
+              value={inquiryContent}
+              onChange={(event) => setInquiryContent(event.target.value)}
+              required
+              minLength={1}
+              maxLength={4000}
+              rows={3}
+              placeholder="이 상품에 대해 궁금한 점을 남겨주세요."
+              className="px-3 py-2.5 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand resize-none"
+            />
+            {inquiryError && <p className="text-sm text-accent">{inquiryError}</p>}
+            <button
+              type="submit"
+              disabled={inquirySubmitting}
+              className="btn-primary h-10 self-end px-5 text-sm disabled:opacity-60"
+            >
+              {inquirySubmitting ? "등록 중..." : "문의 등록"}
+            </button>
+          </form>
+          {myInquiries === null ? (
+            <LoadingState />
+          ) : myInquiries.length === 0 ? (
+            <div className="card py-10 text-center text-sm text-muted">등록한 상품 문의가 없습니다.</div>
+          ) : (
+            <div className="card divide-y divide-border">
+              {myInquiries.map((inquiry) => (
+                <div key={inquiry.id} className="p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`text-xs font-semibold ${
+                        inquiry.status === "ANSWERED" ? "text-success" : "text-muted"
+                      }`}
+                    >
+                      {inquiry.status === "ANSWERED" ? "답변완료" : "답변대기"}
+                    </span>
+                    <span className="text-xs text-muted">{formatDate(inquiry.createdAt)}</span>
+                  </div>
+                  <p className="text-sm mt-2 whitespace-pre-wrap">{inquiry.content}</p>
+                  {inquiry.answer && (
+                    <div className="mt-2 pl-3 border-l-2 border-brand/30 text-sm">
+                      <p className="text-brand font-semibold text-xs mb-1">답변</p>
+                      <p className="whitespace-pre-wrap">{inquiry.answer}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="card px-5 py-10 text-center">
+          <p className="text-sm text-muted mb-4">로그인 후 상품 문의를 남길 수 있습니다.</p>
+          <Link
+            href={`/login?redirect=${encodeURIComponent(`/products/${product.id}${dot ? `?dot=${dot}` : ""}`)}`}
+            className="btn-primary h-10 px-6 text-sm"
+          >
+            로그인
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

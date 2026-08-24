@@ -23,3 +23,31 @@
 export function resolveExtraShipping(): number {
   return 0;
 }
+
+// ---------------------------------------------------------------------------
+// Task 2 — 배송비 (Seller.shippingFee / Seller.freeShippingThreshold)
+// ---------------------------------------------------------------------------
+// Shipping is a per-seller-per-checkout charge, not a per-listing one: a cart
+// with three items from the same seller is charged that seller's fee once,
+// not three times. This function only decides WHAT one seller's fee is for
+// one checkout, given that seller's own goods subtotal (sum of
+// unitPrice * quantity across every item from that seller in this checkout,
+// computed by the caller from DB listing prices — never from the client).
+// It deliberately knows nothing about how many Order rows that seller ends
+// up with; see createBuyerOrders (orders.ts) for how the single resolved
+// value here gets mapped onto potentially many Order rows without
+// multiplying it.
+export interface SellerShippingPolicy {
+  shippingFee: number;
+  freeShippingThreshold: number | null;
+}
+
+export function resolveSellerShippingFee(
+  policy: SellerShippingPolicy,
+  sellerSubtotal: number,
+): number {
+  if (policy.freeShippingThreshold !== null && sellerSubtotal >= policy.freeShippingThreshold) {
+    return 0;
+  }
+  return policy.shippingFee;
+}
