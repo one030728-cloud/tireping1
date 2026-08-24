@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import LoadingState from "@/components/LoadingState";
 import type { AdminOrderView, AdminShippingStatus } from "@/lib/admin-types";
+import { formatDate } from "@/lib/formatDate";
 
 const labels: Record<AdminShippingStatus, string> = { PREPARING: "배송 준비중", TRACKING_REGISTERED: "송장번호 입력", SHIPPED: "발송 완료", DELIVERED: "배송 완료" };
 
-function formatDate(value: string) { return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrderView[]>([]);

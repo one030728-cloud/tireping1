@@ -95,6 +95,11 @@ model User {
   cartItems     CartItem[]
   wishlist      WishlistEntry[]
   passwordResetTokens PasswordResetToken[]
+  shippingAddresses   ShippingAddress[]
+  reviews             Review[]
+  inquiries           Inquiry[]
+  returnRequests      ReturnRequest[]
+  taxInvoices         TaxInvoice[]
 }
 
 // Account recovery (아이디 찾기 / 비밀번호 재설정) — see src/lib/server/passwordReset.ts
@@ -131,7 +136,20 @@ model Seller {
   approvedBy    String?
   suspendReason String?
 
-  listings Listing[]
+  // 배송비 정책. 주문 1건(= 이 판매자에게 가는 한 건)당 부과되며, 주문 시점의
+  // 값이 Order.shippingFee 로 스냅샷된다 — 나중에 판매자가 정책을 바꿔도 이미
+  // 접수된 주문의 청구액이 흔들리면 안 되기 때문이다.
+  // freeShippingThreshold 가 null 이면 무료배송 기준 없음.
+  shippingFee            Int  @default(0)
+  freeShippingThreshold  Int?
+
+  // 플랫폼 수수료율(%). 정산 시 Settlement.commissionAmount 계산에 쓰이고,
+  // 그 값 역시 정산 시점에 스냅샷된다.
+  commissionRate Decimal @default(0) @db.Decimal(5, 2)
+
+  listings    Listing[]
+  settlements Settlement[]
+  reviews     Review[]
 }
 
 model Buyer {
@@ -284,11 +302,35 @@ model Order {
   paymentId      String?
   payment        Payment?       @relation(fields: [paymentId], references: [id])
 
+  // 배송지 스냅샷. 주문 시점에 확정해 저장한다 — 예전에는 판매자가
+  // User.postalCode/address 를 직접 읽었기 때문에, 회원정보를 고치면 이미
+  // 발송된 주문의 배송지까지 소급해서 바뀌었고 지점이 여럿인 사업자는
+  // 주문마다 다른 곳으로 받을 방법이 아예 없었다.
+  // 이 컬럼이 생기기 전 주문은 마이그레이션이 User 값으로 백필했고, 그래서
+  // nullable 이다. 새 주문은 체크아웃에서 항상 채운다.
+  recipientName   String?
+  recipientPhone  String?
+  postalCode      String?
+  address         String?
+  addressDetail   String?
+  deliveryNote    String?
+
+  // 주문 시점에 확정된 기본 배송비(Seller.shippingFee 의 스냅샷).
+  // extraShipping 은 그와 별개인 도서산간 등 추가분으로 남겨 둔다.
+  shippingFee     Int  @default(0)
+
+  settlement   Settlement? @relation(fields: [settlementId], references: [id])
+  settlementId String?
+
+  review        Review?
+  returnRequest ReturnRequest?
+
   @@index([buyerId])
   @@index([sellerId])
   @@index([listingId])
   @@index([paymentId])
   @@index([status, paymentDeadline])
+  @@index([settlementId])
 }
 
 model CartItem {
@@ -329,4 +371,189 @@ model WishlistEntry {
 
   @@index([userId])
   @@unique([userId, code])
+}
+
+// ---------------------------------------------------------------------------
+// 배송지 주소록
+// ---------------------------------------------------------------------------
+// 사업자는 지점이 여럿인 경우가 흔한데, 예전에는 배송지가 User 에 붙은 주소
+// 하나뿐이라 이번 주문만 다른 지점으로 받는 것이 불가능했다. 체크아웃에서
+// 여기 저장된 주소를 고르거나 새로 입력하고, 고른 값은 Order 에 스냅샷된다.
+model ShippingAddress {
+  id             String   @id @default(cuid())
+  user           User     @relation(fields: [userId], references: [id])
+  userId         String
+  label          String
+  recipientName  String
+  recipientPhone String
+  postalCode     String
+  address        String
+  addressDetail  String?
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// 판매자 정산
+// ---------------------------------------------------------------------------
+enum SettlementStatus {
+  PENDING
+  CONFIRMED
+  PAID
+}
+
+// 한 판매자의 한 정산 주기. 금액은 전부 정산 확정 시점의 스냅샷이다 —
+// 나중에 수수료율이나 주문이 바뀌어도 이미 지급한 정산서가 흔들리면 안 된다.
+// netAmount = grossAmount - commissionAmount 이며, 계산 결과가 아니라 확정값을
+// 저장한다.
+model Settlement {
+  id               String           @id @default(cuid())
+  seller           Seller           @relation(fields: [sellerId], references: [id])
+  sellerId         String
+  periodStart      DateTime
+  periodEnd        DateTime
+  grossAmount      Int
+  commissionRate   Decimal          @db.Decimal(5, 2)
+  commissionAmount Int
+  netAmount        Int
+  status           SettlementStatus @default(PENDING)
+  memo             String?
+  confirmedAt      DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime         @default(now())
+
+  orders Order[]
+
+  @@index([sellerId, status])
+}
+
+// ---------------------------------------------------------------------------
+// 리뷰
+// ---------------------------------------------------------------------------
+// 주문 1건당 최대 1개. orderId 가 @unique 인 것이 그 제약이고, 동시에
+// "구매한 사람만 쓸 수 있다"는 보장이기도 하다 — 주문 없이는 리뷰가 존재할 수
+// 없다. 작성 가능 시점(배송완료 이후)은 애플리케이션에서 강제한다.
+model Review {
+  id        String   @id @default(cuid())
+  order     Order    @relation(fields: [orderId], references: [id])
+  orderId   String   @unique
+  buyer     User     @relation(fields: [buyerId], references: [id])
+  buyerId   String
+  seller    Seller   @relation(fields: [sellerId], references: [id])
+  sellerId  String
+  listingId String
+  rating    Int
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sellerId])
+  @@index([listingId])
+}
+
+// ---------------------------------------------------------------------------
+// 1:1 문의 / 상품 문의
+// ---------------------------------------------------------------------------
+enum InquiryStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+// listingId 가 있으면 상품 문의, 없으면 일반 1:1 문의다. 답변은 별도 테이블
+// 없이 여기 담는다 — 이 서비스의 문의는 한 번 묻고 한 번 답하는 형태이고,
+// 스레드가 필요해지면 그때 분리하는 편이 낫다.
+model Inquiry {
+  id         String        @id @default(cuid())
+  user       User          @relation(fields: [userId], references: [id])
+  userId     String
+  listingId  String?
+  category   String
+  title      String
+  content    String
+  status     InquiryStatus @default(OPEN)
+  answer     String?
+  answeredAt DateTime?
+  answeredBy String?
+  createdAt  DateTime      @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@index([listingId])
+}
+
+// ---------------------------------------------------------------------------
+// 교환 / 반품
+// ---------------------------------------------------------------------------
+enum ReturnType {
+  EXCHANGE
+  RETURN
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+// 주문 1건당 최대 1건. COMPLETED 로 넘어갈 때 애플리케이션이 Order.status 를
+// 교환완료/반품완료(CANCEL_STATUS)로 옮긴다 — 그 상태값들은 order-status.ts 에
+// 정의만 되어 있고 지금까지 아무도 세팅하지 않았다.
+model ReturnRequest {
+  id           String       @id @default(cuid())
+  order        Order        @relation(fields: [orderId], references: [id])
+  orderId      String       @unique
+  buyer        User         @relation(fields: [buyerId], references: [id])
+  buyerId      String
+  sellerId     String
+  type         ReturnType
+  reason       String
+  detail       String?
+  status       ReturnStatus @default(REQUESTED)
+  rejectReason String?
+  requestedAt  DateTime     @default(now())
+  processedAt  DateTime?
+  processedBy  String?
+
+  @@index([buyerId])
+  @@index([sellerId, status])
+}
+
+// ---------------------------------------------------------------------------
+// 세금계산서
+// ---------------------------------------------------------------------------
+enum TaxInvoiceStatus {
+  REQUESTED
+  ISSUED
+  REJECTED
+  CANCELED
+}
+
+// 사업자 전용 서비스라 세금계산서는 부가기능이 아니라 결제 조건에 가깝다.
+// 다만 국세청/팝빌 연동은 없으므로 이 테이블은 "신청 접수 → 관리자가 외부에서
+// 발행 → 결과 기록"까지만 다룬다. externalId 는 실제 발행 시스템의 승인번호를
+// 적어 두는 자리이고, 연동이 붙으면 그대로 쓰면 된다.
+// 금액은 신청 시점에 확정해 저장한다 — 나중에 주문이 취소돼도 이미 발행된
+// 계산서의 금액이 바뀌면 안 되기 때문이다.
+model TaxInvoice {
+  id           String           @id @default(cuid())
+  user         User             @relation(fields: [userId], references: [id])
+  userId       String
+  periodMonth  String
+  supplyAmount Int
+  vat          Int
+  totalAmount  Int
+  status       TaxInvoiceStatus @default(REQUESTED)
+  externalId   String?
+  issuedAt     DateTime?
+  issuedBy     String?
+  rejectReason String?
+  requestedAt  DateTime         @default(now())
+
+  @@unique([userId, periodMonth])
+  @@index([status])
 }

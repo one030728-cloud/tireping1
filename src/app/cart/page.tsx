@@ -47,7 +47,7 @@ function CartContent() {
       } catch {
         window.alert("주문은 완료되었지만 장바구니를 비우지 못했습니다. 주문내역을 확인해 주세요.");
       }
-      router.push("/orders?justOrdered=1");
+      router.push("/mypage/orders?justOrdered=1");
     } catch (error) {
       const code = error instanceof OrderRequestError ? error.code : "ORDER_REQUEST_FAILED";
       window.alert(

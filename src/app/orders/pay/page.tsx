@@ -122,7 +122,7 @@ function PaymentContent() {
       {error && (
         <div className="card p-5 text-sm">
           <p className="text-accent font-semibold">{error}</p>
-          <Link href="/orders" className="btn-outline mt-4 inline-flex h-10 items-center px-4">
+          <Link href="/mypage/orders" className="btn-outline mt-4 inline-flex h-10 items-center px-4">
             주문내역으로 돌아가기
           </Link>
         </div>

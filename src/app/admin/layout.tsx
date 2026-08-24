@@ -10,6 +10,7 @@ const navigation = [
   { href: "/admin/sellers", label: "판매자 관리" },
   { href: "/admin/listings", label: "상품 심사" },
   { href: "/admin/orders", label: "전체 주문" },
+  { href: "/admin/settlements", label: "정산 관리" },
   { href: "/admin/events", label: "공지·이벤트" },
 ];
 

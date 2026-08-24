@@ -8,6 +8,7 @@ const navigation = [
   { href: "/seller", label: "대시보드" },
   { href: "/seller/listings", label: "내 상품" },
   { href: "/seller/orders", label: "주문 관리" },
+  { href: "/seller/settlements", label: "정산" },
 ];
 
 function isActive(pathname: string, href: string) {

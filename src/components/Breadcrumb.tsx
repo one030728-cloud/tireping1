@@ -16,7 +16,6 @@ const LABELS: Record<string, string> = {
   "/customer": "고객센터",
   "/wishlist": "찜한 판매업체",
   "/cart": "타이어 장바구니",
-  "/orders": "주문내역",
   "/mypage/status": "주문 / 배송 현황",
   "/mypage/orders": "주문내역 / 배송조회",
   "/mypage/deposits": "입출금 내역",

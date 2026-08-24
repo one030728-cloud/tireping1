@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import LoadingState from "@/components/LoadingState";
 import { ORDER_STATUS, isCancelledOrderStatus } from "@/lib/order-status";
 import type { SellerOrderView, SellerShippingStatus } from "@/lib/seller-types";
+import { formatDate } from "@/lib/formatDate";
 
 const shippingLabels: Record<SellerShippingStatus, string> = {
   PREPARING: "배송 준비중",
@@ -18,9 +19,6 @@ const nextAction: Partial<Record<SellerShippingStatus, { status: SellerShippingS
   SHIPPED: { status: "DELIVERED", label: "배송 완료 처리" },
 };
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
 
 export default function SellerOrdersPage() {
   const [orders, setOrders] = useState<SellerOrderView[]>([]);

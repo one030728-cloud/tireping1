@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import LoadingState from "@/components/LoadingState";
 import type { SellerListingStatus, SellerListingView } from "@/lib/seller-types";
+import { formatDay } from "@/lib/formatDate";
 
 const statusLabels: Record<SellerListingStatus, string> = {
   DRAFT: "작성중",
@@ -14,9 +15,6 @@ const statusLabels: Record<SellerListingStatus, string> = {
   HIDDEN: "비노출",
 };
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(new Date(value));
-}
 
 export default function SellerListingsPage() {
   const [status, setStatus] = useState("");
@@ -141,7 +139,7 @@ export default function SellerListingsPage() {
                       </p>
                     )}
                   </td>
-                  <td className="py-3 px-4 text-xs text-muted">{formatDate(listing.updatedAt)}</td>
+                  <td className="py-3 px-4 text-xs text-muted">{formatDay(listing.updatedAt)}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <Link href={`/seller/listings/${listing.id}/edit`} className="btn-outline h-8 px-2.5 text-xs">

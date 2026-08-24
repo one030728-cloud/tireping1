@@ -89,7 +89,7 @@ function SuccessContent() {
           <CheckCircle2 size={48} className="mx-auto text-brand" />
           <h1 className="mt-4 text-xl font-extrabold">결제를 확인하고 있습니다</h1>
           <p className="mt-3 text-sm text-muted">{error}</p>
-          <Link href="/orders" className="btn-primary mt-6 inline-flex h-11 items-center px-5">
+          <Link href="/mypage/orders" className="btn-primary mt-6 inline-flex h-11 items-center px-5">
             주문내역으로 이동
           </Link>
         </div>
@@ -97,7 +97,7 @@ function SuccessContent() {
         <div className="card p-6 text-center">
           <h1 className="text-xl font-extrabold">결제 승인에 실패했습니다</h1>
           <p className="mt-3 text-sm text-muted">{error}</p>
-          <Link href="/orders" className="btn-outline mt-6 inline-flex h-11 items-center px-5">
+          <Link href="/mypage/orders" className="btn-outline mt-6 inline-flex h-11 items-center px-5">
             주문내역에서 다시 시도하기
           </Link>
         </div>

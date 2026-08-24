@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import LoadingState from "@/components/LoadingState";
 import type { SellerListingView, SellerOrderView } from "@/lib/seller-types";
+import type { SellerPayoutView } from "@/lib/payout-types";
+import { formatDay } from "@/lib/formatDate";
+
+function won(value: number) {
+  return `${value.toLocaleString()}원`;
+}
 
 const statusLabels: Record<SellerListingView["status"], string> = {
   DRAFT: "작성중",
@@ -21,13 +27,11 @@ const shippingLabels: Record<SellerOrderView["shippingStatus"], string> = {
   DELIVERED: "배송 완료",
 };
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(new Date(value));
-}
 
 export default function SellerDashboardPage() {
   const [listings, setListings] = useState<SellerListingView[]>([]);
   const [orders, setOrders] = useState<SellerOrderView[]>([]);
+  const [payout, setPayout] = useState<SellerPayoutView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -43,11 +47,16 @@ export default function SellerDashboardPage() {
         if (!response.ok) throw new Error("orders");
         return response.json() as Promise<{ orders: SellerOrderView[] }>;
       }),
+      fetch("/api/seller/settlements", { cache: "no-store" }).then((response) => {
+        if (!response.ok) throw new Error("settlements");
+        return response.json() as Promise<{ payout: SellerPayoutView }>;
+      }),
     ])
-      .then(([listingData, orderData]) => {
+      .then(([listingData, orderData, payoutData]) => {
         if (!cancelled) {
           setListings(listingData.listings);
           setOrders(orderData.orders);
+          setPayout(payoutData.payout);
         }
       })
       .catch(() => {
@@ -96,6 +105,27 @@ export default function SellerDashboardPage() {
           상품 등록
         </Link>
       </div>
+
+      {payout && (
+        <section className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-bold text-muted">이번 기간 미정산 예상액</h2>
+            <Link href="/seller/settlements" className="text-xs text-brand hover:underline">
+              정산 상세
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <SummaryCard label="판매대금" value={won(payout.unsettled.grossAmount)} tone="neutral" />
+            <SummaryCard
+              label={`수수료 (${payout.commissionRate}%)`}
+              value={`-${won(payout.unsettled.commissionAmount)}`}
+              tone="accent"
+            />
+            <SummaryCard label="실지급 예상액" value={won(payout.unsettled.netAmount)} tone="brand" />
+            <SummaryCard label="미정산 주문" value={payout.unsettled.orderCount} tone="warning" />
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <SummaryCard label="판매중 상품" value={counts.active} tone="brand" />
@@ -157,7 +187,7 @@ export default function SellerDashboardPage() {
                     </span>
                   </div>
                   <p className="text-xs text-muted mt-1">
-                    {formatDate(order.orderedAt)} · {order.quantity}개 · {order.total.toLocaleString()}원
+                    {formatDay(order.orderedAt)} · {order.quantity}개 · {order.total.toLocaleString()}원
                   </p>
                 </div>
               ))}
@@ -175,7 +205,7 @@ function SummaryCard({
   tone,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   tone: "brand" | "warning" | "accent" | "neutral";
 }) {
   const toneClass = {

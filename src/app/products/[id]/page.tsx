@@ -177,7 +177,7 @@ function ProductDetailContent() {
     try {
       if (buyNow) {
         await addOrders([{ ...item, id: `${item.tireId}-${item.sellerCode}-${Date.now()}` }]);
-        router.push("/orders?justOrdered=1");
+        router.push("/mypage/orders?justOrdered=1");
       } else {
         await addItem(item);
         router.push("/cart");

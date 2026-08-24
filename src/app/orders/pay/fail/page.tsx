@@ -65,7 +65,7 @@ function FailContent() {
         <h1 className="text-xl font-extrabold">결제를 완료하지 못했습니다</h1>
         <p className="mt-3 text-sm text-muted">{resolveFailureMessage(rawCode)}</p>
         {safeCode && <p className="mt-2 text-xs text-muted">오류 코드: {safeCode}</p>}
-        <Link href="/orders" className="btn-primary mt-6 inline-flex h-11 items-center px-5">
+        <Link href="/mypage/orders" className="btn-primary mt-6 inline-flex h-11 items-center px-5">
           주문내역에서 다시 결제하기
         </Link>
       </div>

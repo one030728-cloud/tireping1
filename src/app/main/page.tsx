@@ -471,7 +471,7 @@ function MainContent() {
                 </span>
                 최근 주문 내역
               </h2>
-              <Link href="/orders" className="flex items-center text-xs text-[#777]">
+              <Link href="/mypage/orders" className="flex items-center text-xs text-[#777]">
                 전체보기 <ChevronRight size={14} />
               </Link>
             </div>
@@ -479,7 +479,7 @@ function MainContent() {
               {recentOrders.map((order, index) => (
                 <Link
                   key={order.id}
-                  href="/orders"
+                  href="/mypage/orders"
                   className="grid min-h-[48px] grid-cols-[56px_1fr_auto] items-center gap-2 px-4 text-[13px] active:bg-[#f7f9fc]"
                 >
                   <span className="text-[#777]">{order.id}</span>
@@ -581,7 +581,7 @@ function MainContent() {
                 <Clock size={18} strokeWidth={1.8} />
                 최근 주문 내역
               </h2>
-              <Link href="/orders" className="flex items-center text-[13px] text-[#555]">
+              <Link href="/mypage/orders" className="flex items-center text-[13px] text-[#555]">
                 전체보기 <ChevronRight size={14} />
               </Link>
             </div>

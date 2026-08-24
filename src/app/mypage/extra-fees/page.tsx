@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
 import type { SettlementView } from "@/lib/settlement-types";
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium" }).format(new Date(value));
-}
+import { formatDate } from "@/lib/formatDate";
 
 function ExtraFeesContent() {
   const [settlement, setSettlement] = useState<SettlementView | null>(null);
