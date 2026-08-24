@@ -864,7 +864,36 @@ export async function cancelOrder(
     if (nextStatus === CANCEL_STATUS.PAYMENT_AFTER && order.paymentId) {
       const payment = await tx.payment.findUnique({ where: { id: order.paymentId } });
       if (payment && payment.status === "DONE") {
-        const cancelledOrderAmount = order.unitPrice * order.quantity + order.extraShipping + order.shippingFee;
+        // 배송비 승계 (LEAK A 수정): 이 주문이 배송비를 짊어지고 있는데
+        // (shippingFee > 0) 같은 결제·같은 판매자의 다른 주문이 아직 살아
+        // 있다면, 그 배송비는 여전히 실제로 나갈 배송 건에 대한 몫이다 —
+        // 취소된 이 주문 하나만 환불 대상에서 배송비를 빼고, 대신 살아남은
+        // 형제 주문(가장 먼저 생성된 것, orderedAt asc)에게 그 금액을
+        // 그대로 넘긴다. 형제가 없다면(이 판매자 몫으로 남은 게 없다면)
+        // 기존 그대로 배송비까지 전액 환불한다. shippingFee 가 실제로
+        // heir 행으로 옮겨가므로, heir 를 나중에 취소해도 이 로직이 다시
+        // 돌며 그 다음 heir 를 찾거나(마지막이면) 배송비를 정상 환불한다.
+        let refundableShippingFee = order.shippingFee;
+        if (order.shippingFee > 0) {
+          const feeHeir = await tx.order.findFirst({
+            where: {
+              paymentId: payment.id,
+              sellerId: order.sellerId,
+              id: { not: orderId },
+              status: { notIn: cancelledStatusValues },
+            },
+            orderBy: { orderedAt: "asc" },
+          });
+          if (feeHeir) {
+            await tx.order.update({
+              where: { id: feeHeir.id },
+              data: { shippingFee: { increment: order.shippingFee } },
+            });
+            refundableShippingFee = 0;
+          }
+        }
+        const cancelledOrderAmount =
+          order.unitPrice * order.quantity + order.extraShipping + refundableShippingFee;
         const remainingActiveOrders = await tx.order.count({
           where: {
             paymentId: payment.id,

@@ -82,7 +82,9 @@ export default function SellerOrdersPage() {
             ? "입금 확인 전에는 배송 처리를 할 수 없습니다."
             : body?.error === "ORDER_CANCELLED"
               ? "취소된 주문은 배송 처리를 할 수 없습니다."
-              : "배송 상태를 변경하지 못했습니다.";
+              : body?.error === "ORDER_STATE_CHANGED"
+                ? "주문 상태가 변경되었습니다. 새로고침 후 다시 시도해 주세요."
+                : "배송 상태를 변경하지 못했습니다.";
       setError(message);
       setBusyId(null);
       return;

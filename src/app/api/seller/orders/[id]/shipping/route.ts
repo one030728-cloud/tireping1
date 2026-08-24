@@ -32,6 +32,9 @@ export async function PATCH(
     if (result.kind === "INVALID_TRANSITION") {
       return NextResponse.json({ error: "INVALID_SHIPPING_TRANSITION" }, { status: 409 });
     }
+    if (result.kind === "ORDER_STATE_CHANGED") {
+      return NextResponse.json({ error: "ORDER_STATE_CHANGED" }, { status: 409 });
+    }
     if (result.kind === "TRACKING_REQUIRED") {
       return NextResponse.json({ error: "TRACKING_NUMBER_REQUIRED" }, { status: 400 });
     }

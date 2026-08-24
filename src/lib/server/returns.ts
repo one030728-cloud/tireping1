@@ -419,8 +419,12 @@ export async function processReturnRequest(
     if (existing.status !== "REQUESTED") return { kind: "INVALID_STATUS" as const, status: existing.status };
     if (!data.approve && !data.reason?.trim()) return { kind: "REASON_REQUIRED" as const };
 
-    const updated = await tx.returnRequest.update({
-      where: { id: returnRequestId },
+    // Guarded updateMany on the request's own current status — same
+    // lost-the-race pattern as confirmPurchase/completeReturnRequest, so a
+    // concurrent double-decision (two approve/reject calls racing on a stale
+    // read) can't have the second silently overwrite the first.
+    const marked = await tx.returnRequest.updateMany({
+      where: { id: returnRequestId, status: "REQUESTED" },
       data: {
         status: data.approve ? "APPROVED" : "REJECTED",
         rejectReason: data.approve ? null : data.reason!.trim(),
@@ -428,6 +432,9 @@ export async function processReturnRequest(
         processedBy: actor.userId,
       },
     });
+    if (marked.count !== 1) return { kind: "INVALID_STATUS" as const, status: existing.status };
+
+    const updated = await tx.returnRequest.findUniqueOrThrow({ where: { id: returnRequestId } });
 
     if (actor.kind === "ADMIN") {
       await tx.adminActionLog.create({

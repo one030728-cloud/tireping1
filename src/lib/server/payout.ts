@@ -454,10 +454,16 @@ export async function markPayoutPaid(settlementId: string, adminId: string): Pro
       return { kind: "INVALID_STATUS" as const, status: settlement.status };
     }
 
-    const updated = await tx.settlement.update({
-      where: { id: settlementId },
+    // Guarded updateMany on the settlement's own current status — same
+    // lost-the-race pattern as the claim step above, so a concurrent
+    // double-payout call can't have the second silently overwrite the first.
+    const marked = await tx.settlement.updateMany({
+      where: { id: settlementId, status: "CONFIRMED" },
       data: { status: "PAID", paidAt: new Date() },
     });
+    if (marked.count !== 1) return { kind: "INVALID_STATUS" as const, status: settlement.status };
+
+    const updated = await tx.settlement.findUniqueOrThrow({ where: { id: settlementId } });
     await tx.adminActionLog.create({
       data: {
         adminId,

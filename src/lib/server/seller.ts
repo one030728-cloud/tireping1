@@ -781,8 +781,14 @@ export async function updateSellerShipping(
   const advancedOrderStatus = nextOrderStatusForShipping(order.status, nextStatus);
 
   const previousShippingStatus = order.shippingStatus;
-  const updated = await prisma.order.update({
-    where: { id: orderId },
+
+  // Guarded updateMany on both order.status and order.shippingStatus — same
+  // lost-the-race pattern as confirmPurchase/completeReturnRequest. Guarding
+  // on both catches a concurrent buyer cancel (status changed) AND a
+  // concurrent admin shipping override (shippingStatus changed) since either
+  // one invalidates the checks already run above against the stale read.
+  const marked = await prisma.order.updateMany({
+    where: { id: orderId, status: order.status, shippingStatus: order.shippingStatus },
     data: {
       shippingStatus: nextStatus,
       ...(advancedOrderStatus ? { status: advancedOrderStatus } : {}),
@@ -791,8 +797,10 @@ export async function updateSellerShipping(
       ...(nextStatus === "SHIPPED" && !order.shippedAt ? { shippedAt: new Date() } : {}),
       ...(nextStatus === "DELIVERED" && !order.deliveredAt ? { deliveredAt: new Date() } : {}),
     },
-    include: sellerOrderInclude,
   });
+  if (marked.count !== 1) return { kind: "ORDER_STATE_CHANGED" as const };
+
+  const updated = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: sellerOrderInclude });
 
   // Buyer-facing "shipping status advanced" notification — only when the
   // shipping status actually changed (a seller re-saving the same status
@@ -828,10 +836,19 @@ export async function confirmSellerOrder(sellerId: string, orderId: string) {
     return { kind: "INVALID_STATUS" as const, status: order.status };
   }
 
-  const updated = await prisma.order.update({
-    where: { id: orderId },
+  // Guarded updateMany on the order's own current status — same
+  // lost-the-race pattern as confirmPurchase/completeReturnRequest, so a
+  // concurrent status change between the read above and this write can't be
+  // silently overwritten.
+  const marked = await prisma.order.updateMany({
+    where: { id: orderId, status: ORDER_STATUS.PAYMENT_COMPLETED },
     data: { status: ORDER_STATUS.ORDER_CONFIRMED },
-    include: sellerOrderInclude,
   });
+  if (marked.count !== 1) {
+    const fresh = await prisma.order.findUnique({ where: { id: orderId } });
+    return fresh ? { kind: "INVALID_STATUS" as const, status: fresh.status } : { kind: "NOT_FOUND" as const };
+  }
+
+  const updated = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: sellerOrderInclude });
   return { kind: "OK" as const, order: toOrderView(updated) };
 }
