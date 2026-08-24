@@ -412,7 +412,10 @@ const AUTO_REFUND_TOSS_FAILURE_REASON = "AUTO_REFUND_FAILED_NEEDS_MANUAL_TOSS_CA
 
 async function cancelTossPaymentForRefund(
   paymentKey: string | null,
-  cancelAmount: number,
+  // null = cancel whatever balance Toss still holds, by omitting cancelAmount
+  // from the request. Only used when this cancellation leaves no active order
+  // on the payment — see settleOrderRefundViaToss.
+  cancelAmount: number | null,
   reason: string,
   idempotencyKey: string,
 ): Promise<boolean> {
@@ -446,12 +449,25 @@ async function cancelTossPaymentForRefund(
       },
       body: JSON.stringify({
         cancelReason: reason,
-        // Task 1: refund exactly this order's own amount, never the whole
-        // remaining balance — see the long comment on
-        // settleOrderRefundViaToss for why every cancellation (including
-        // what used to be "the full refund") now sends its own explicit
-        // cancelAmount instead of omitting it.
-        cancelAmount,
+        // A cancellation that still leaves other orders live sends its own
+        // exact amount, so only that slice comes back. The one that leaves
+        // nothing active passes null and omits the field entirely, which
+        // tells Toss to cancel the whole remaining balance.
+        //
+        // That difference is not cosmetic. Sending an explicit amount for
+        // the last order too makes Toss record it as yet another *partial*
+        // cancellation, so the payment sits at PARTIAL_CANCELED in the Toss
+        // console even once its balance reaches 0 — observed on a real test
+        // payment, where a fully refunded 6,000원 order still displayed as
+        // 부분취소. An operator reconciling in that console cannot tell a
+        // fully-refunded payment from one still owing money.
+        //
+        // Omitting it is also self-healing: the remaining balance includes
+        // any earlier slice whose own cancel call failed, so the final
+        // cancellation sweeps up what the sticky failure marker would
+        // otherwise have left for a human. Toss can never return more than
+        // it holds, so this cannot over-refund.
+        ...(cancelAmount === null ? {} : { cancelAmount }),
         // Every product this marketplace sells is a taxable tire — nothing
         // in Product/Listing carries a tax-exempt flag, so the tax-free
         // portion of any cancellation here is always 0. Toss's own docs call
@@ -514,7 +530,10 @@ async function settleOrderRefundViaToss(
   try {
     const tossCancelSucceeded = await cancelTossPaymentForRefund(
       paymentKey,
-      cancelAmount,
+      // Last active order on this payment -> cancel Toss's whole remaining
+      // balance rather than this order's slice, so the payment lands on
+      // CANCELED instead of PARTIAL_CANCELED. See cancelTossPaymentForRefund.
+      isFullRefund ? null : cancelAmount,
       reasonWhenSubmitting,
       // Stable per order (not per attempt): a retry of this exact call for
       // the exact same order replays Toss's first response instead of
