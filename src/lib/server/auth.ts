@@ -118,6 +118,10 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.sellerId = token.sellerId ?? null;
+        // `iat` is stamped by next-auth when it signs the token. Carrying it
+        // onto the session is what lets getSession() below tell a token
+        // minted before a password change from one minted after it.
+        session.user.tokenIssuedAt = typeof token.iat === "number" ? token.iat : undefined;
       }
       return session;
     },
@@ -133,11 +137,34 @@ export async function getSession() {
     select: {
       withdrawnAt: true,
       role: true,
+      passwordChangedAt: true,
       seller: { select: { status: true } },
       buyer: { select: { status: true } },
     },
   });
   if (!user || user.withdrawnAt) return null;
+
+  // Sessions are JWTs, so changing the password does nothing to tokens that
+  // are already out there — without this check, someone who suspects their
+  // account is compromised could reset their password and the intruder would
+  // stay signed in for the rest of the 8-hour session. That matters more here
+  // than in most apps: account recovery is operator-mediated (see
+  // passwordReset.ts), so a password reset is effectively the only self-serve
+  // remedy a user has.
+  //
+  // Both sides are truncated to whole seconds before comparing. A JWT's `iat`
+  // is already floor()ed to seconds, while passwordChangedAt keeps
+  // milliseconds — comparing them raw would reject a token minted a few
+  // hundred milliseconds *after* the change, i.e. the fresh login the user
+  // performs immediately after resetting. Truncating both leaves a
+  // sub-second window in which a token survives, which is the standard
+  // trade-off and far safer than logging out the person who just recovered
+  // their account.
+  if (user.passwordChangedAt) {
+    const changedAtSeconds = Math.floor(user.passwordChangedAt.getTime() / 1000);
+    const issuedAtSeconds = session.user.tokenIssuedAt;
+    if (issuedAtSeconds === undefined || issuedAtSeconds < changedAtSeconds) return null;
+  }
   if (user.role === "SELLER" && user.seller?.status !== "ACTIVE") return null;
   if (user.role === "BUYER" && user.buyer?.status !== "ACTIVE") return null;
 

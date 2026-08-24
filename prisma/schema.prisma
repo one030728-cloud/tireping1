@@ -52,6 +52,13 @@ model User {
   notifyOptIn          Boolean   @default(true)
   createdAt            DateTime  @default(now())
   withdrawnAt          DateTime?
+  // Set whenever the password changes (see consumePasswordReset in
+  // src/lib/server/passwordReset.ts). getSession() refuses any JWT issued
+  // before this instant, which is what actually signs an intruder out when
+  // the owner resets their password — sessions are JWTs, so the token itself
+  // is unaware the password moved. Null means the password has never been
+  // changed since this column existed, and nothing is invalidated.
+  passwordChangedAt    DateTime?
 
   businessName         String
   // Uniqueness is scoped to real, still-registerable numbers only: withdrawAccount

@@ -210,7 +210,14 @@ export async function consumePasswordReset(rawToken: string, newPassword: string
     });
     if (claim.count === 0) return false;
 
-    await tx.user.update({ where: { id: record.userId }, data: { passwordHash } });
+    // passwordChangedAt is what actually signs out sessions that already
+    // exist: getSession() (src/lib/server/auth.ts) rejects any JWT issued
+    // before this instant. Without it a reset would change the password
+    // while leaving an intruder's session alive for the rest of its 8 hours.
+    await tx.user.update({
+      where: { id: record.userId },
+      data: { passwordHash, passwordChangedAt: new Date() },
+    });
     // Invalidate every other outstanding token for this user too, not just
     // the one just redeemed.
     await tx.passwordResetToken.updateMany({
