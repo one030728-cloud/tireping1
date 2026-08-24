@@ -873,14 +873,23 @@ export async function cancelOrder(
         // 기존 그대로 배송비까지 전액 환불한다. shippingFee 가 실제로
         // heir 행으로 옮겨가므로, heir 를 나중에 취소해도 이 로직이 다시
         // 돌며 그 다음 heir 를 찾거나(마지막이면) 배송비를 정상 환불한다.
+        // 승계는 "아직 정산되지 않은" 주문들 사이에서만 한다. 취소되는
+        // 주문이 이미 정산됐다면(settlementId != null) 그 배송비는 이미
+        // 판매자에게 지급된 몫이므로, 이를 heir 로 옮기면 heir 가 정산될 때
+        // 판매자가 같은 배송비를 두 번 받는다. 그 경우 승계하지 않고 기존
+        // 동작(환불에 배송비 포함)에 맡긴다. heir 역시 미정산(settlementId
+        // null)이어야 그 배송비를 실제 정산으로 이어받는다 — 이미 정산된
+        // 주문은 정산 후보 조회에서 settlementId: null 로 제외되므로(payout.ts
+        // confirmPayout), 그런 주문으로 옮기면 배송비가 그냥 사라진다.
         let refundableShippingFee = order.shippingFee;
-        if (order.shippingFee > 0) {
+        if (order.shippingFee > 0 && order.settlementId === null) {
           const feeHeir = await tx.order.findFirst({
             where: {
               paymentId: payment.id,
               sellerId: order.sellerId,
               id: { not: orderId },
               status: { notIn: cancelledStatusValues },
+              settlementId: null,
             },
             orderBy: { orderedAt: "asc" },
           });
