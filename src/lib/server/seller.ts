@@ -303,6 +303,7 @@ function resolveOrderShipping(order: SellerOrderRecord) {
 function toOrderView(order: SellerOrderRecord) {
   return {
     id: order.id,
+    orderNo: order.orderNo,
     listingId: order.listingId,
     sellerId: order.sellerId,
     status: order.status,

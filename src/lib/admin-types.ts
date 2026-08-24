@@ -107,6 +107,7 @@ export interface AdminOrderShippingView {
 
 export interface AdminOrderView {
   id: string;
+  orderNo: string | null;
   listingId: string;
   sellerId: string;
   status: string;

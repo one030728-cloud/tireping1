@@ -50,6 +50,9 @@ export interface User {
 export interface Seller {
   id?: string;
   code: string;
+  // 배송비 정책 — 실서버 응답에만 있고 목데이터(getSellersForTire)에는 없어 optional.
+  shippingFee?: number;
+  freeShippingThreshold?: number | null;
   discountRate: number;
   price: number;
   stock: number;
@@ -104,6 +107,7 @@ export interface CartItem {
 
 export interface FullOrder {
   id: string;
+  orderNo: string | null;
   status: string;
   manufacturer: Manufacturer;
   model: string;

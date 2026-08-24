@@ -738,6 +738,7 @@ export const CATALOG: CatalogRow[] = buildCatalog();
 export const FULL_ORDERS: FullOrder[] = [
   {
     id: "247137",
+    orderNo: "247137",
     status: "구매확정",
     manufacturer: "금호",
     model: "솔루스 TA31",
@@ -754,6 +755,7 @@ export const FULL_ORDERS: FullOrder[] = [
   },
   {
     id: "247095",
+    orderNo: "247095",
     status: "입금후취소",
     manufacturer: "금호",
     model: "솔루스 TA31",
@@ -770,6 +772,7 @@ export const FULL_ORDERS: FullOrder[] = [
   },
   {
     id: "238333",
+    orderNo: "238333",
     status: "구매확정",
     manufacturer: "한국",
     model: "Dynapro HPX (RA43)",
@@ -786,6 +789,7 @@ export const FULL_ORDERS: FullOrder[] = [
   },
   {
     id: "233115",
+    orderNo: "233115",
     status: "구매확정",
     manufacturer: "한국",
     model: "Ventus S2 AS (H462)",
@@ -802,6 +806,7 @@ export const FULL_ORDERS: FullOrder[] = [
   },
   {
     id: "232762",
+    orderNo: "232762",
     status: "구매확정",
     manufacturer: "한국",
     model: "KINERGY ST AS (H318)",

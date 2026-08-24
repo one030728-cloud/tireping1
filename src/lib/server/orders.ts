@@ -126,6 +126,7 @@ export function domainErrorResponse(error: unknown) {
 function toBuyerOrderView(order: BuyerOrderRecord) {
   return {
     id: order.id,
+    orderNo: order.orderNo,
     listingId: order.listingId,
     sellerId: order.sellerId,
     status: order.status,
@@ -365,7 +366,27 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
   // released the stock.
   await expireStaleUnpaidOrders({ buyerId });
 
-  const createdIds = await prisma.$transaction(async (tx) => {
+  // 주문번호 충돌(동시 체크아웃이 같은 당일 순번을 계산한 경우)만 재시도한다.
+  // P2002 로 트랜잭션이 좌초하면 재고 차감을 포함한 모든 쓰기가 롤백된 상태라
+  // 처음부터 다시 실행해도 이중 차감이 없고, 재시도한 쪽은 커밋된 상대방
+  // 주문까지 세어 다음 번호를 받는다. 그 외의 P2002 나 다른 예외는 그대로
+  // 던진다 — 이 루프는 채번 경합 전용이지 일반 재시도 장치가 아니다.
+  let createdIds: string[] = [];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      createdIds = await runCreateOrdersTransaction();
+      break;
+    } catch (error) {
+      const isOrderNoCollision =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        JSON.stringify(error.meta?.target ?? "").includes("orderNo");
+      if (!isOrderNoCollision || attempt >= 2) throw error;
+    }
+  }
+
+  async function runCreateOrdersTransaction() {
+    return prisma.$transaction(async (tx) => {
     // Pass 1 — resolve, validate and decrement stock for every item, in
     // exactly the order and with exactly the guards this always had:
     // findActiveListing's seller-in-good-standing lookup, the minOrder
@@ -435,6 +456,18 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
       ]),
     );
 
+    // 주문번호 채번. KST 날짜 + 당일 순번(YYYYMMDD-0001) — 내부 cuid 를
+    // 화면에 그대로 내보내던 것을 대체한다. 당일 건수는 이 트랜잭션 안에서
+    // 세므로, 동시 체크아웃 두 개가 같은 번호를 계산하면 orderNo 의 unique
+    // 제약이 한쪽을 P2002 로 좌초시키고(재고 차감까지 함께 롤백),
+    // createBuyerOrders 바깥의 재시도 루프가 새로 센다. 날짜를 KST 로 하는
+    // 이유는 백필 마이그레이션과 같은 달력을 써야 하기 때문 — UTC 면 한국
+    // 새벽 주문이 전날 번호를 받는다.
+    const kstDatePrefix = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" })
+      .format(new Date())
+      .replace(/-/g, "");
+    let orderSeq = await tx.order.count({ where: { orderNo: { startsWith: `${kstDatePrefix}-` } } });
+
     // Pass 2 — create the Order rows. A per-seller fee has to land on
     // per-listing Order rows without being multiplied by however many
     // listings that seller happens to have in this cart: the first Order row
@@ -449,8 +482,10 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
       const isFirstOrderForSeller = !sellerCharged.has(listing.sellerId);
       if (isFirstOrderForSeller) sellerCharged.add(listing.sellerId);
 
+      orderSeq += 1;
       const order = await tx.order.create({
         data: {
+          orderNo: `${kstDatePrefix}-${String(orderSeq).padStart(4, "0")}`,
           buyerId,
           listingId: listing.id,
           sellerId: listing.sellerId,
@@ -485,7 +520,8 @@ export async function createBuyerOrders(buyerId: string, data: z.infer<typeof cr
     }
 
     return ids;
-  });
+    });
+  }
 
   const orders = await prisma.order.findMany({
     where: { id: { in: createdIds } },
@@ -784,11 +820,22 @@ export async function cancelOrder(
       order.status === ORDER_STATUS.PAYMENT_PENDING
         ? CANCEL_STATUS.PAYMENT_BEFORE
         : CANCEL_STATUS.PAYMENT_AFTER;
+    // QA 발견: 구매자 셀프 취소만 취소 사유가 비어 있었다. 자동 만료·판매자
+    // 취소는 항상 사유를 남기는데(판매자는 필수이기까지 하다) 구매자 취소는
+    // 화면이 사유를 안 받으므로 null 로 남아, 같은 목록에서 이 행만 "취소
+    // 사유" 줄이 사라졌다. 사유가 없으면 행위자별 기본 문구를 기록해 취소된
+    // 모든 주문이 왜 취소됐는지 답을 갖게 한다.
+    const defaultReason =
+      actor.kind === "BUYER"
+        ? "구매자 요청으로 취소되었습니다."
+        : actor.kind === "ADMIN"
+          ? "관리자에 의해 취소되었습니다."
+          : null; // SELLER 는 위에서 사유가 필수라 여기 도달하지 않는다.
     const markedCancelled = await tx.order.updateMany({
       where: { id: orderId, status: order.status },
       data: {
         status: nextStatus,
-        cancelReason: reason?.trim() || null,
+        cancelReason: reason?.trim() || defaultReason,
       },
     });
     if (markedCancelled.count !== 1) {

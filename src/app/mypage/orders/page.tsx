@@ -484,7 +484,7 @@ function OrdersContent() {
                     )}
                     <div className="min-w-0">
                       <p className="text-xs text-muted mb-1">
-                        주문번호 {o.id} · {formatDate(o.orderedAt)}
+                        주문번호 {o.orderNo ?? o.id} · {formatDate(o.orderedAt)}
                       </p>
                       <p className="font-semibold truncate">
                         {o.manufacturer} {o.model}

@@ -274,6 +274,15 @@ enum ShippingStatus {
 
 model Order {
   id             String         @id @default(cuid())
+  // 사람이 읽는 주문번호 (예: 20260824-0003). id(cuid)는 URL·외래키용 내부
+  // 식별자로만 남기고, 화면·CS·계산서에는 이 값을 쓴다 — 고객이 전화로
+  // "cmt6kgb1p..."를 불러줄 수는 없기 때문. 날짜는 KST 기준, 순번은 당일
+  // 생성 순서. 생성은 createBuyerOrders 가 트랜잭션 안에서 당일 건수+1 로
+  // 만들고, 동시 주문이 같은 번호를 잡으면 unique 가 P2002 로 막아 전체
+  // 트랜잭션을 되돌린 뒤 재시도한다(재고 차감도 함께 롤백되므로 안전).
+  // nullable 인 이유: 이 컬럼 이전의 주문은 마이그레이션이 백필하지만,
+  // 표시는 orderNo ?? id 로 방어한다.
+  orderNo        String?        @unique
   buyer          User           @relation(fields: [buyerId], references: [id])
   buyerId        String
   listing        Listing        @relation(fields: [listingId], references: [id])

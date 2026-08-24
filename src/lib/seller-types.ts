@@ -69,6 +69,7 @@ export interface OrderShippingView {
 
 export interface SellerOrderView {
   id: string;
+  orderNo: string | null;
   listingId: string;
   sellerId: string;
   status: string;

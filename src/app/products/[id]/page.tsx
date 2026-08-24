@@ -446,6 +446,14 @@ function ProductDetailContent() {
                   {seller.shippingNote}
                   <br />
                   {seller.courier}
+                  {typeof seller.shippingFee === "number" && (
+                    <>
+                      <br />
+                      {seller.shippingFee === 0
+                        ? "배송비 무료"
+                        : `배송비 ${seller.shippingFee.toLocaleString()}원${seller.freeShippingThreshold ? ` (${seller.freeShippingThreshold.toLocaleString()}원 이상 무료)` : ""}`}
+                    </>
+                  )}
                 </td>
                 <td className="py-3 px-4">
                   {user ? (
@@ -538,6 +546,14 @@ function ProductDetailContent() {
               {user
                 ? `재고 ${seller.stock.toLocaleString()} · 최소주문수량 ${seller.minOrder} · ${seller.shippingNote}`
                 : `재고·최소주문수량 로그인 후 공개 · ${seller.shippingNote}`}
+              {typeof seller.shippingFee === "number" && (
+                <>
+                  {" · "}
+                  {seller.shippingFee === 0
+                    ? "배송비 무료"
+                    : `배송비 ${seller.shippingFee.toLocaleString()}원${seller.freeShippingThreshold ? ` (${seller.freeShippingThreshold.toLocaleString()}원 이상 무료)` : ""}`}
+                </>
+              )}
             </p>
             {user ? (
               <div className="flex items-center gap-2">

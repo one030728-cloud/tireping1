@@ -23,6 +23,8 @@ const publicListingSelect = {
       code: true,
       courier: true,
       shippingNote: true,
+      shippingFee: true,
+      freeShippingThreshold: true,
     },
   },
   images: {
@@ -85,6 +87,11 @@ function toSeller(listing: PublicListing) {
     minOrder: listing.minOrder,
     shippingNote: listing.seller.shippingNote ?? "",
     courier: listing.seller.courier,
+    // QA 발견: 판매점 비교 화면이 택배사·배송메모는 보여주면서 정작 배송비
+    // 금액과 무료배송 기준은 장바구니에 담기 전까지 알 수 없었다. 구매자가
+    // 판매점을 고르는 화면이므로 가격 비교에 배송비도 필요하다.
+    shippingFee: listing.seller.shippingFee,
+    freeShippingThreshold: listing.seller.freeShippingThreshold,
     images: listing.images.map((image) => image.url),
   };
 }

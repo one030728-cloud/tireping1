@@ -55,6 +55,7 @@ interface OrdersContextValue {
 
 interface BuyerOrderApi {
   id: string;
+  orderNo: string | null;
   listingId: string;
   sellerId: string;
   status: string;
@@ -105,6 +106,7 @@ const OrdersContext = createContext<OrdersContextValue | null>(null);
 function toFullOrder(order: BuyerOrderApi): FullOrder {
   return {
     id: order.id,
+    orderNo: order.orderNo,
     listingId: order.listingId,
     sellerId: order.sellerId,
     status: order.status,

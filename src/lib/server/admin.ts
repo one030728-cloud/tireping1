@@ -214,6 +214,7 @@ function resolveOrderShipping(order: AdminOrderRecord) {
 function toAdminOrderView(order: AdminOrderRecord) {
   return {
     id: order.id,
+    orderNo: order.orderNo,
     listingId: order.listingId,
     sellerId: order.sellerId,
     status: order.status,

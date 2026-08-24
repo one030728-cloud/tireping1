@@ -134,7 +134,7 @@ export default function SellerOrdersPage() {
               <article key={order.id} className="card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4 mb-4">
                   <div>
-                    <p className="text-xs text-muted">주문번호 {order.id}</p>
+                    <p className="text-xs text-muted">주문번호 {order.orderNo ?? order.id}</p>
                     <h2 className="font-bold mt-1">{order.product.manufacturer} {order.product.model}</h2>
                     <p className="text-sm text-muted mt-1">
                       {order.product.width}/{order.product.ratio} R {order.product.rim} · DOT {order.product.dot} · {order.quantity}개
