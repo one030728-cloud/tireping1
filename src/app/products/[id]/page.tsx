@@ -195,7 +195,10 @@ function ProductDetailContent() {
           category: "product",
           // 상품 문의는 상품 맥락 자체가 제목이라 별도 제목 입력을 받지 않고
           // 여기서 채운다 — 사용자에게는 문의 내용만 입력받는다.
-          title: `[상품문의] ${product.manufacturer} ${product.model}`,
+          // "[상품문의]" 접두사는 넣지 않는다: 목록 화면(admin/inquiries,
+          // customer)이 listingId 유무로 판단해 스스로 배지를 붙이므로,
+          // 여기서 또 박으면 "[상품문의][상품문의]"로 이중 표시된다.
+          title: `${product.manufacturer} ${product.model}`,
           content: inquiryContent,
           listingId: listingIds[0],
         }),

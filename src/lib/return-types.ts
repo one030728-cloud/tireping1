@@ -50,6 +50,8 @@ export interface ReturnRequestOrderContext {
 // on top of the request itself — mirrors SellerOrderView's product shape
 // (seller-types.ts).
 export interface ReturnRequestOrderSummary {
+  // 사람이 읽는 주문번호. 컬럼 이전 주문은 null 이라 화면에서 orderId 로 폴백.
+  orderNo: string | null;
   manufacturer: string;
   model: string;
   width: number;

@@ -272,6 +272,7 @@ function toBuyerReturnRequestView(record: BuyerReturnRequestRecord): BuyerReturn
     ...toReturnRequestView(record),
     sellerCode: record.order.listing.seller.code,
     order: {
+      orderNo: record.order.orderNo,
       manufacturer: record.order.listing.product.manufacturer,
       model: record.order.listing.product.model,
       width: record.order.listing.product.width,
@@ -310,6 +311,7 @@ function toSellerReturnRequestView(record: SellerReturnRequestRecord): SellerRet
     ...toReturnRequestView(record),
     buyer: record.buyer,
     order: {
+      orderNo: record.order.orderNo,
       manufacturer: record.order.listing.product.manufacturer,
       model: record.order.listing.product.model,
       width: record.order.listing.product.width,

@@ -138,7 +138,7 @@ function AdminReturnsContent() {
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4 mb-4">
                 <div>
                   <p className="text-xs text-muted">
-                    주문번호 {request.orderId} · {formatDate(request.requestedAt)}
+                    주문번호 {request.order.orderNo ?? request.orderId} · {formatDate(request.requestedAt)}
                   </p>
                   <h2 className="font-bold mt-1">
                     {request.type === "EXCHANGE" ? "교환" : "반품"} · {request.order.manufacturer}{" "}

@@ -26,8 +26,19 @@ export default function AdminListingDetailPage() {
 
   async function review(approve: boolean) {
     if (!listing) return;
-    const reason = approve ? undefined : window.prompt("반려 사유를 입력해 주세요.");
-    if (!approve && !reason?.trim()) return;
+    let reason: string | null | undefined = undefined;
+    if (!approve) {
+      // window.prompt 는 sandboxed iframe·일부 엔터프라이즈 정책·자동화
+      // 환경에서 null 을 반환하지 않고 예외를 던진다. try 로 감싸지 않으면
+      // 그 예외가 uncaught rejection 으로 새어 버튼이 hard-fail 한다.
+      try {
+        reason = window.prompt("반려 사유를 입력해 주세요.");
+      } catch {
+        setError("이 환경에서는 반려 사유 입력창을 열 수 없습니다. 다른 브라우저에서 시도해 주세요.");
+        return;
+      }
+      if (!reason?.trim()) return;
+    }
     const response = await fetch(`/api/admin/listings/${listing.id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approve, ...(reason ? { reason } : {}) }) });
     if (!response.ok) { setError(approve ? "상품 승인에 실패했습니다." : "상품 반려에 실패했습니다."); return; }
     setListing((current) => current ? { ...current, status: approve ? (current.stock > 0 ? "ACTIVE" : "SOLDOUT") : "REJECTED", rejectedReason: approve ? null : reason ?? null } : current);
