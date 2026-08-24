@@ -3,9 +3,10 @@ import { NOTICES } from "@/lib/mockData";
 
 const QUICK_LINKS = [
   { href: "/customer", label: "회사소개" },
-  { href: "/customer", label: "이용약관" },
-  { href: "/customer", label: "판매회원 이용약관" },
-  { href: "/customer", label: "개인정보 취급방침" },
+  { href: "/terms", label: "이용약관" },
+  { href: "/seller-terms", label: "판매회원 이용약관" },
+  { href: "/privacy", label: "개인정보 취급방침" },
+  { href: "/refund-policy", label: "청약철회 및 교환·반품 정책" },
   { href: "/customer", label: "고객센터" },
   { href: "/customer?tab=qna", label: "문의하기" },
 ];

@@ -149,6 +149,13 @@ function PaymentContent() {
           <p className="mt-3 text-xs leading-5 text-muted">
             주문 금액은 서버에서 다시 확인하며, 결제가 완료되면 주문 상태가 자동으로 입금완료로 바뀝니다.
           </p>
+          <p className="mt-2 text-xs leading-5 text-muted">
+            결제를 진행하면 <Link href="/terms" className="underline hover:text-brand">이용약관</Link>과{" "}
+            <Link href="/refund-policy" className="underline hover:text-brand">
+              청약철회 및 교환·반품 정책
+            </Link>
+            에 동의한 것으로 간주됩니다.
+          </p>
         </div>
       )}
     </div>
