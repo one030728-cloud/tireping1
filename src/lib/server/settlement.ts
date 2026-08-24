@@ -141,14 +141,23 @@ async function getDeposits(buyerId: string) {
   return { deposits, depositsTotal };
 }
 
-async function getTaxAggregate(buyerId: string) {
-  // "실제로 결제된" orders only: the order itself must not be cancelled, and
-  // it must sit on a payment that is currently DONE (still an active
-  // charge). An order whose payment was fully refunded (CANCELED) is always
-  // also cancelled itself (cancelOrder only marks a payment's full refund
-  // once every order on it is cancelled), so excluding cancelled orders
-  // already excludes that revenue — nothing here double-counts a refunded
-  // sale as if it were still taxable turnover.
+interface PaidOrderMonthlyAmount {
+  month: string;
+  total: number;
+}
+
+/**
+ * Shared primitive behind both getTaxAggregate below and
+ * getBuyerMonthPaidTotal (exported for taxInvoice.ts / Task 2 — see that
+ * function's own comment). "실제로 결제된" orders only: the order itself must
+ * not be cancelled, and it must sit on a payment that is currently DONE
+ * (still an active charge). An order whose payment was fully refunded
+ * (CANCELED) is always also cancelled itself (cancelOrder only marks a
+ * payment's full refund once every order on it is cancelled), so excluding
+ * cancelled orders already excludes that revenue — nothing here
+ * double-counts a refunded sale as if it were still taxable turnover.
+ */
+async function getBuyerPaidOrderMonthlyAmounts(buyerId: string): Promise<PaidOrderMonthlyAmount[]> {
   const paidOrders = await prisma.order.findMany({
     where: {
       buyerId,
@@ -166,8 +175,7 @@ async function getTaxAggregate(buyerId: string) {
     },
   });
 
-  const monthlyTotals = new Map<string, number>();
-  for (const order of paidOrders) {
+  return paidOrders.map((order) => {
     // shippingFee 를 반드시 포함해야 한다. 이 화면이 보여주는 월별 공급가액·
     // 부가세는 "구매자가 실제로 청구받은 금액"의 집계여야 하는데, 배송비는
     // 결제·환불·판매자 정산 어디에서나 청구액의 일부로 계산된다(prepare 의
@@ -175,21 +183,33 @@ async function getTaxAggregate(buyerId: string) {
     // 세무 참고용으로 쓰는 숫자가 실제 청구액보다 배송비만큼 적게 나온다.
     const total = order.unitPrice * order.quantity + order.extraShipping + order.shippingFee;
     const paidAt = order.payment?.approvedAt ?? order.orderedAt;
-    const month = paidAt.toISOString().slice(0, 7); // "YYYY-MM"
+    return { month: paidAt.toISOString().slice(0, 7), total }; // month: "YYYY-MM"
+  });
+}
+
+// Standard Korean 부가세 breakdown (합계 = 공급가액 + 부가세, VAT 10%). This
+// app only ever stores a tax-inclusive order total — there is no per-line
+// supply/VAT split anywhere — so 공급가액 is backed out of the total rather
+// than computed independently. That keeps every row internally consistent
+// (공급가액 + 부가세 === 합계 exactly), which matters more for a 집계
+// reference screen (and a TaxInvoice snapshot — see taxInvoice.ts) than
+// matching some externally-issued invoice's rounding.
+function splitSupplyAndVat(total: number): { supplyAmount: number; vat: number } {
+  const supplyAmount = Math.round(total / 1.1);
+  return { supplyAmount, vat: total - supplyAmount };
+}
+
+async function getTaxAggregate(buyerId: string) {
+  const amounts = await getBuyerPaidOrderMonthlyAmounts(buyerId);
+
+  const monthlyTotals = new Map<string, number>();
+  for (const { month, total } of amounts) {
     monthlyTotals.set(month, (monthlyTotals.get(month) ?? 0) + total);
   }
 
   const taxByYear: Record<string, TaxMonthEntry[]> = {};
   for (const [month, total] of monthlyTotals) {
-    // Standard Korean 부가세 breakdown (합계 = 공급가액 + 부가세, VAT 10%).
-    // This app only ever stores a tax-inclusive order total — there is no
-    // per-line supply/VAT split anywhere — so 공급가액 is backed out of the
-    // total rather than computed independently. That keeps every row
-    // internally consistent (공급가액 + 부가세 === 합계 exactly), which
-    // matters more for a 집계 reference screen than matching some
-    // externally-issued invoice's rounding.
-    const supplyAmount = Math.round(total / 1.1);
-    const vat = total - supplyAmount;
+    const { supplyAmount, vat } = splitSupplyAndVat(total);
     const year = month.slice(0, 4);
     (taxByYear[year] ??= []).push({ month, supplyAmount, vat, total });
   }
@@ -199,6 +219,27 @@ async function getTaxAggregate(buyerId: string) {
   const taxYears = Object.keys(taxByYear).sort((a, b) => Number(b) - Number(a));
 
   return { taxYears, taxByYear };
+}
+
+/**
+ * Task 2 (세금계산서) — the exact same paid-order computation getTaxAggregate
+ * uses above, narrowed to one buyer + one calendar month, so a requested tax
+ * invoice's supplyAmount/vat/totalAmount can never be a second formula that
+ * silently drifts from what this buyer's own 세금계산서 내역 aggregate shows
+ * for that month. Returns null when there are no paid orders in that month
+ * at all (distinct from "paid orders summing to a total of 0", which cannot
+ * actually happen — unitPrice * quantity is always positive — but checking
+ * array length rather than the summed total keeps that distinction correct
+ * in principle). See requestTaxInvoice in taxInvoice.ts, the only caller.
+ */
+export async function getBuyerMonthPaidTotal(
+  buyerId: string,
+  month: string,
+): Promise<{ supplyAmount: number; vat: number; total: number } | null> {
+  const amounts = (await getBuyerPaidOrderMonthlyAmounts(buyerId)).filter((amount) => amount.month === month);
+  if (amounts.length === 0) return null;
+  const total = amounts.reduce((sum, amount) => sum + amount.total, 0);
+  return { total, ...splitSupplyAndVat(total) };
 }
 
 async function getExtraFees(buyerId: string) {

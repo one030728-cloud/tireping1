@@ -36,6 +36,47 @@ function canBuyerCancel(order: FullOrder): boolean {
   return !shippedByStatusRank && !shippedByShippingStatus;
 }
 
+// Mirrors isOrderReturnEligible in src/lib/server/returns.ts exactly: not
+// cancelled, and ranked at or past 배송완료 — this feature starts exactly
+// where cancelOrder (and canBuyerCancel above) stops, rather than
+// overlapping it. Only used to decide whether to show the "교환/반품 신청"
+// link at all; the server re-checks this independently regardless.
+function canRequestReturn(order: FullOrder): boolean {
+  if (isCancelledOrderStatus(order.status)) return false;
+  const rank = orderStatusRank[order.status as OrderStatusValue];
+  return rank !== undefined && rank >= orderStatusRank[ORDER_STATUS.SHIPPING_COMPLETED];
+}
+
+const RETURN_STATUS_LABEL: Record<string, string> = {
+  REQUESTED: "접수됨",
+  APPROVED: "승인됨",
+  REJECTED: "반려됨",
+  COMPLETED: "완료",
+};
+
+function ReturnRequestEntry({ order }: { order: FullOrder }) {
+  if (order.returnRequest) {
+    const { type, status } = order.returnRequest;
+    return (
+      <Link
+        href={`/mypage/returns/new?orderId=${encodeURIComponent(order.id)}`}
+        className="text-xs text-muted underline underline-offset-2 hover:text-brand"
+      >
+        {type === "EXCHANGE" ? "교환" : "반품"} {RETURN_STATUS_LABEL[status] ?? status}
+      </Link>
+    );
+  }
+  if (!canRequestReturn(order)) return null;
+  return (
+    <Link
+      href={`/mypage/returns/new?orderId=${encodeURIComponent(order.id)}`}
+      className="text-xs text-brand underline underline-offset-2 hover:text-brand/80"
+    >
+      교환/반품 신청
+    </Link>
+  );
+}
+
 function OrderActions({
   order,
   cancellingId,
@@ -388,13 +429,16 @@ function OrdersContent() {
                     </td>
                     <td className="py-3 pr-3 whitespace-nowrap">{formatDate(o.orderedAt)}</td>
                     <td className="py-3 pr-3">
-                      <OrderActions
-                        order={o}
-                        cancellingId={cancellingId}
-                        confirmingId={confirmingId}
-                        onCancel={(id) => void handleCancel(id)}
-                        onConfirm={(id) => void handleConfirmPurchase(id)}
-                      />
+                      <div className="flex flex-col items-end gap-1.5">
+                        <OrderActions
+                          order={o}
+                          cancellingId={cancellingId}
+                          confirmingId={confirmingId}
+                          onCancel={(id) => void handleCancel(id)}
+                          onConfirm={(id) => void handleConfirmPurchase(id)}
+                        />
+                        <ReturnRequestEntry order={o} />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -478,7 +522,7 @@ function OrdersContent() {
                   </div>
                 )}
 
-                <div className="mt-3 flex justify-end border-t border-border pt-3">
+                <div className="mt-3 flex flex-col items-end gap-1.5 border-t border-border pt-3">
                   <OrderActions
                     order={o}
                     cancellingId={cancellingId}
@@ -486,6 +530,7 @@ function OrdersContent() {
                     onCancel={(id) => void handleCancel(id)}
                     onConfirm={(id) => void handleConfirmPurchase(id)}
                   />
+                  <ReturnRequestEntry order={o} />
                 </div>
               </div>
             ))}

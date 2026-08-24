@@ -85,6 +85,12 @@ interface BuyerOrderApi {
   address: string | null;
   addressDetail: string | null;
   deliveryNote: string | null;
+  returnRequest: {
+    id: string;
+    type: "EXCHANGE" | "RETURN";
+    status: "REQUESTED" | "APPROVED" | "REJECTED" | "COMPLETED";
+    rejectReason: string | null;
+  } | null;
 }
 
 export class OrderRequestError extends Error {
@@ -129,6 +135,7 @@ function toFullOrder(order: BuyerOrderApi): FullOrder {
     trackingNumber: order.trackingNumber,
     shippedAt: order.shippedAt,
     deliveredAt: order.deliveredAt,
+    returnRequest: order.returnRequest,
   };
 }
 

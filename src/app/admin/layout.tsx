@@ -10,6 +10,8 @@ const navigation = [
   { href: "/admin/sellers", label: "판매자 관리" },
   { href: "/admin/listings", label: "상품 심사" },
   { href: "/admin/orders", label: "전체 주문" },
+  { href: "/admin/returns", label: "교환/반품 관리" },
+  { href: "/admin/tax-invoices", label: "세금계산서 관리" },
   { href: "/admin/settlements", label: "정산 관리" },
   { href: "/admin/inquiries", label: "1:1 문의" },
   { href: "/admin/events", label: "공지·이벤트" },

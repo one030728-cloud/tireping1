@@ -139,6 +139,14 @@ export interface FullOrder {
   address?: string | null;
   addressDetail?: string | null;
   deliveryNote?: string | null;
+  // 교환/반품 — null until the buyer files one (src/lib/server/returns.ts).
+  // See /mypage/orders for how this drives the "교환/반품 신청" entry point.
+  returnRequest?: {
+    id: string;
+    type: "EXCHANGE" | "RETURN";
+    status: "REQUESTED" | "APPROVED" | "REJECTED" | "COMPLETED";
+    rejectReason: string | null;
+  } | null;
 }
 
 export interface WishSeller {

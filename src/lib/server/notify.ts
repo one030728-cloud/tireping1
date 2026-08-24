@@ -62,7 +62,13 @@ export type NotificationEvent =
   | "SELLER_ORDER_RECEIVED"
   | "BUYER_ORDER_SHIPPED"
   | "BUYER_ORDER_AUTO_CANCELLED"
-  | "INQUIRY_ANSWERED";
+  | "INQUIRY_ANSWERED"
+  | "SELLER_RETURN_REQUEST_RECEIVED"
+  | "BUYER_RETURN_REQUEST_APPROVED"
+  | "BUYER_RETURN_REQUEST_REJECTED"
+  | "BUYER_RETURN_REQUEST_COMPLETED"
+  | "BUYER_TAX_INVOICE_ISSUED"
+  | "BUYER_TAX_INVOICE_REJECTED";
 
 export interface NotificationMessage {
   /** Short line suitable for a push/SMS title or an email subject. */

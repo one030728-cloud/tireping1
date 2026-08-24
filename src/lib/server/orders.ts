@@ -72,6 +72,12 @@ const buyerOrderInclude = {
       seller: { select: { code: true } },
     },
   },
+  // 교환/반품 — lets /mypage/orders show an accurate per-order entry point
+  // (신청 vs 상태) without a second fetch per row. See returns.ts; harmless
+  // on cancelOrder/confirmPurchase's own use of this same include, since a
+  // cancelled order can never carry a return request (createReturnRequest's
+  // eligibility check refuses one).
+  returnRequest: { select: { id: true, type: true, status: true, rejectReason: true } },
 } satisfies Prisma.OrderInclude;
 
 type BuyerOrderRecord = Prisma.OrderGetPayload<{
@@ -154,6 +160,18 @@ function toBuyerOrderView(order: BuyerOrderRecord) {
     address: order.address,
     addressDetail: order.addressDetail,
     deliveryNote: order.deliveryNote,
+    // 교환/반품 — null until the buyer files one (returns.ts). Once present,
+    // it stays present forever (orderId is @unique on ReturnRequest), so the
+    // client can render "신청" only when this is null and eligibility allows
+    // it, and the request's own status otherwise.
+    returnRequest: order.returnRequest
+      ? {
+          id: order.returnRequest.id,
+          type: order.returnRequest.type,
+          status: order.returnRequest.status,
+          rejectReason: order.returnRequest.rejectReason,
+        }
+      : null,
   };
 }
 
@@ -514,7 +532,12 @@ const cancelledStatusValues = Object.values(CANCEL_STATUS);
 // (README's 운영 가이드) rather than risk a later, unrelated success quietly
 // clearing the "환불 필요" badge while the earlier failure's money is still
 // sitting un-refunded.
-const AUTO_REFUND_TOSS_FAILURE_REASON = "AUTO_REFUND_FAILED_NEEDS_MANUAL_TOSS_CANCEL";
+//
+// Exported so returns.ts's completeReturnRequest can apply the same
+// never-paper-over-an-unresolved-failure rule when a RETURN completes on a
+// payment that already carries this marker from an earlier cancellation —
+// see that function for details.
+export const AUTO_REFUND_TOSS_FAILURE_REASON = "AUTO_REFUND_FAILED_NEEDS_MANUAL_TOSS_CANCEL";
 
 async function cancelTossPaymentForRefund(
   paymentKey: string | null,
