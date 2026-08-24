@@ -21,9 +21,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // `/reset-password/admin` is the operator screen that mints account-
+  // recovery tokens (src/app/reset-password/admin/page.tsx) — it is
+  // deliberately not nested under /admin (see that file's comment) but
+  // still needs the same proxy coverage as every other admin surface, so it
+  // is checked here as its own ADMIN-gated prefix. `/reset-password` and
+  // `/reset-password/confirm` (the actual public recovery flow, plus
+  // `/find-id`) are untouched by this check and stay public — see the
+  // matcher below, which only targets `/reset-password/admin`, not
+  // `/reset-password` itself.
   const requiredRole: ProtectedRole | null = pathname.startsWith("/seller")
     ? "SELLER"
-    : pathname.startsWith("/admin")
+    : pathname.startsWith("/admin") || pathname.startsWith("/reset-password/admin")
       ? "ADMIN"
       : null;
 
@@ -45,5 +54,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/seller/:path*", "/admin/:path*"],
+  // `/reset-password/admin/:path*` widens coverage to the admin recovery
+  // screen without matching `/reset-password` or `/reset-password/confirm`
+  // (path-to-regexp anchors `/reset-password/admin` to that exact prefix —
+  // it does not also match sibling paths like `/reset-password/confirm`,
+  // per the "Are anchored to the start of the path" rule in
+  // node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md).
+  // `/find-id` is unrelated to this prefix and was never matched.
+  matcher: ["/seller/:path*", "/admin/:path*", "/reset-password/admin/:path*"],
 };

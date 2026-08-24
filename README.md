@@ -133,7 +133,16 @@ S3_FORCE_PATH_STYLE=false
   - 무료 웹 서비스는 트래픽이 없으면 슬립 상태가 되어 첫 요청에 콜드스타트 지연이 발생합니다.
   - 실제 트래픽을 받기 전에 반드시 유료 플랜으로 업그레이드해야 합니다. **이 문서는 안내만 할 뿐, `render.yaml`의 플랜/커넥션 문자열 변경은 이 저장소를 소유한 담당자가 직접 결정하고 수정해야 하는 사안입니다** (외부 커넥션 문자열을 쓰는 현재 설정도 이전 커밋에서 의도적으로 선택된 것입니다).
 
-### 6. 비밀번호 재설정/알림 기능이 아직 없다는 점
+### 6. Prisma 커넥션 풀 설정이 없다는 점
+
+`render.yaml`의 `DATABASE_URL`은 Render DB의 `externalConnectionString`을 그대로 사용하며, 여기에 `?connection_limit=N` 같은 Prisma 커넥션 풀 파라미터가 붙어 있지 않습니다.
+
+- **기본 동작**: Prisma는 `connection_limit`을 명시하지 않으면 `num_physical_cpus * 2 + 1`을 기본값으로 사용합니다([Prisma 공식 문서](https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration/databases-connections#connection-pool-size)). 이 값은 이 앱을 서빙하는 Render 웹 서비스 인스턴스의 CPU 코어 수를 기준으로 계산되는 것이지, Postgres 쪽이 실제로 감당할 수 있는 동시 연결 수와는 무관합니다.
+- **왜 문제가 되는가**: Render의 저가/무료 Postgres 플랜은 `max_connections`가 작습니다. 인스턴스를 여러 개로 늘리거나(오토스케일), CPU 코어가 많은 인스턴스 타입으로 올리면 Prisma 기본값이 그만큼 커져서, 애플리케이션 쪽 커넥션 풀 총합이 DB의 `max_connections`를 넘어설 수 있습니다. 이 경우 DB가 새 연결을 거부하기 시작하고, 결제·주문처럼 실시간으로 DB를 쓰는 요청이 무작위로 실패합니다.
+- **지금 값을 정하지 않은 이유**: 적절한 `connection_limit`은 (a) 최종적으로 선택할 Postgres 플랜의 `max_connections`, (b) 웹 서비스 인스턴스 개수, (c) 그 외 이 DB에 붙는 다른 클라이언트(예: Prisma Studio, 배치 스크립트) 수에 따라 달라집니다. 이 저장소는 아직 유료 플랜 확정 전이므로(위 5번 항목 참고), 근거 없이 숫자를 하나 박아두는 대신 이 문서에만 절차를 남겨 둡니다.
+- **플랜이 정해지면 할 일**: `render.yaml`의 `DATABASE_URL` 값(현재 `fromDatabase.property: externalConnectionString`으로 주입됨)에 커넥션 풀 파라미터를 추가합니다. Prisma는 연결 문자열의 쿼리 파라미터로 이를 읽으므로, 예를 들어 DB의 `max_connections`가 20이고 웹 서비스가 항상 인스턴스 1개로만 뜬다면 다른 클라이언트 여유분을 남기고 `connection_limit=10~15` 사이로 시작해 실제 부하를 보며 조정하는 식입니다. Render 대시보드에서 해당 Postgres 인스턴스의 `max_connections`를 먼저 확인한 뒤 결정하십시오.
+
+### 7. 비밀번호 재설정/알림 기능이 아직 없다는 점
 
 로그인 화면의 "아이디 찾기"/"비밀번호 재설정" 버튼은 현재 아무 동작도 하지 않습니다(placeholder). 즉:
 

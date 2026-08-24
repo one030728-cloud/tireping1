@@ -69,8 +69,36 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/login",
   },
+  // Without an explicit maxAge, NextAuth v4 falls back to a 30-day session
+  // (see SessionOptions.maxAge in node_modules/next-auth/core/types.d.ts).
+  // That is too long for a B2B service where a logged-in session can place
+  // orders and sellers can see buyer PII, and where accounts are commonly
+  // used on shared shop-floor PCs that nobody explicitly signs out of.
+  //
+  // 8 hours covers a full working day without interrupting it, and
+  // `updateAge: 0` re-issues the session cookie on every request while the
+  // user is active (default is once per day — too coarse for an 8h window,
+  // since a session started at 9am would otherwise still expire at 9am
+  // sharp even if the user was actively using it at 8:55am). Together this
+  // means: active use never gets logged out mid-day, but a machine left
+  // unattended overnight is signed out by morning.
+  //
+  // `jwt.maxAge` must be set separately — it is NOT derived from
+  // `session.maxAge`. NextAuth's core init (node_modules/next-auth/core/init.js)
+  // hardcodes a 30-day default for `jwt.maxAge` independently of whatever
+  // `session.maxAge` is, and the encrypted JWT's own `exp` claim is stamped
+  // from `jwt.maxAge` (see the `encode()` call in
+  // node_modules/next-auth/jwt/index.js). Leaving it unset here would mean
+  // the signed cookie payload keeps validating for 30 days even though the
+  // session option says 8h — i.e. the token would outlive the session it
+  // claims to represent.
   session: {
     strategy: "jwt",
+    maxAge: 8 * 60 * 60,
+    updateAge: 0,
+  },
+  jwt: {
+    maxAge: 8 * 60 * 60,
   },
   secret: process.env.NEXTAUTH_SECRET,
   useSecureCookies: process.env.NEXTAUTH_URL
