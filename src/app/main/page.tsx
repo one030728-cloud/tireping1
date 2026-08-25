@@ -480,9 +480,9 @@ function MainContent() {
                 <Link
                   key={order.id}
                   href="/mypage/orders"
-                  className="grid min-h-[48px] grid-cols-[56px_1fr_auto] items-center gap-2 px-4 text-[13px] active:bg-[#f7f9fc]"
+                  className="grid min-h-[48px] grid-cols-[104px_1fr_auto] items-center gap-2 px-4 text-[13px] active:bg-[#f7f9fc]"
                 >
-                  <span className="text-[#777]">{order.id}</span>
+                  <span className="truncate tabular-nums text-[#777]">{order.orderNo ?? order.id}</span>
                   <span className="truncate font-semibold text-[#075bea]">{order.model}</span>
                   <span
                     className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
@@ -589,9 +589,9 @@ function MainContent() {
               {recentOrders.map((order, index) => (
                 <div
                   key={order.id}
-                  className="grid grid-cols-[52px_1fr_auto] items-center gap-2 text-[13px] leading-6"
+                  className="grid grid-cols-[104px_1fr_auto] items-center gap-2 text-[13px] leading-6"
                 >
-                  <span className="text-[#555]">{order.id}</span>
+                  <span className="truncate tabular-nums text-[#555]">{order.orderNo ?? order.id}</span>
                   <span className="truncate font-medium text-[#075bea]">{order.model}</span>
                   <span
                     className={`text-[12px] font-medium ${
