@@ -13,6 +13,9 @@ interface ConfirmedPayment {
   method: string | null;
   approvedAt: string | null;
   orderCount: number;
+  // 사람이 읽는 주문번호(20260825-0003). 결제 1건이 여러 주문을 덮을 수 있어
+  // 배열이며, 컬럼 이전 주문만 비어 있어 그때는 tossOrderId 로 폴백한다.
+  orderNos: string[];
 }
 
 function SuccessContent() {
@@ -78,7 +81,14 @@ function SuccessContent() {
             {payment.orderCount}건의 주문이 입금완료 상태로 변경되었습니다.
           </p>
           <p className="mt-5 border-t border-border pt-5 text-sm">
-            결제번호 <span className="font-medium break-all">{payment.tossOrderId}</span>
+            주문번호{" "}
+            <span className="font-medium break-all">
+              {payment.orderNos.length === 0
+                ? payment.tossOrderId
+                : payment.orderNos.length === 1
+                  ? payment.orderNos[0]
+                  : `${payment.orderNos[0]} 외 ${payment.orderNos.length - 1}건`}
+            </span>
           </p>
           <Link href="/mypage/status" className="btn-primary mt-6 inline-flex h-11 items-center px-5">
             주문 상태 확인하기

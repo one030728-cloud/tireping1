@@ -70,6 +70,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "PAYMENT_NOT_FOUND" }, { status: 404 });
   }
 
+  // 사람이 읽는 주문번호(예: 20260825-0003). 결제완료 화면이 내부
+  // tossOrderId(order_<uuid>) 대신 이 값을 보여줄 수 있도록 모든 성공 응답에
+  // 함께 내려준다. orderNo 는 주문 생성 시 확정돼 이후 바뀌지 않으므로, 이
+  // 스냅샷(include: orders)으로 아래 모든 분기에서 안전하게 쓸 수 있다. 컬럼
+  // 이전 주문은 null 이라 화면에서 tossOrderId 로 폴백한다.
+  const orderNos = payment.orders
+    .map((order) => order.orderNo)
+    .filter((orderNo): orderNo is string => orderNo !== null);
+
   // Idempotent replay: a page refresh or a double-fired confirm request for a
   // payment we already approved must not call Toss again. Return the same
   // success shape instead of failing the second call.
@@ -87,6 +96,7 @@ export async function POST(request: Request) {
         method: payment.method,
         approvedAt: payment.approvedAt?.toISOString() ?? null,
         orderCount: completedOrderCount,
+        orderNos,
       },
     });
   }
@@ -229,6 +239,7 @@ export async function POST(request: Request) {
         method: result.completedPayment.method,
         approvedAt: result.completedPayment.approvedAt?.toISOString() ?? null,
         orderCount: result.updatedOrderCount,
+        orderNos,
       },
     });
   } catch (error) {
@@ -300,6 +311,7 @@ export async function POST(request: Request) {
             method: currentPayment.method,
             approvedAt: currentPayment.approvedAt?.toISOString() ?? null,
             orderCount: completedOrderCount,
+            orderNos,
           },
         });
       }
