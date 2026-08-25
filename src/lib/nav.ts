@@ -1,5 +1,6 @@
 export const SIDEBAR_LINKS = [
   { href: "/events?tab=ongoing", label: "진행중인 이벤트" },
+  { href: "/exhibition", label: "기획전" },
   { href: "/factory-price", label: "공장도가 확인" },
   { href: "/products", label: "일반 상품목록" },
   { href: "/direct", label: "당일직배송 상품목록" },

@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import RequireAuth from "@/components/RequireAuth";
 
 const navigation = [
-  { href: "/admin/buyers", label: "구매자 관리" },
   { href: "/admin", label: "대시보드" },
+  { href: "/admin/buyers", label: "구매자 관리" },
   { href: "/admin/sellers", label: "판매자 관리" },
   { href: "/admin/listings", label: "상품 심사" },
   { href: "/admin/orders", label: "전체 주문" },

@@ -2,35 +2,70 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 import {
   Bell,
   ChevronRight,
   CircleDot,
   Heart,
   ShoppingCart,
+  Sparkles,
   Star,
+  Tag,
   Truck,
   UserRound,
+  type LucideIcon,
 } from "lucide-react";
 import { MYPAGE_LINKS, SIDEBAR_LINKS } from "@/lib/nav";
 
-const SIDEBAR_ICONS = [Bell, Star, CircleDot, Truck, Bell, Heart, ShoppingCart];
+const SIDEBAR_ICONS: Record<string, LucideIcon> = {
+  "/events?tab=ongoing": Bell,
+  "/exhibition": Sparkles,
+  "/factory-price": Star,
+  "/products": CircleDot,
+  "/direct": Truck,
+  "/products?tag=EVENT": Tag,
+  "/wishlist": Heart,
+  "/cart": ShoppingCart,
+};
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [mypageOpen, setMypageOpen] = useState(true);
+
+  const activeHref = useMemo(() => {
+    let bestHref: string | null = null;
+    let bestSpecificity = -1;
+
+    for (const link of SIDEBAR_LINKS) {
+      const [linkPath, queryString] = link.href.split("?");
+      if (pathname !== linkPath) continue;
+
+      const linkParams = new URLSearchParams(queryString ?? "");
+      const specificity = Array.from(linkParams.keys()).length;
+
+      const matches = Array.from(linkParams.entries()).every(
+        ([key, value]) => searchParams.get(key) === value
+      );
+      if (!matches) continue;
+
+      if (specificity > bestSpecificity) {
+        bestSpecificity = specificity;
+        bestHref = link.href;
+      }
+    }
+
+    return bestHref;
+  }, [pathname, searchParams]);
 
   return (
     <aside className="sticky top-[71px] hidden h-[calc(100vh-71px)] w-[224px] shrink-0 self-start flex-col overflow-y-auto border-r border-[#e7eaf0] bg-white lg:flex">
       <div className="flex flex-col px-3 py-4">
-        {SIDEBAR_LINKS.map((link, index) => {
-          const active =
-            pathname === "/main"
-              ? link.href === "/factory-price"
-              : pathname === link.href.split("?")[0];
-          const Icon = SIDEBAR_ICONS[index];
+        {SIDEBAR_LINKS.map((link) => {
+          const active = link.href === activeHref;
+          const Icon = SIDEBAR_ICONS[link.href] ?? CircleDot;
           return (
             <Link
               key={link.href}
