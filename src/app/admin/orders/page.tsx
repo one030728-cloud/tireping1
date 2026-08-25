@@ -67,8 +67,14 @@ export default function AdminOrdersPage() {
       setBusyId(null);
       return;
     }
-    const data = (await response.json()) as { order: AdminOrderView };
-    setOrders((current) => current.map((item) => item.id === order.id ? data.order : item));
+    // cancelOrder(서버)는 구매자 화면용 BuyerOrderView 를 돌려주므로 그대로
+    // 이 목록(AdminOrderView[])에 끼워넣으면 다음 렌더에서 buyer/seller/shipping
+    // 필드가 없어 크래시한다. 대신 admin 형태로 목록을 다시 불러온다.
+    const refreshed = await fetch("/api/admin/orders", { cache: "no-store" });
+    if (refreshed.ok) {
+      const data = (await refreshed.json()) as { orders: AdminOrderView[] };
+      setOrders(data.orders);
+    }
     setBusyId(null);
   }
 
