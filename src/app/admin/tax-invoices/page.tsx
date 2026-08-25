@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
 import { formatDate } from "@/lib/formatDate";
 import type { AdminTaxInvoiceView } from "@/lib/tax-invoice-types";
 
@@ -107,17 +108,18 @@ function AdminTaxInvoicesContent() {
         <p className="text-sm text-muted">
           총 <b className="text-foreground">{invoices.length}</b>건
         </p>
-        <select
+        <Select
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          onValueChange={setStatus}
+          items={[
+            { value: "", label: "전체 상태" },
+            { value: "REQUESTED", label: "신청됨" },
+            { value: "ISSUED", label: "발행완료" },
+            { value: "REJECTED", label: "반려됨" },
+          ]}
           className="h-10 px-3 rounded-lg border border-border text-sm bg-background"
-          aria-label="상태 필터"
-        >
-          <option value="">전체 상태</option>
-          <option value="REQUESTED">신청됨</option>
-          <option value="ISSUED">발행완료</option>
-          <option value="REJECTED">반려됨</option>
-        </select>
+          ariaLabel="상태 필터"
+        />
       </div>
       {error && <p className="text-sm text-accent mb-3">{error}</p>}
 

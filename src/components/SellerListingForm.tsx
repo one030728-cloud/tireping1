@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ImagePlus, X } from "lucide-react";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
 import { MANUFACTURERS } from "@/lib/mockData";
 import type { SellerListingView } from "@/lib/seller-types";
 
@@ -309,9 +310,12 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
             <h2 className="font-bold mb-4">상품 기본 정보</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="제조사" required>
-                <select value={form.manufacturer} onChange={(event) => setField("manufacturer", event.target.value)} className="seller-input" required>
-                  {MANUFACTURERS.map((manufacturer) => <option key={manufacturer} value={manufacturer}>{manufacturer}</option>)}
-                </select>
+                <Select
+                  value={form.manufacturer}
+                  onValueChange={(value) => setField("manufacturer", value)}
+                  items={MANUFACTURERS.map((manufacturer) => ({ value: manufacturer, label: manufacturer }))}
+                  ariaLabel="제조사"
+                />
               </Field>
               <Field label="모델명" required>
                 <input value={form.model} onChange={(event) => setField("model", event.target.value)} className="seller-input" required />
@@ -352,11 +356,16 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
               <NumberField label="재고" field="stock" form={form} setField={setField} required />
               <NumberField label="최소 주문수량" field="minOrder" form={form} setField={setField} required />
               <Field label="태그">
-                <select value={form.tag} onChange={(event) => setField("tag", event.target.value)} className="seller-input">
-                  <option value="">없음</option>
-                  <option value="EVENT">EVENT</option>
-                  <option value="BEST">BEST</option>
-                </select>
+                <Select
+                  value={form.tag}
+                  onValueChange={(value) => setField("tag", value)}
+                  items={[
+                    { value: "", label: "없음" },
+                    { value: "EVENT", label: "EVENT" },
+                    { value: "BEST", label: "BEST" },
+                  ]}
+                  ariaLabel="태그"
+                />
               </Field>
             </div>
           </section>

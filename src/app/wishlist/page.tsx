@@ -2,16 +2,18 @@
 
 import { Star, Trash2 } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { useWishlist } from "@/lib/wishlist";
 
 function WishlistContent() {
   const { sellers, removeWish } = useWishlist();
+  const { alert: alertDialog } = useDialogs();
 
   async function handleRemove(id: string) {
     try {
       await removeWish(id);
     } catch {
-      window.alert("관심 판매처를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      await alertDialog({ title: "관심 판매처를 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요." });
     }
   }
 

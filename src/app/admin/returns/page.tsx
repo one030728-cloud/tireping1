@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { formatDate } from "@/lib/formatDate";
 import type { AdminReturnRequestView } from "@/lib/return-types";
 
@@ -15,6 +17,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 function AdminReturnsContent() {
   const searchParams = useSearchParams();
+  const { confirm: confirmDialog } = useDialogs();
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
   const [requests, setRequests] = useState<AdminReturnRequestView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +92,7 @@ function AdminReturnsContent() {
   }
 
   async function complete(request: AdminReturnRequestView) {
-    if (!window.confirm("완료 처리하면 되돌릴 수 없습니다. 계속하시겠습니까?")) return;
+    if (!(await confirmDialog({ title: "완료 처리할까요?", description: "완료 처리하면 되돌릴 수 없습니다.", destructive: true }))) return;
     setBusyId(request.id);
     setError(null);
     const response = await fetch(`/api/admin/returns/${request.id}/complete`, { method: "POST" });
@@ -114,18 +117,19 @@ function AdminReturnsContent() {
         <p className="text-sm text-muted">
           총 <b className="text-foreground">{requests.length}</b>건
         </p>
-        <select
+        <Select
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          onValueChange={setStatus}
+          items={[
+            { value: "", label: "전체 상태" },
+            { value: "REQUESTED", label: "접수됨" },
+            { value: "APPROVED", label: "승인됨" },
+            { value: "REJECTED", label: "반려됨" },
+            { value: "COMPLETED", label: "완료" },
+          ]}
           className="h-10 px-3 rounded-lg border border-border text-sm bg-background"
-          aria-label="상태 필터"
-        >
-          <option value="">전체 상태</option>
-          <option value="REQUESTED">접수됨</option>
-          <option value="APPROVED">승인됨</option>
-          <option value="REJECTED">반려됨</option>
-          <option value="COMPLETED">완료</option>
-        </select>
+          ariaLabel="상태 필터"
+        />
       </div>
       {error && <p className="text-sm text-accent mb-3">{error}</p>}
 

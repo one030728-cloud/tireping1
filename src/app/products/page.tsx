@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SearchX } from "lucide-react";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
 import { MANUFACTURERS } from "@/lib/mockData";
 import type { CatalogRow } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
@@ -169,18 +170,16 @@ function ProductsContent() {
             placeholder="사이즈 검색 예) 245 45 18"
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand col-span-2 sm:col-span-1"
           />
-          <select
+          <Select
             value={manufacturer}
-            onChange={(e) => setManufacturer(e.target.value)}
+            onValueChange={setManufacturer}
+            items={[
+              { value: "", label: "제조사" },
+              ...MANUFACTURERS.map((m) => ({ value: m, label: m })),
+            ]}
+            ariaLabel="제조사"
             className="h-10 px-3 rounded-lg border border-border text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-          >
-            <option value="">제조사</option>
-            {MANUFACTURERS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+          />
           <input
             value={model}
             onChange={(e) => setModel(e.target.value)}

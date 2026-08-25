@@ -16,6 +16,7 @@ import {
 import HeroCarousel from "@/components/HeroCarousel";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import Carousel from "@/components/Carousel";
+import Select from "@/components/ui/Select";
 import type { Tire } from "@/lib/types";
 import {
   DIRECT_NOTICE,
@@ -418,19 +419,16 @@ function MainContent() {
           </h2>
           <form onSubmit={handleSearch}>
             <div className="mb-3 flex h-11 overflow-hidden rounded-xl border border-[#d9dee7] bg-white">
-              <select
+              <Select
                 value={manufacturer}
-                onChange={(e) => setManufacturer(e.target.value)}
-                aria-label="제조사"
+                onValueChange={setManufacturer}
+                items={[
+                  { value: "", label: "제조사" },
+                  ...MANUFACTURERS.map((m) => ({ value: m, label: m })),
+                ]}
+                ariaLabel="제조사"
                 className="w-[108px] shrink-0 border-0 border-r border-[#d9dee7] px-3 text-sm focus:outline-none"
-              >
-                <option value="">제조사</option>
-                {MANUFACTURERS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+              />
               <input
                 value={size}
                 onChange={(e) => setSize(e.target.value)}
@@ -546,18 +544,16 @@ function MainContent() {
             </h2>
             <form onSubmit={handleSearch}>
               <div className="mb-3 flex h-[38px] overflow-hidden rounded-[6px] border border-[#d9dee7]">
-                <select
+                <Select
                   value={manufacturer}
-                  onChange={(e) => setManufacturer(e.target.value)}
+                  onValueChange={setManufacturer}
+                  items={[
+                    { value: "", label: "제조사" },
+                    ...MANUFACTURERS.map((m) => ({ value: m, label: m })),
+                  ]}
+                  ariaLabel="제조사"
                   className="w-[153px] border-0 border-r border-[#d9dee7] px-3 text-[14px] focus:outline-none"
-                >
-                  <option value="">제조사</option>
-                  {MANUFACTURERS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                />
                 <input
                   value={size}
                   onChange={(e) => setSize(e.target.value)}

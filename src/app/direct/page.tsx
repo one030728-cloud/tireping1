@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { MapPin, Search, Truck } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
+import Select from "@/components/ui/Select";
 import { DIRECT_NOTICE, MANUFACTURERS, REGIONS, TIRES } from "@/lib/mockData";
 
 const DIRECT_TIRE_IDS = ["t1", "t5", "t6", "t7", "t10", "t12"];
@@ -51,57 +52,43 @@ function DirectContent() {
         <div className="flex items-center gap-1.5 text-xs font-semibold text-muted px-1 sm:hidden">
           <MapPin size={14} /> 직배송 지역 설정
         </div>
-        <select
+        <Select
           value={province}
-          onChange={(e) => handleProvinceChange(e.target.value)}
+          onValueChange={handleProvinceChange}
+          items={provinces.map((p) => ({ value: p, label: p }))}
           className="h-11 px-3 rounded-lg border border-border sm:w-40 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-        >
-          {provinces.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-        <select
+          ariaLabel="도/광역시"
+        />
+        <Select
           value={city}
-          onChange={(e) => handleCityChange(e.target.value)}
+          onValueChange={handleCityChange}
+          items={cities.map((c) => ({ value: c, label: c }))}
           className="h-11 px-3 rounded-lg border border-border sm:w-40 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-        >
-          {cities.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <select
+          ariaLabel="시/군/구"
+        />
+        <Select
           value={town}
-          onChange={(e) => setTown(e.target.value)}
+          onValueChange={setTown}
+          items={towns.map((t) => ({ value: t, label: t }))}
           className="h-11 px-3 rounded-lg border border-border sm:w-40 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-        >
-          {towns.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          ariaLabel="읍/면/동"
+        />
         <button className="btn-primary h-11 px-5 gap-1.5 sm:ml-auto">
           <Search size={15} /> 직배송 상품보기
         </button>
       </div>
 
       <div className="card p-4 mb-6 flex flex-col sm:flex-row gap-2">
-        <select
+        <Select
           value={manufacturer}
-          onChange={(e) => setManufacturer(e.target.value)}
+          onValueChange={setManufacturer}
+          items={[
+            { value: "", label: "제조사" },
+            ...MANUFACTURERS.map((m) => ({ value: m, label: m })),
+          ]}
           className="h-10 px-3 rounded-lg border border-border text-sm sm:w-40 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-        >
-          <option value="">제조사</option>
-          {MANUFACTURERS.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
+          ariaLabel="제조사"
+        />
         <input
           value={model}
           onChange={(e) => setModel(e.target.value)}

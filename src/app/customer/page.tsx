@@ -17,6 +17,7 @@ import {
   User,
 } from "lucide-react";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth";
 import { formatDate } from "@/lib/formatDate";
 import type { InquiryView } from "@/lib/inquiry-types";
@@ -168,6 +169,14 @@ function QnaBoard() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // 문의 유형은 서버(createInquirySchema)에서도 필수다. 네이티브 <select
+    // required> 를 Radix Select 로 바꾸면서 브라우저의 기본 검증이 사라졌으므로,
+    // 여기서 직접 막지 않으면 빈 값이 그대로 전송돼 400 이 나고 사용자에게는
+    // "문의 등록에 실패했습니다" 라는 엉뚱한 메시지만 보인다.
+    if (!category) {
+      setSubmitError("문의 유형을 선택해 주세요.");
+      return;
+    }
     setSubmitting(true);
     setSubmitError(null);
     setSubmitted(false);
@@ -203,21 +212,14 @@ function QnaBoard() {
       <p className="text-sm text-muted mb-5">궁금하신 내용을 남겨주시면 순차적으로 답변드립니다.</p>
 
       <form onSubmit={(event) => void handleSubmit(event)} className="card p-5 flex flex-col gap-3">
-        <select
+        <Select
           value={category}
-          onChange={(event) => setCategory(event.target.value)}
-          required
+          onValueChange={setCategory}
+          items={FAQ_CATEGORIES.map((c) => ({ value: c.id, label: c.label }))}
+          placeholder="문의 유형 선택"
           className="h-11 px-3 rounded-lg border border-border text-sm sm:w-56 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-        >
-          <option value="" disabled>
-            문의 유형 선택
-          </option>
-          {FAQ_CATEGORIES.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+          ariaLabel="문의 유형 선택"
+        />
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import type { SellerListingStatus, SellerListingView } from "@/lib/seller-types";
 import { formatDay } from "@/lib/formatDate";
 
@@ -17,6 +19,7 @@ const statusLabels: Record<SellerListingStatus, string> = {
 
 
 export default function SellerListingsPage() {
+  const { confirm: confirmDialog } = useDialogs();
   const [status, setStatus] = useState("");
   const [listings, setListings] = useState<SellerListingView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +53,7 @@ export default function SellerListingsPage() {
   }, [status]);
 
   async function handleDelete(id: string) {
-    if (!window.confirm("작성중인 상품을 삭제하시겠습니까?")) return;
+    if (!(await confirmDialog({ title: "작성중인 상품을 삭제하시겠습니까?", destructive: true }))) return;
     const response = await fetch(`/api/seller/listings/${id}`, { method: "DELETE" });
     if (!response.ok) {
       setError("상품을 삭제하지 못했습니다. 작성중 상태인지 확인해 주세요.");
@@ -77,20 +80,21 @@ export default function SellerListingsPage() {
         <p className="text-sm text-muted">
           총 <b className="text-foreground">{listings.length}</b>건
         </p>
-        <select
+        <Select
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          onValueChange={setStatus}
+          items={[
+            { value: "", label: "전체 상태" },
+            { value: "DRAFT", label: "작성중" },
+            { value: "PENDING", label: "승인 대기" },
+            { value: "ACTIVE", label: "판매중" },
+            { value: "REJECTED", label: "반려" },
+            { value: "SOLDOUT", label: "품절" },
+            { value: "HIDDEN", label: "비노출" },
+          ]}
           className="h-10 px-3 rounded-lg border border-border text-sm bg-background"
-          aria-label="상품 상태 필터"
-        >
-          <option value="">전체 상태</option>
-          <option value="DRAFT">작성중</option>
-          <option value="PENDING">승인 대기</option>
-          <option value="ACTIVE">판매중</option>
-          <option value="REJECTED">반려</option>
-          <option value="SOLDOUT">품절</option>
-          <option value="HIDDEN">비노출</option>
-        </select>
+          ariaLabel="상품 상태 필터"
+        />
       </div>
 
       {error && <p className="text-sm text-accent mb-3">{error}</p>}

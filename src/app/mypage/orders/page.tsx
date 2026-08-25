@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, PackageSearch } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { formatDate } from "@/lib/formatDate";
 import { OrderRequestError, useOrders } from "@/lib/orders";
 import { ORDER_STATUS, isCancelledOrderStatus, orderStatusRank, type OrderStatusValue } from "@/lib/order-status";
@@ -213,6 +214,7 @@ function RecipientInfo({ order }: { order: FullOrder }) {
 }
 
 function OrdersContent() {
+  const { confirm: confirmDialog, alert: alertDialog } = useDialogs();
   const { orders, loading, cancelOrder, confirmPurchase } = useOrders();
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -285,34 +287,36 @@ function OrdersContent() {
         setCopiedId((current) => (current === order.id ? null : current));
       }, 1500);
     } catch {
-      window.alert("송장번호 복사에 실패했습니다.");
+      await alertDialog({ title: "송장번호 복사에 실패했습니다." });
     }
   }
 
   async function handleCancel(id: string) {
-    if (!window.confirm("이 주문을 취소하시겠습니까?")) return;
+    if (!(await confirmDialog({ title: "이 주문을 취소하시겠습니까?", destructive: true }))) return;
     setCancellingId(id);
     try {
       await cancelOrder(id);
     } catch (error) {
       const code = error instanceof OrderRequestError ? error.code : "ORDER_REQUEST_FAILED";
-      window.alert(
-        code === "CANCEL_AFTER_SHIPPING"
-          ? "발송이 시작된 주문은 주문 취소를 할 수 없습니다."
-          : "주문 취소에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-      );
+      await alertDialog({
+        title:
+          code === "CANCEL_AFTER_SHIPPING"
+            ? "발송이 시작된 주문은 주문 취소를 할 수 없습니다."
+            : "주문 취소에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      });
     } finally {
       setCancellingId(null);
     }
   }
 
   async function handleConfirmPurchase(id: string) {
-    if (!window.confirm("구매를 확정하시겠습니까? 확정 후에는 취소할 수 없습니다.")) return;
+    if (!(await confirmDialog({ title: "구매를 확정하시겠습니까?", description: "확정 후에는 취소할 수 없습니다." })))
+      return;
     setConfirmingId(id);
     try {
       await confirmPurchase(id);
     } catch {
-      window.alert("구매 확정에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      await alertDialog({ title: "구매 확정에 실패했습니다. 잠시 후 다시 시도해 주세요." });
     } finally {
       setConfirmingId(null);
     }
@@ -377,25 +381,25 @@ function OrdersContent() {
 
           {/* Desktop: detailed table, horizontal scroll (columns keep growing
               with shipping/tracking/action data, so min-w is generous). */}
-          <div className="hidden lg:block card p-4 overflow-x-auto">
-            <table className="min-w-[1600px] w-full text-xs border-collapse">
+          <div className="hidden lg:block card p-4 overflow-auto max-h-[calc(100vh-14rem)]">
+            <table className="min-w-[1400px] w-full text-xs border-collapse">
               <thead>
-                <tr className="text-left text-muted border-b border-border">
-                  <th className="py-2 pr-3 font-medium w-8"></th>
-                  <th className="py-2 pr-3 font-medium">통합주문번호</th>
-                  <th className="py-2 pr-3 font-medium">주문상태</th>
-                  <th className="py-2 pr-3 font-medium">제조사</th>
-                  <th className="py-2 pr-3 font-medium">주문상품</th>
-                  <th className="py-2 pr-3 font-medium">공장도가</th>
-                  <th className="py-2 pr-3 font-medium">단가</th>
-                  <th className="py-2 pr-3 font-medium">수량</th>
-                  <th className="py-2 pr-3 font-medium">추가배송비</th>
-                  <th className="py-2 pr-3 font-medium">배송비</th>
-                  <th className="py-2 pr-3 font-medium">합계금액</th>
-                  <th className="py-2 pr-3 font-medium">판매점</th>
-                  <th className="py-2 pr-3 font-medium">배송정보</th>
-                  <th className="py-2 pr-3 font-medium">주문일자</th>
-                  <th className="py-2 pr-3 font-medium">관리</th>
+                <tr className="text-left text-muted">
+                  <th className="py-2 pr-3 font-medium w-8 sticky top-0 z-10 bg-surface border-b border-border"></th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">통합주문번호</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">주문상태</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">제조사</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">주문상품</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">공장도가</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">단가</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">수량</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">추가배송비</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">배송비</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">합계금액</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">판매점</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">배송정보</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">주문일자</th>
+                  <th className="py-2 pr-3 font-medium sticky top-0 z-10 bg-surface border-b border-border">관리</th>
                 </tr>
               </thead>
               <tbody>
@@ -437,7 +441,7 @@ function OrdersContent() {
                     <td className="py-3 pr-3">{(o.shippingFee ?? 0).toLocaleString()}원</td>
                     <td className="py-3 pr-3 font-semibold">{o.total.toLocaleString()}원</td>
                     <td className="py-3 pr-3">{o.sellerCode}</td>
-                    <td className="py-3 pr-3 min-w-[260px]">
+                    <td className="py-3 pr-3 min-w-[220px]">
                       <ShippingInfo order={o} copiedId={copiedId} onCopy={(order) => void handleCopyTracking(order)} />
                       <div className="mt-1.5 pt-1.5 border-t border-border">
                         <RecipientInfo order={o} />

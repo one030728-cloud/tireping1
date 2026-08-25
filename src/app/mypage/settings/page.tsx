@@ -3,6 +3,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import RequireAuth from "@/components/RequireAuth";
+import { useDialogs } from "@/components/ui/DialogProvider";
+import Select from "@/components/ui/Select";
 import { useAuth } from "@/lib/auth";
 import type { AccountProfile } from "@/lib/account-types";
 
@@ -79,6 +81,7 @@ async function readError(response: Response, fallback: string) {
 }
 
 function SettingsContent() {
+  const { confirm: confirmDialog } = useDialogs();
   const { user } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<AccountProfile | null>(null);
@@ -188,7 +191,14 @@ function SettingsContent() {
   }
 
   async function withdraw() {
-    if (!window.confirm("탈퇴 후에는 계정을 사용할 수 없습니다. 정말 탈퇴하시겠습니까?")) return;
+    if (
+      !(await confirmDialog({
+        title: "정말 탈퇴하시겠습니까?",
+        description: "탈퇴 후에는 계정을 사용할 수 없습니다.",
+        destructive: true,
+      }))
+    )
+      return;
 
     setWithdrawing(true);
     setMessage("");
@@ -330,19 +340,16 @@ function SettingsContent() {
           <h2 className="font-bold mb-4">환불 / 정산 계좌</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="은행" htmlFor="s-bank">
-              <select
-                id="s-bank"
+              <Select
                 value={form.bankName}
-                onChange={(event) => updateField("bankName", event.target.value)}
+                onValueChange={(value) => updateField("bankName", value)}
+                items={BANKS.map((bank) => ({ value: bank, label: bank }))}
+                placeholder="은행을 선택해 주세요"
                 className={inputClass}
-              >
-                <option value="">은행을 선택해 주세요</option>
-                {BANKS.map((bank) => (
-                  <option key={bank} value={bank}>
-                    {bank}
-                  </option>
-                ))}
-              </select>
+                ariaLabel="은행"
+                name="s-bank"
+                id="s-bank"
+              />
             </Field>
             <Field label="계좌번호" htmlFor="s-account">
               <input

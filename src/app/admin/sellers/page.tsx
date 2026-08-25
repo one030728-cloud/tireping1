@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AdminSellerStatus, AdminSellerView } from "@/lib/admin-types";
 
 const statusLabels: Record<AdminSellerStatus, string> = {
@@ -14,6 +16,7 @@ const statusLabels: Record<AdminSellerStatus, string> = {
 
 function SellersContent() {
   const searchParams = useSearchParams();
+  const { confirm: confirmDialog, prompt: promptDialog } = useDialogs();
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
   const [sellers, setSellers] = useState<AdminSellerView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +56,7 @@ function SellersContent() {
   }
 
   async function suspend(id: string) {
-    const reason = window.prompt("정지 사유를 입력해 주세요.");
+    const reason = await promptDialog({ title: "정지 사유를 입력해 주세요.", multiline: true });
     if (!reason?.trim()) return;
     setError(null);
     const response = await fetch(`/api/admin/sellers/${id}/suspend`, {
@@ -69,7 +72,7 @@ function SellersContent() {
   }
 
   async function reinstate(id: string) {
-    if (!window.confirm("이 가맹점의 정지를 해제하고 활성 상태로 되돌리시겠습니까?")) return;
+    if (!(await confirmDialog({ title: "정지를 해제할까요?", description: "이 가맹점의 정지를 해제하고 활성 상태로 되돌립니다." }))) return;
     setError(null);
     const response = await fetch(`/api/admin/sellers/${id}/reinstate`, { method: "POST" });
     if (!response.ok) {
@@ -86,9 +89,7 @@ function SellersContent() {
       <div className="mb-5"><h1 className="text-xl font-extrabold">판매자 관리</h1><p className="text-sm text-muted mt-1">가맹점 가입을 승인하거나 운영 상태를 관리합니다.</p></div>
       <div className="flex items-center justify-between gap-3 mb-4">
         <p className="text-sm text-muted">총 <b className="text-foreground">{sellers.length}</b>개</p>
-        <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 px-3 rounded-lg border border-border text-sm bg-background" aria-label="가맹점 상태 필터">
-          <option value="">전체 상태</option><option value="PENDING">승인 대기</option><option value="ACTIVE">활성</option><option value="SUSPENDED">정지</option>
-        </select>
+        <Select value={status} onValueChange={setStatus} items={[{ value: "", label: "전체 상태" }, { value: "PENDING", label: "승인 대기" }, { value: "ACTIVE", label: "활성" }, { value: "SUSPENDED", label: "정지" }]} className="h-10 px-3 rounded-lg border border-border text-sm bg-background" ariaLabel="가맹점 상태 필터" />
       </div>
       {error && <p className="text-sm text-accent mb-3">{error}</p>}
       {sellers.length === 0 ? <div className="card py-16 text-center text-sm text-muted">조건에 맞는 가맹점이 없습니다.</div> : (

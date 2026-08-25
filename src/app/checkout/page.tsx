@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PackageSearch } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { useCart } from "@/lib/cart";
 import { OrderRequestError, useOrders } from "@/lib/orders";
 import type { ShippingAddressView } from "@/lib/shippingAddress-types";
@@ -34,6 +35,7 @@ function CheckoutContent() {
   const { items, loading: cartLoading, clear } = useCart();
   const { addOrders } = useOrders();
   const router = useRouter();
+  const { alert: alertDialog } = useDialogs();
 
   const [addresses, setAddresses] = useState<ShippingAddressView[]>([]);
   const [feesBySellerCode, setFeesBySellerCode] = useState<Map<string, ShippingGroupSummary>>(new Map());
@@ -152,7 +154,9 @@ function CheckoutContent() {
       try {
         await clear();
       } catch {
-        window.alert("주문은 완료되었지만 장바구니를 비우지 못했습니다. 주문내역을 확인해 주세요.");
+        await alertDialog({
+          title: "주문은 완료되었지만 장바구니를 비우지 못했습니다. 주문내역을 확인해 주세요.",
+        });
       }
 
       if (selectedAddressId === "new" && saveNewAddress) {
@@ -170,7 +174,7 @@ function CheckoutContent() {
             }),
           });
         } catch {
-          window.alert("주문은 완료되었지만 배송지를 저장하지 못했습니다.");
+          await alertDialog({ title: "주문은 완료되었지만 배송지를 저장하지 못했습니다." });
         }
       }
 

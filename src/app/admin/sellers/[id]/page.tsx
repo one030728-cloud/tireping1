@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import LoadingState from "@/components/LoadingState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AdminListingView, AdminSellerView } from "@/lib/admin-types";
 
 const statusLabels = { PENDING: "승인 대기", ACTIVE: "활성", SUSPENDED: "정지" } as const;
@@ -11,6 +12,7 @@ const listingLabels = { DRAFT: "작성중", PENDING: "심사 대기", ACTIVE: "�
 
 export default function AdminSellerDetailPage() {
   const params = useParams<{ id: string }>();
+  const { confirm: confirmDialog, prompt: promptDialog } = useDialogs();
   const [seller, setSeller] = useState<AdminSellerView | null>(null);
   const [listings, setListings] = useState<AdminListingView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +50,7 @@ export default function AdminSellerDetailPage() {
 
   async function suspend() {
     if (!seller) return;
-    const reason = window.prompt("정지 사유를 입력해 주세요.");
+    const reason = await promptDialog({ title: "정지 사유를 입력해 주세요.", multiline: true });
     if (!reason?.trim()) return;
     const response = await fetch(`/api/admin/sellers/${seller.id}/suspend`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
     if (!response.ok) { setError("정지 처리에 실패했습니다."); return; }
@@ -57,7 +59,7 @@ export default function AdminSellerDetailPage() {
 
   async function reinstate() {
     if (!seller) return;
-    if (!window.confirm("이 가맹점의 정지를 해제하고 활성 상태로 되돌리시겠습니까?")) return;
+    if (!(await confirmDialog({ title: "정지를 해제할까요?", description: "이 가맹점의 정지를 해제하고 활성 상태로 되돌립니다." }))) return;
     const response = await fetch(`/api/admin/sellers/${seller.id}/reinstate`, { method: "POST" });
     if (!response.ok) { setError("복구 처리에 실패했습니다."); return; }
     setSeller((current) => current ? { ...current, status: "ACTIVE", suspendReason: null } : current);

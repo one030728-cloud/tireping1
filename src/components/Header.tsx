@@ -8,6 +8,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronRight, LogOut, Megaphone, Menu, MessageCircle, Search, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import Select from "@/components/ui/Select";
 import { GNB_LINKS, GOODS_CATEGORIES, MYPAGE_LINKS, SIDEBAR_LINKS } from "@/lib/nav";
 import { MANUFACTURERS, NOTICES } from "@/lib/mockData";
 
@@ -207,18 +208,16 @@ export default function Header() {
               onSubmit={handleGuestSearch}
               className="hidden md:flex items-center border border-border rounded-lg overflow-hidden h-10"
             >
-              <select
+              <Select
                 value={searchManufacturer}
-                onChange={(e) => setSearchManufacturer(e.target.value)}
+                onValueChange={setSearchManufacturer}
+                items={[
+                  { value: "", label: "통합검색" },
+                  ...MANUFACTURERS.map((m) => ({ value: m, label: m })),
+                ]}
+                ariaLabel="제조사 선택"
                 className="h-full px-2.5 text-sm border-0 border-r border-border bg-surface focus:outline-none"
-              >
-                <option value="">통합검색</option>
-                {MANUFACTURERS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+              />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

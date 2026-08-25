@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { MapPin, Pencil, Star, Trash2 } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
 import LoadingState from "@/components/LoadingState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import type { ShippingAddressView } from "@/lib/shippingAddress-types";
 
 interface AddressForm {
@@ -65,6 +66,7 @@ async function readAddressError(response: Response, fallback: string) {
 }
 
 function AddressesContent() {
+  const { confirm: confirmDialog } = useDialogs();
   const [addresses, setAddresses] = useState<ShippingAddressView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -166,7 +168,7 @@ function AddressesContent() {
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("이 배송지를 삭제하시겠습니까?")) return;
+    if (!(await confirmDialog({ title: "이 배송지를 삭제하시겠습니까?", destructive: true }))) return;
     setBusyId(id);
     setError("");
     try {

@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { ChevronLeft, Star } from "lucide-react";
 import ImagePlaceholder from "@/components/ImagePlaceholder";
 import LoadingState from "@/components/LoadingState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { CartRequestError, useCart } from "@/lib/cart";
 import { useWishlist, WishlistRequestError } from "@/lib/wishlist";
 import { useAuth } from "@/lib/auth";
@@ -101,6 +102,7 @@ function ProductDetailContent() {
   const { addItem } = useCart();
   const { isWished, toggleWish } = useWishlist();
   const { user } = useAuth();
+  const { alert: alertDialog } = useDialogs();
   const dot = searchParams.get("dot");
   const [product, setProduct] = useState<ProductView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -302,11 +304,12 @@ function ProductDetailContent() {
       router.push(buyNow ? "/checkout" : "/cart");
     } catch (error) {
       const code = error instanceof CartRequestError ? error.code : "CART_REQUEST_FAILED";
-      window.alert(
-        code === "ORDER_STOCK_INSUFFICIENT"
-          ? "재고가 부족한 상품이 있어 담을 수 없습니다."
-          : "요청 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-      );
+      await alertDialog({
+        title:
+          code === "ORDER_STOCK_INSUFFICIENT"
+            ? "재고가 부족한 상품이 있어 담을 수 없습니다."
+            : "요청 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      });
     }
   }
 
@@ -326,7 +329,7 @@ function ProductDetailContent() {
       });
     } catch (error) {
       if (error instanceof WishlistRequestError) {
-        window.alert("관심 판매처를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        await alertDialog({ title: "관심 판매처를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요." });
       }
     }
   }

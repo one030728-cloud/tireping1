@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import LoadingState from "@/components/LoadingState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { formatDate } from "@/lib/formatDate";
 import type { SellerReturnRequestView } from "@/lib/return-types";
 
@@ -13,6 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function SellerReturnsPage() {
+  const { confirm: confirmDialog } = useDialogs();
   const [requests, setRequests] = useState<SellerReturnRequestView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,15 +82,16 @@ export default function SellerReturnsPage() {
   }
 
   async function complete(request: SellerReturnRequestView) {
-    if (
-      !window.confirm(
+    const confirmed = await confirmDialog({
+      title:
+        request.type === "EXCHANGE" ? "교환 상품 발송을 완료하셨나요?" : "반품 상품을 회수하셨나요?",
+      description:
         request.type === "EXCHANGE"
-          ? "교환 상품 발송을 완료하셨나요? 완료 처리하면 되돌릴 수 없습니다."
-          : "반품 상품을 회수하셨나요? 완료 처리하면 재고가 복원되고 되돌릴 수 없습니다.",
-      )
-    ) {
-      return;
-    }
+          ? "완료 처리하면 되돌릴 수 없습니다."
+          : "완료 처리하면 재고가 복원되고 되돌릴 수 없습니다.",
+      destructive: true,
+    });
+    if (!confirmed) return;
     setBusyId(request.id);
     setError(null);
     const response = await fetch(`/api/seller/returns/${request.id}/complete`, { method: "POST" });

@@ -6,6 +6,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Package, Plus, Trash2, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { ListingsRequestError, useListings } from "@/lib/listings";
 import { MANUFACTURERS } from "@/lib/mockData";
 import type { Manufacturer } from "@/lib/types";
@@ -67,6 +69,7 @@ const EMPTY_FORM = {
 
 function SellContent() {
   const { listings, addListing, removeListing, toggleStatus } = useListings();
+  const { alert: alertDialog } = useDialogs();
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -107,7 +110,7 @@ function SellContent() {
     try {
       await action();
     } catch {
-      window.alert("상품 상태를 변경하지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+      await alertDialog({ title: "상품 상태를 변경하지 못했습니다. 새로고침 후 다시 시도해 주세요." });
     }
   }
 
@@ -156,20 +159,14 @@ function SellContent() {
             </div>
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               <Field label="제조사" htmlFor="sell-manufacturer" required>
-                <select
-                  id="sell-manufacturer"
+                <Select
                   value={form.manufacturer}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, manufacturer: e.target.value as Manufacturer }))
-                  }
+                  onValueChange={(v) => setForm((f) => ({ ...f, manufacturer: v as Manufacturer }))}
+                  items={MANUFACTURERS.map((m) => ({ value: m, label: m }))}
+                  ariaLabel="제조사"
+                  id="sell-manufacturer"
                   className="h-11 px-3 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
-                >
-                  {MANUFACTURERS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                />
               </Field>
               <Field label="모델명" htmlFor="sell-model" required>
                 <input

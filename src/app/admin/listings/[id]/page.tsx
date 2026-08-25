@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import LoadingState from "@/components/LoadingState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AdminListingView } from "@/lib/admin-types";
 
 const labels = { DRAFT: "작성중", PENDING: "심사 대기", ACTIVE: "판매중", REJECTED: "반려", SOLDOUT: "품절", HIDDEN: "비노출" } as const;
 
 export default function AdminListingDetailPage() {
   const params = useParams<{ id: string }>();
+  const { prompt: promptDialog } = useDialogs();
   const [listing, setListing] = useState<AdminListingView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,15 +30,7 @@ export default function AdminListingDetailPage() {
     if (!listing) return;
     let reason: string | null | undefined = undefined;
     if (!approve) {
-      // window.prompt 는 sandboxed iframe·일부 엔터프라이즈 정책·자동화
-      // 환경에서 null 을 반환하지 않고 예외를 던진다. try 로 감싸지 않으면
-      // 그 예외가 uncaught rejection 으로 새어 버튼이 hard-fail 한다.
-      try {
-        reason = window.prompt("반려 사유를 입력해 주세요.");
-      } catch {
-        setError("이 환경에서는 반려 사유 입력창을 열 수 없습니다. 다른 브라우저에서 시도해 주세요.");
-        return;
-      }
+      reason = await promptDialog({ title: "반려 사유를 입력해 주세요.", multiline: true });
       if (!reason?.trim()) return;
     }
     const response = await fetch(`/api/admin/listings/${listing.id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ approve, ...(reason ? { reason } : {}) }) });
@@ -46,16 +40,7 @@ export default function AdminListingDetailPage() {
 
   async function delist() {
     if (!listing) return;
-    let reason: string | null;
-    // window.prompt 는 sandboxed iframe·일부 엔터프라이즈 정책·자동화
-    // 환경에서 null 을 반환하지 않고 예외를 던진다. try 로 감싸지 않으면
-    // 그 예외가 uncaught rejection 으로 새어 버튼이 hard-fail 한다.
-    try {
-      reason = window.prompt("판매 중지 사유를 입력해 주세요.");
-    } catch {
-      setError("이 환경에서는 판매 중지 사유 입력창을 열 수 없습니다. 다른 브라우저에서 시도해 주세요.");
-      return;
-    }
+    const reason = await promptDialog({ title: "판매 중지 사유를 입력해 주세요.", multiline: true });
     if (!reason?.trim()) return;
     const response = await fetch(`/api/admin/listings/${listing.id}/delist`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
     if (!response.ok) {

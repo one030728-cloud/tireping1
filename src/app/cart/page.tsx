@@ -3,19 +3,26 @@
 import Link from "next/link";
 import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import RequireAuth from "@/components/RequireAuth";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { CartRequestError, useCart } from "@/lib/cart";
 
 function CartContent() {
   const { items, removeItem, updateQuantity, clear } = useCart();
+  const { confirm: confirmDialog, alert: alertDialog } = useDialogs();
 
   const total = items.reduce((sum, i) => sum + i.price * i.quantity + i.extraShipping, 0);
 
   async function handleClear() {
-    if (window.confirm("장바구니에 담긴 모든 상품을 삭제할까요?")) {
+    if (
+      await confirmDialog({
+        title: "장바구니에 담긴 모든 상품을 삭제할까요?",
+        destructive: true,
+      })
+    ) {
       try {
         await clear();
       } catch {
-        window.alert("장바구니를 비우지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        await alertDialog({ title: "장바구니를 비우지 못했습니다. 잠시 후 다시 시도해 주세요." });
       }
     }
   }
@@ -28,7 +35,7 @@ function CartContent() {
         error instanceof CartRequestError && error.code === "CART_ITEM_NOT_FOUND"
           ? "장바구니 상품을 찾지 못했습니다. 새로고침 후 다시 시도해 주세요."
           : "장바구니를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-      window.alert(message);
+      await alertDialog({ title: message });
     }
   }
 

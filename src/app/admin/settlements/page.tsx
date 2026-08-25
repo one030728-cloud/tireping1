@@ -8,6 +8,7 @@ import type {
   PayoutStatus,
 } from "@/lib/payout-types";
 import LoadingState from "@/components/LoadingState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { formatDate } from "@/lib/formatDate";
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
@@ -55,6 +56,7 @@ async function fetchPayout(start: string, end: string): Promise<AdminPayoutView>
 }
 
 export default function AdminSettlementsPage() {
+  const { confirm: confirmDialog } = useDialogs();
   const initial = defaultPeriod();
   const [periodStart, setPeriodStart] = useState(initial.start);
   const [periodEnd, setPeriodEnd] = useState(initial.end);
@@ -99,10 +101,10 @@ export default function AdminSettlementsPage() {
   }
 
   async function confirmSettlement(row: AdminUnsettledSellerRow) {
-    const confirmed = window.confirm(
-      `${row.businessName} (${row.sellerCode}) 판매자의 ${periodStart} ~ ${periodEnd} 정산을 확정하시겠습니까?\n` +
-        `대상 주문 ${row.orderCount}건 · 실지급액 ${row.netAmount.toLocaleString()}원`,
-    );
+    const confirmed = await confirmDialog({
+      title: `${row.businessName} (${row.sellerCode}) 판매자의 ${periodStart} ~ ${periodEnd} 정산을 확정하시겠습니까?`,
+      description: `대상 주문 ${row.orderCount}건 · 실지급액 ${row.netAmount.toLocaleString()}원`,
+    });
     if (!confirmed) return;
 
     setActionError(null);
@@ -130,9 +132,11 @@ export default function AdminSettlementsPage() {
   }
 
   async function markPaid(settlement: AdminPayoutSettlementView) {
-    const confirmed = window.confirm(
-      `${settlement.seller.businessName} 판매자에게 ${settlement.netAmount.toLocaleString()}원을 지급 완료 처리하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`,
-    );
+    const confirmed = await confirmDialog({
+      title: `${settlement.seller.businessName} 판매자에게 ${settlement.netAmount.toLocaleString()}원을 지급 완료 처리하시겠습니까?`,
+      description: "이 작업은 되돌릴 수 없습니다.",
+      destructive: true,
+    });
     if (!confirmed) return;
 
     setActionError(null);

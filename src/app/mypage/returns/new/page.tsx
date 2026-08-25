@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import LoadingState from "@/components/LoadingState";
 import RequireAuth from "@/components/RequireAuth";
+import Select from "@/components/ui/Select";
 import { formatDate } from "@/lib/formatDate";
 import type { ReturnEligibleOrderView, ReturnRequestOrderContext } from "@/lib/return-types";
 
@@ -190,17 +191,13 @@ function RequestForm({ orderId, onDone }: { orderId: string; onDone: () => void 
       </div>
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">사유</span>
-        <select
+        <Select
           value={reason}
-          onChange={(event) => setReason(event.target.value)}
+          onValueChange={setReason}
+          items={REASON_OPTIONS.map((option) => ({ value: option, label: option }))}
           className="h-10 px-3 rounded-lg border border-border bg-background"
-        >
-          {REASON_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+          ariaLabel="사유"
+        />
       </label>
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium">상세 내용 (선택)</span>

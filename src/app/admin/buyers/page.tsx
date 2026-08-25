@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import type { AdminBuyerStatus, AdminBuyerView } from "@/lib/admin-types";
 
 const statusLabels: Record<AdminBuyerStatus, string> = {
@@ -14,6 +16,7 @@ const statusLabels: Record<AdminBuyerStatus, string> = {
 
 function BuyersContent() {
   const searchParams = useSearchParams();
+  const { prompt: promptDialog } = useDialogs();
   const [status, setStatus] = useState(searchParams.get("status") ?? "");
   const [buyers, setBuyers] = useState<AdminBuyerView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +70,7 @@ function BuyersContent() {
   }
 
   async function reject(id: string) {
-    const reason = window.prompt("거절 사유를 입력해 주세요.");
+    const reason = await promptDialog({ title: "거절 사유를 입력해 주세요.", multiline: true });
     if (!reason?.trim()) return;
     setError(null);
     const response = await fetch(`/api/admin/buyers/${id}/reject`, {
@@ -87,7 +90,7 @@ function BuyersContent() {
   }
 
   async function suspend(id: string) {
-    const reason = window.prompt("정지 사유를 입력해 주세요.");
+    const reason = await promptDialog({ title: "정지 사유를 입력해 주세요.", multiline: true });
     if (!reason?.trim()) return;
     setError(null);
     const response = await fetch(`/api/admin/buyers/${id}/suspend`, {
@@ -120,21 +123,22 @@ function BuyersContent() {
         <p className="text-sm text-muted">
           총 <b className="text-foreground">{buyers.length}</b>명
         </p>
-        <select
+        <Select
           value={status}
-          onChange={(event) => {
+          onValueChange={(value) => {
             setLoading(true);
-            setStatus(event.target.value);
+            setStatus(value);
           }}
+          items={[
+            { value: "", label: "전체 상태" },
+            { value: "PENDING", label: "승인 대기" },
+            { value: "ACTIVE", label: "활성" },
+            { value: "SUSPENDED", label: "정지" },
+            { value: "REJECTED", label: "거절" },
+          ]}
           className="h-10 px-3 rounded-lg border border-border text-sm bg-background"
-          aria-label="구매자 상태 필터"
-        >
-          <option value="">전체 상태</option>
-          <option value="PENDING">승인 대기</option>
-          <option value="ACTIVE">활성</option>
-          <option value="SUSPENDED">정지</option>
-          <option value="REJECTED">거절</option>
-        </select>
+          ariaLabel="구매자 상태 필터"
+        />
       </div>
       {error && <p className="text-sm text-accent mb-3">{error}</p>}
       {buyers.length === 0 ? (

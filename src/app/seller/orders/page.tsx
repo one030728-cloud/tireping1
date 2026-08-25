@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import LoadingState from "@/components/LoadingState";
+import { useDialogs } from "@/components/ui/DialogProvider";
 import { ORDER_STATUS, isCancelledOrderStatus } from "@/lib/order-status";
 import type { SellerOrderView, SellerShippingStatus } from "@/lib/seller-types";
 import { formatDate } from "@/lib/formatDate";
@@ -21,6 +22,7 @@ const nextAction: Partial<Record<SellerShippingStatus, { status: SellerShippingS
 
 
 export default function SellerOrdersPage() {
+  const { prompt: promptDialog } = useDialogs();
   const [orders, setOrders] = useState<SellerOrderView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,16 +109,7 @@ export default function SellerOrdersPage() {
   }
 
   async function cancelSellerOrder(order: SellerOrderView) {
-    let reason: string | null;
-    // window.prompt 는 sandboxed iframe·일부 엔터프라이즈 정책·자동화
-    // 환경에서 null 을 반환하지 않고 예외를 던진다. try 로 감싸지 않으면
-    // 그 예외가 uncaught rejection 으로 새어 버튼이 hard-fail 한다.
-    try {
-      reason = window.prompt("취소 사유를 입력해 주세요.");
-    } catch {
-      setError("이 환경에서는 입력 창을 열 수 없습니다.");
-      return;
-    }
+    const reason = await promptDialog({ title: "취소 사유를 입력해 주세요.", multiline: true });
     const trimmedReason = reason?.trim();
     if (!trimmedReason) return;
     setBusyId(order.id);

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import LoadingState from "@/components/LoadingState";
+import Select from "@/components/ui/Select";
 import { formatDate } from "@/lib/formatDate";
 import type { AdminInquiryView } from "@/lib/inquiry-types";
 
@@ -94,17 +95,18 @@ function InquiriesContent() {
         <p className="text-sm text-muted">
           총 <b className="text-foreground">{inquiries.length}</b>건
         </p>
-        <select
+        <Select
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
+          onValueChange={setStatus}
+          items={[
+            { value: "", label: "전체 상태" },
+            { value: "OPEN", label: "답변 대기" },
+            { value: "ANSWERED", label: "답변완료" },
+            { value: "CLOSED", label: "종료" },
+          ]}
           className="h-10 px-3 rounded-lg border border-border text-sm bg-background"
-          aria-label="문의 상태 필터"
-        >
-          <option value="">전체 상태</option>
-          <option value="OPEN">답변 대기</option>
-          <option value="ANSWERED">답변완료</option>
-          <option value="CLOSED">종료</option>
-        </select>
+          ariaLabel="문의 상태 필터"
+        />
       </div>
       {error && <p className="text-sm text-accent mb-3">{error}</p>}
       {inquiries.length === 0 ? (
