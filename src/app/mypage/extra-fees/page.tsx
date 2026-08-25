@@ -82,7 +82,7 @@ function ExtraFeesContent() {
             <tbody>
               {extraFees.map((e) => (
                 <tr key={e.orderId} className="border-b border-border hover:bg-surface-2">
-                  <td className="py-3 pr-3 text-brand font-semibold">{e.orderId}</td>
+                  <td className="py-3 pr-3 text-brand font-semibold tabular-nums break-all">{e.orderNo ?? e.orderId}</td>
                   <td className="py-3 pr-3">{e.itemLabel}</td>
                   <td className="py-3 pr-3">{e.extraShipping.toLocaleString()}원</td>
                   <td className="py-3 pr-3 whitespace-nowrap">{formatDate(e.orderedAt)}</td>

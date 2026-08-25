@@ -41,6 +41,9 @@ export interface TaxMonthEntry {
 
 export interface ExtraFeeEntry {
   orderId: string;
+  // 사람이 읽는 주문번호(20260825-0003). 화면 "주문번호" 컬럼에 내부 cuid 대신
+  // 이 값을 쓰고, 컬럼 이전 주문만 null 이라 그때는 orderId 로 폴백한다.
+  orderNo: string | null;
   itemLabel: string;
   extraShipping: number;
   orderedAt: string;

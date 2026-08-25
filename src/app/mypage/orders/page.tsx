@@ -408,11 +408,11 @@ function OrdersContent() {
                           checked={effectiveSelectedIds.has(o.id)}
                           onChange={() => toggleSelect(o)}
                           className="h-4 w-4"
-                          aria-label={`${o.id} 결제 선택`}
+                          aria-label={`${o.orderNo ?? o.id} 결제 선택`}
                         />
                       )}
                     </td>
-                    <td className="py-3 pr-3 text-brand font-semibold">{o.id}</td>
+                    <td className="py-3 pr-3 text-brand font-semibold tabular-nums break-all">{o.orderNo ?? o.id}</td>
                     <td className="py-3 pr-3">
                       <span
                         className={`inline-block px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${getStatusStyle(o.status)}`}

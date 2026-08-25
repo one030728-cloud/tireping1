@@ -262,6 +262,7 @@ async function getExtraFees(buyerId: string) {
 
   const extraFees: ExtraFeeEntry[] = orders.map((order) => ({
     orderId: order.id,
+    orderNo: order.orderNo,
     itemLabel: `${order.listing.product.manufacturer} ${order.listing.product.model}`,
     extraShipping: order.extraShipping,
     orderedAt: order.orderedAt.toISOString(),
