@@ -20,6 +20,10 @@ export type DepositRefundStatus = "NONE" | "COMPLETED" | "PARTIAL" | "PENDING";
 export interface DepositEntry {
   paymentId: string;
   tossOrderId: string;
+  // 사람이 읽는 주문번호들(20260825-0003). 결제 1건이 주문 여러 개를 묶으므로
+  // 배열. 화면은 이 값을 "통합주문번호"로 보여주고, 컬럼 이전 주문(비어 있음)만
+  // tossOrderId 로 폴백한다.
+  orderNos: string[];
   itemLabel: string;
   paidAmount: number;
   refundAmount: number;

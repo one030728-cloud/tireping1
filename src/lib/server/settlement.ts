@@ -25,7 +25,9 @@ function paymentItemLabel(orderCount: number) {
 }
 
 const buyerPaymentInclude = {
-  orders: { select: { id: true } },
+  // orderNo 는 입출금내역의 "통합주문번호"를 사람이 읽는 값으로 보여주기 위해,
+  // id 는 결제에 묶인 주문 개수(itemLabel)를 세기 위해 필요하다.
+  orders: { select: { id: true, orderNo: true } },
 } satisfies Prisma.PaymentInclude;
 
 type BuyerPaymentRecord = Prisma.PaymentGetPayload<{
@@ -91,6 +93,9 @@ function toDepositEntry(payment: BuyerPaymentRecord): DepositEntry {
   return {
     paymentId: payment.id,
     tossOrderId: payment.tossOrderId,
+    orderNos: payment.orders
+      .map((order) => order.orderNo)
+      .filter((orderNo): orderNo is string => orderNo !== null),
     itemLabel: paymentItemLabel(payment.orders.length),
     paidAmount: payment.amount,
     refundAmount: payment.refundAmount,

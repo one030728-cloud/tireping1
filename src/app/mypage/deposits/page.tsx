@@ -83,7 +83,13 @@ function DepositsContent() {
             <tbody>
               {deposits.map((d) => (
                 <tr key={d.paymentId} className="border-b border-border hover:bg-surface-2">
-                  <td className="py-3 pr-3 text-brand font-semibold">{d.tossOrderId}</td>
+                  <td className="py-3 pr-3 text-brand font-semibold break-all">
+                    {d.orderNos.length === 0
+                      ? d.tossOrderId
+                      : d.orderNos.length === 1
+                        ? d.orderNos[0]
+                        : `${d.orderNos[0]} 외 ${d.orderNos.length - 1}건`}
+                  </td>
                   <td className="py-3 pr-3">{d.itemLabel}</td>
                   <td className="py-3 pr-3">{d.paidAmount ? `${d.paidAmount.toLocaleString()}원` : "-"}</td>
                   <td className="py-3 pr-3">
