@@ -479,7 +479,7 @@ function OrdersContent() {
                         checked={effectiveSelectedIds.has(o.id)}
                         onChange={() => toggleSelect(o)}
                         className="mt-1 h-4 w-4 shrink-0"
-                        aria-label={`${o.id} 결제 선택`}
+                        aria-label={`${o.orderNo ?? o.id} 결제 선택`}
                       />
                     )}
                     <div className="min-w-0">
