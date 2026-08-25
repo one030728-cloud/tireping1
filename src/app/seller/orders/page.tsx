@@ -106,6 +106,44 @@ export default function SellerOrdersPage() {
     setBusyId(null);
   }
 
+  async function cancelSellerOrder(order: SellerOrderView) {
+    let reason: string | null;
+    // window.prompt 는 sandboxed iframe·일부 엔터프라이즈 정책·자동화
+    // 환경에서 null 을 반환하지 않고 예외를 던진다. try 로 감싸지 않으면
+    // 그 예외가 uncaught rejection 으로 새어 버튼이 hard-fail 한다.
+    try {
+      reason = window.prompt("취소 사유를 입력해 주세요.");
+    } catch {
+      setError("이 환경에서는 입력 창을 열 수 없습니다.");
+      return;
+    }
+    const trimmedReason = reason?.trim();
+    if (!trimmedReason) return;
+    setBusyId(order.id);
+    setError(null);
+    const response = await fetch(`/api/seller/orders/${order.id}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: trimmedReason }),
+    });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const message =
+        body?.error === "CANCEL_AFTER_SHIPPING"
+          ? "이미 발송된 주문은 취소할 수 없습니다."
+          : body?.error === "ORDER_ALREADY_CANCELLED"
+            ? "이미 취소된 주문입니다."
+            : body?.error === "CANCEL_REASON_REQUIRED"
+              ? "취소 사유를 입력해 주세요."
+              : "주문 취소에 실패했습니다.";
+      setError(message);
+      setBusyId(null);
+      return;
+    }
+    await loadOrders();
+    setBusyId(null);
+  }
+
   if (loading) return <LoadingState />;
 
   return (
@@ -132,6 +170,8 @@ export default function SellerOrdersPage() {
             const unpaid = order.status === ORDER_STATUS.PAYMENT_PENDING;
             const cancelled = isCancelledOrderStatus(order.status);
             const shippingBlocked = unpaid || cancelled;
+            const shipped = order.shippingStatus === "SHIPPED" || order.shippingStatus === "DELIVERED";
+            const cancellable = !cancelled && !shipped;
             return (
               <article key={order.id} className="card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4 mb-4">
@@ -163,6 +203,15 @@ export default function SellerOrdersPage() {
                         className="btn-primary h-8 px-3 text-xs mt-1"
                       >
                         {busyId === order.id ? "처리 중..." : "주문확인"}
+                      </button>
+                    )}
+                    {cancellable && (
+                      <button
+                        onClick={() => void cancelSellerOrder(order)}
+                        disabled={busyId === order.id}
+                        className="btn-outline text-accent border-accent h-10 text-sm mt-1"
+                      >
+                        {busyId === order.id ? "처리 중..." : "주문 취소"}
                       </button>
                     )}
                   </div>
