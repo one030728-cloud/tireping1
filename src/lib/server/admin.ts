@@ -104,6 +104,10 @@ export const adminReviewSchema = z.object({
   reason: z.string().trim().max(500).optional(),
 });
 
+export const adminDelistSchema = z.object({
+  reason: z.string().trim().min(1, "사유를 입력해 주세요.").max(500),
+});
+
 export const adminSuspendSchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
@@ -635,6 +639,62 @@ export async function reviewAdminListing(
             body: `등록하신 상품이 반려되었습니다. 사유: ${data.reason}`,
           },
     );
+    return { kind: "OK" as const, listing: result.listing };
+  }
+  return result;
+}
+
+// 이미 게시된(ACTIVE/SOLDOUT) 상품을 판매 중지시킬 때는 HIDDEN이 아니라
+// REJECTED로 보낸다. HIDDEN은 suspendAdminSeller/reinstateAdminSeller
+// 전용 상태다 — 판매자를 정지시키면 그 판매자의 ACTIVE 상품이 모두
+// HIDDEN으로 바뀌고, 이후 판매자를 복귀시키면 reinstateAdminSeller가
+// "그 판매자의 HIDDEN 상품은 전부 정지 때문에 숨겨진 것"이라고 가정하고
+// ACTIVE/SOLDOUT으로 일괄 복원한다. 만약 여기서도 HIDDEN을 쓰면, 정책
+// 위반으로 판매 중지시킨 상품이 나중에 (관련 없는) 판매자 정지→복귀
+// 사이클만으로 조용히 다시 노출되어 버린다. REJECTED는 이 충돌이 없고,
+// 구매자 목록 조회에서도 제외되며(products.ts는 ACTIVE만 노출), 판매자의
+// 기존 재심사 제출 경로로 복구할 수 있다.
+export async function delistAdminListing(
+  listingId: string,
+  adminId: string,
+  data: z.infer<typeof adminDelistSchema>,
+) {
+  const result = await prisma.$transaction(async (tx) => {
+    const listing = await tx.listing.findUnique({ where: { id: listingId } });
+    if (!listing) return { kind: "NOT_FOUND" as const };
+    if (listing.status !== "ACTIVE" && listing.status !== "SOLDOUT") {
+      return { kind: "INVALID_STATUS" as const, status: listing.status };
+    }
+
+    const updated = await tx.listing.update({
+      where: { id: listingId },
+      data: {
+        status: "REJECTED",
+        rejectedReason: data.reason,
+        reviewedAt: new Date(),
+        reviewedBy: adminId,
+      },
+      include: adminListingInclude,
+    });
+    await tx.adminActionLog.create({
+      data: {
+        adminId,
+        action: "LISTING_DELIST",
+        targetType: "Listing",
+        targetId: listingId,
+        reason: data.reason,
+      },
+    });
+    return { kind: "OK" as const, listing: toAdminListingView(updated), sellerUserId: updated.seller.userId };
+  });
+
+  if (result.kind === "OK") {
+    // Notification fires only after the transaction above has committed —
+    // never from inside it (see notify.ts).
+    await notifyUser(result.sellerUserId, "LISTING_REJECTED", {
+      subject: "상품이 판매 중지되었습니다",
+      body: `등록하신 상품이 판매 중지되었습니다. 사유: ${data.reason}`,
+    });
     return { kind: "OK" as const, listing: result.listing };
   }
   return result;

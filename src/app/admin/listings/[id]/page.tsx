@@ -44,6 +44,28 @@ export default function AdminListingDetailPage() {
     setListing((current) => current ? { ...current, status: approve ? (current.stock > 0 ? "ACTIVE" : "SOLDOUT") : "REJECTED", rejectedReason: approve ? null : reason ?? null } : current);
   }
 
+  async function delist() {
+    if (!listing) return;
+    let reason: string | null;
+    // window.prompt 는 sandboxed iframe·일부 엔터프라이즈 정책·자동화
+    // 환경에서 null 을 반환하지 않고 예외를 던진다. try 로 감싸지 않으면
+    // 그 예외가 uncaught rejection 으로 새어 버튼이 hard-fail 한다.
+    try {
+      reason = window.prompt("판매 중지 사유를 입력해 주세요.");
+    } catch {
+      setError("이 환경에서는 판매 중지 사유 입력창을 열 수 없습니다. 다른 브라우저에서 시도해 주세요.");
+      return;
+    }
+    if (!reason?.trim()) return;
+    const response = await fetch(`/api/admin/listings/${listing.id}/delist`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null) as { error?: string } | null;
+      setError(data?.error === "LISTING_NOT_LIVE" ? "이미 판매 중이 아닌 상품입니다." : "상품 판매 중지에 실패했습니다.");
+      return;
+    }
+    setListing((current) => current ? { ...current, status: "REJECTED", rejectedReason: reason } : current);
+  }
+
   if (loading) return <LoadingState />;
   if (error || !listing) return <div className="px-4 py-16 text-center"><p className="text-accent mb-4">{error ?? "상품을 찾을 수 없습니다."}</p><Link href="/admin/listings" className="text-brand font-semibold">상품 심사 목록으로</Link></div>;
 
@@ -58,6 +80,7 @@ export default function AdminListingDetailPage() {
         <section className="card p-5"><h2 className="font-bold mb-4">판매 조건</h2><div className="grid grid-cols-2 gap-x-5 gap-y-3 text-sm"><Info label="공장도가" value={`${listing.factoryPrice.toLocaleString()}원`} /><Info label="판매가" value={`${listing.price.toLocaleString()}원`} /><Info label="할인율" value={`${listing.discountRate}%`} /><Info label="재고" value={listing.stock.toLocaleString()} /><Info label="최소 주문" value={listing.minOrder.toLocaleString()} /><Info label="택배 판매자" value={`${listing.seller.code} · ${listing.seller.businessName}`} /></div></section>
       </div>
       {listing.status === "PENDING" && <div className="flex justify-end gap-2 mt-5"><button onClick={() => void review(false)} className="btn-outline h-11 px-5 text-accent border-accent">반려</button><button onClick={() => void review(true)} className="btn-primary h-11 px-5">승인 및 게시</button></div>}
+      {(listing.status === "ACTIVE" || listing.status === "SOLDOUT") && <div className="flex justify-end gap-2 mt-5"><button onClick={() => void delist()} className="btn-outline text-accent border-accent h-11 px-5">판매 중지</button></div>}
     </div>
   );
 }
