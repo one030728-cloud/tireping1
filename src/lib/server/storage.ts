@@ -1,5 +1,5 @@
-import { S3Client } from "@aws-sdk/client-s3";
-import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { z } from "zod";
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -121,43 +121,42 @@ export async function createImagePresign(
   const extension = extensionByContentType[data.contentType];
   const key = `listing-images/${userId}/${crypto.randomUUID()}.${extension}`;
 
-  // A presigned PUT's ContentLength can be bound into the signature (via
-  // signableHeaders) so the request must carry a matching Content-Length
-  // header, but that requires an *exact* byte match end-to-end to the
-  // storage backend. This bucket is Cloudflare R2 (see README's S3_ENDPOINT
-  // example), fronted over the public internet rather than verified in this
-  // change against a live bucket — if anything between the browser and R2
-  // (a corporate proxy, an SDK/runtime that streams instead of sending a
-  // fixed-length body) drops or rewrites that header, every upload would
-  // 403 with a signature mismatch and sellers couldn't add photos at all.
-  // A presigned POST with a `content-length-range` condition only enforces
-  // a byte-count range instead of an exact match, which is both enough to
-  // close the "declare size:1000, upload gigabytes" hole this exists for
-  // and more tolerant of exactly that kind of transport variance.
+  // Presigned PUT — deliberately NOT presigned POST. Cloudflare R2 (this
+  // project's documented storage backend, see README) does not implement the
+  // S3 POST Object API at all: its presigned-URL docs state "POST (multipart
+  // form uploads via HTML forms) is not currently supported" and list only
+  // GET/HEAD/PUT/DELETE (developers.cloudflare.com/r2/api/s3/presigned-urls,
+  // checked 2026-08-28). An earlier revision of this file switched to
+  // createPresignedPost for its content-length-range condition; on R2 that
+  // fails every upload outright, so it was reverted to this approach.
   //
-  // NOT verified against a live R2 bucket in this change (no credentials
-  // available here) — manually verify with a real seller/admin account
-  // before deploying: upload one listing image end-to-end and confirm it
-  // succeeds and appears at the returned `url`.
-  const { url: uploadUrl, fields } = await createPresignedPost(config.client, {
+  // Size enforcement instead binds ContentLength into the PUT signature (via
+  // signableHeaders below): R2 then rejects any request whose Content-Length
+  // doesn't exactly match the `size` the client declared to the presign
+  // endpoint (which imagePresignSchema caps at MAX_IMAGE_BYTES). Browsers
+  // always send an exact Content-Length for a fixed-size File/Blob body, and
+  // the upload goes straight from the browser to the R2 endpoint with no
+  // intermediary that could rewrite the header, so the exact-match
+  // requirement is safe in this deployment. Verify once against the live
+  // bucket after deploying (upload one listing image as a seller/admin and
+  // confirm it renders from the returned `url`).
+  const command = new PutObjectCommand({
     Bucket: config.bucket,
     Key: key,
-    Conditions: [
-      ["content-length-range", 1, MAX_IMAGE_BYTES],
-      { "Content-Type": data.contentType },
-    ],
-    Fields: {
-      "Content-Type": data.contentType,
-    },
-    Expires: PRESIGNED_URL_EXPIRES_IN,
+    ContentType: data.contentType,
+    ContentLength: data.size,
+  });
+  const uploadUrl = await getSignedUrl(config.client, command, {
+    expiresIn: PRESIGNED_URL_EXPIRES_IN,
+    signableHeaders: new Set(["content-length"]),
   });
 
   return {
     key,
     uploadUrl,
-    fields,
     url: publicObjectUrl(config.publicBaseUrl, key),
     contentType: data.contentType,
+    contentLength: data.size,
     expiresIn: PRESIGNED_URL_EXPIRES_IN,
   };
 }
