@@ -261,7 +261,24 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
           setError(lines.length > 0 ? lines.join("\n") : "입력값을 확인해 주세요.");
           return;
         }
-        setError("상품을 저장하지 못했습니다.");
+        // 입력값 문제가 아닌 실패(로그인 만료, 판매자 승인 대기/정지 등)를
+        // 전부 "상품을 저장하지 못했습니다" 한 줄로 뭉개면 판매자가 원인을
+        // 알 수 없다 — 가드가 내려주는 에러 코드별로 실제 이유를 보여준다.
+        if (body?.error === "UNAUTHENTICATED") {
+          setError("로그인이 만료되었습니다. 다시 로그인한 뒤 시도해 주세요.");
+          return;
+        }
+        if (body?.error === "SELLER_INACTIVE" || body?.error === "SELLER_PROFILE_REQUIRED" || body?.error === "FORBIDDEN") {
+          setError(
+            "판매자 계정이 아직 활성 상태가 아닙니다. 가입 승인이 완료되지 않았거나 계정이 정지된 경우 상품을 등록할 수 없습니다. 관리자에게 문의해 주세요.",
+          );
+          return;
+        }
+        setError(
+          body?.error
+            ? `상품을 저장하지 못했습니다. (오류 코드: ${body.error})`
+            : "상품을 저장하지 못했습니다.",
+        );
         return;
       }
 
