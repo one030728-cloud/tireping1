@@ -183,36 +183,83 @@ async function removeNonCanonicalSeedData() {
     const staleSellerIds = staleUsers.flatMap((u) => (u.seller ? [u.seller.id] : []));
     const staleBuyerIds = staleUsers.flatMap((u) => (u.buyer ? [u.buyer.id] : []));
 
-    if (staleSellerIds.length > 0) {
-      const staleListings = await tx.listing.findMany({
-        where: { sellerId: { in: staleSellerIds } },
-        select: { id: true },
-      });
-      const staleListingIds = staleListings.map((l) => l.id);
+    const staleListings = staleSellerIds.length > 0
+      ? await tx.listing.findMany({
+          where: { sellerId: { in: staleSellerIds } },
+          select: { id: true },
+        })
+      : [];
+    const staleListingIds = staleListings.map((l) => l.id);
 
-      if (staleListingIds.length > 0) {
-        // CartItem.listingId is ON DELETE SET NULL, so no explicit cleanup is
-        // needed for it before the listing rows below are deleted.
-        await tx.listingPriceChange.deleteMany({ where: { listingId: { in: staleListingIds } } });
-        await tx.listingImage.deleteMany({ where: { listingId: { in: staleListingIds } } });
-        await tx.order.deleteMany({ where: { listingId: { in: staleListingIds } } });
-        await tx.listing.deleteMany({ where: { id: { in: staleListingIds } } });
-      }
+    // Every order about to be deleted, across both axes (a stale buyer's
+    // orders, and every order on a stale seller's listings). Computed up
+    // front because Review.orderId / ReturnRequest.orderId /
+    // SettlementAdjustment.orderId are all RESTRICT-on-delete FKs — their
+    // rows must go before the order rows, or order.deleteMany below fails
+    // with P2003 and aborts the whole cleanup transaction. (Same class of
+    // failure the Payment comment below describes for User.)
+    const staleOrders = await tx.order.findMany({
+      where: {
+        OR: [
+          { buyerId: { in: staleUserIds } },
+          ...(staleListingIds.length > 0 ? [{ listingId: { in: staleListingIds } }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    const staleOrderIds = staleOrders.map((o) => o.id);
+
+    if (staleOrderIds.length > 0) {
+      await tx.review.deleteMany({ where: { orderId: { in: staleOrderIds } } });
+      await tx.returnRequest.deleteMany({ where: { orderId: { in: staleOrderIds } } });
+      await tx.settlementAdjustment.deleteMany({ where: { orderId: { in: staleOrderIds } } });
+    }
+    // A stale buyer can also have reviewed / return-requested a canonical
+    // seller's order, and a canonical buyer can have reviewed a stale
+    // seller — those rows reference the stale User/Seller directly, so they
+    // have to go too regardless of which orders were caught above.
+    await tx.review.deleteMany({ where: { buyerId: { in: staleUserIds } } });
+    await tx.returnRequest.deleteMany({ where: { buyerId: { in: staleUserIds } } });
+    if (staleSellerIds.length > 0) {
+      await tx.review.deleteMany({ where: { sellerId: { in: staleSellerIds } } });
+      await tx.settlementAdjustment.deleteMany({ where: { sellerId: { in: staleSellerIds } } });
     }
 
-    await tx.order.deleteMany({ where: { buyerId: { in: staleUserIds } } });
+    if (staleOrderIds.length > 0) {
+      await tx.order.deleteMany({ where: { id: { in: staleOrderIds } } });
+    }
+
+    if (staleListingIds.length > 0) {
+      // CartItem.listingId is ON DELETE SET NULL, so no explicit cleanup is
+      // needed for it before the listing rows below are deleted.
+      await tx.listingPriceChange.deleteMany({ where: { listingId: { in: staleListingIds } } });
+      await tx.listingImage.deleteMany({ where: { listingId: { in: staleListingIds } } });
+      await tx.listing.deleteMany({ where: { id: { in: staleListingIds } } });
+    }
+
     // Payment.buyerId is a required, RESTRICT-on-delete FK, so payments for stale
     // buyers must be removed before the buyer's User row, or user.deleteMany below
     // fails with P2003 and leaves the earlier deletes in this half-applied.
+    // PasswordResetToken / ShippingAddress / Inquiry / TaxInvoice all hold the
+    // same kind of required FK to User and must go for the same reason.
     await tx.payment.deleteMany({ where: { buyerId: { in: staleUserIds } } });
     await tx.cartItem.deleteMany({ where: { userId: { in: staleUserIds } } });
     await tx.wishlistEntry.deleteMany({ where: { userId: { in: staleUserIds } } });
+    await tx.passwordResetToken.deleteMany({ where: { userId: { in: staleUserIds } } });
+    await tx.shippingAddress.deleteMany({ where: { userId: { in: staleUserIds } } });
+    await tx.inquiry.deleteMany({ where: { userId: { in: staleUserIds } } });
+    await tx.taxInvoice.deleteMany({ where: { userId: { in: staleUserIds } } });
 
     if (staleBuyerIds.length > 0) {
       await tx.buyer.deleteMany({ where: { id: { in: staleBuyerIds } } });
     }
 
     if (staleSellerIds.length > 0) {
+      // Settlement.sellerId is a required FK to Seller; its own dependents are
+      // already gone by here (the seller's orders above, and that seller's
+      // SettlementAdjustment rows — Adjustment.settlementId is SET NULL
+      // anyway), so settlements go right before the Seller rows they block.
+      await tx.settlement.deleteMany({ where: { sellerId: { in: staleSellerIds } } });
       await tx.seller.deleteMany({ where: { id: { in: staleSellerIds } } });
     }
     await tx.user.deleteMany({ where: { id: { in: staleUserIds } } });
