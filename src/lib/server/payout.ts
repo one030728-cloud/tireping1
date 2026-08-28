@@ -87,6 +87,7 @@ import type {
   PayoutAggregate,
   PayoutSettlementView,
 } from "@/lib/payout-types";
+import { currentKstMonthPeriod, parseKstDateOnly } from "./kst";
 import { prisma } from "./prisma";
 
 const cancelledStatusValues = Object.values(CANCEL_STATUS);
@@ -113,36 +114,35 @@ export const nonSettleableStatusValues = cancelledStatusValues.filter(
 // Period helpers. Every query in this module is scoped to a period, expressed
 // internally as [start, end) — end is always exclusive so a date-only "정산
 // 기간 종료일" picked by a user can unambiguously include that whole day
-// (see parsePeriodRange).
+// (see parsePeriodRange). Month/day boundaries are KST, not UTC — see
+// src/lib/server/kst.ts's header for why this has to match settlement.ts and
+// taxInvoice.ts exactly.
 // ---------------------------------------------------------------------------
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-function parseDateOnly(value: string): Date | null {
-  if (!DATE_ONLY_RE.test(value)) return null;
-  const [y, m, d] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
 // The default, no-picker period every "이번 기간" view uses: the 1st of the
-// current month at 00:00 through right now. Using `now` (not end-of-month) as
-// the upper bound is deliberate — the month isn't over, and nothing dated
-// later than "now" can exist yet, so there's no practical difference and this
-// avoids ever implying a future cutoff.
+// current KST calendar month at 00:00 KST through right now. Using `now` (not
+// end-of-month) as the upper bound is deliberate — the month isn't over, and
+// nothing dated later than "now" can exist yet, so there's no practical
+// difference and this avoids ever implying a future cutoff. Delegates to
+// kst.ts's currentKstMonthPeriod (the shared single source of truth for month
+// boundaries across payout/settlement/taxInvoice) — kept under this name so
+// existing call sites (app/api/admin/settlements/route.ts,
+// app/admin/settlements/page.tsx) don't have to change.
 export function getCurrentMonthPeriod(now: Date = new Date()): { start: Date; end: Date } {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  return { start, end: now };
+  return currentKstMonthPeriod(now);
 }
 
-// Parses two required "YYYY-MM-DD" strings (an admin-chosen period) into an
-// exclusive [start, end) range. `endStr` is the last day the admin wants
-// *included*, so it's bumped to the start of the following day rather than
-// used as-is — using it directly would silently drop that entire last day.
+// Parses two required "YYYY-MM-DD" strings (an admin-chosen period, KST wall-
+// clock dates) into an exclusive [start, end) range of UTC instants. `endStr`
+// is the last KST day the admin wants *included*, so it's bumped to the start
+// of the following KST day rather than used as-is — using it directly would
+// silently drop that entire last day.
 export function parsePeriodRange(startStr: string, endStr: string): { start: Date; end: Date } | null {
-  const start = parseDateOnly(startStr);
-  const endDay = parseDateOnly(endStr);
+  const start = parseKstDateOnly(startStr);
+  const endDay = parseKstDateOnly(endStr);
   if (!start || !endDay) return null;
   const end = new Date(endDay.getTime() + ONE_DAY_MS);
   if (start.getTime() >= end.getTime()) return null;

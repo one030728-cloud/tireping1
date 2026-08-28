@@ -7,6 +7,7 @@ import type {
   SettlementView,
   TaxMonthEntry,
 } from "@/lib/settlement-types";
+import { kstMonthString } from "./kst";
 import { prisma } from "./prisma";
 
 export function serverErrorResponse(error: unknown, message: string) {
@@ -188,7 +189,7 @@ async function getBuyerPaidOrderMonthlyAmounts(buyerId: string): Promise<PaidOrd
     // 세무 참고용으로 쓰는 숫자가 실제 청구액보다 배송비만큼 적게 나온다.
     const total = order.unitPrice * order.quantity + order.extraShipping + order.shippingFee;
     const paidAt = order.payment?.approvedAt ?? order.orderedAt;
-    return { month: paidAt.toISOString().slice(0, 7), total }; // month: "YYYY-MM"
+    return { month: kstMonthString(paidAt), total }; // month: "YYYY-MM" (KST calendar month)
   });
 }
 
