@@ -75,7 +75,7 @@ S3_PUBLIC_BASE_URL=https://cdn.example.com
 S3_FORCE_PATH_STYLE=false
 ```
 
-`S3_PUBLIC_BASE_URL`은 업로드된 파일을 브라우저가 읽을 수 있는 공개 도메인(Cloudflare R2 커스텀 도메인 또는 S3/CloudFront 주소)이어야 합니다. 버킷 CORS에는 앱 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허용해야 합니다.
+`S3_PUBLIC_BASE_URL`은 업로드된 파일을 브라우저가 읽을 수 있는 공개 도메인(Cloudflare R2 커스텀 도메인 또는 S3/CloudFront 주소)이어야 합니다. 업로드는 presigned **POST**(multipart form, `content-length-range` 조건)로 이루어지므로 버킷 CORS에는 앱 도메인의 `POST` 요청과 `Content-Type` 헤더를 허용해야 합니다(과거 PUT 방식에서 변경됨 — PUT만 허용된 CORS 설정에서는 브라우저 프리플라이트 단계에서 업로드가 실패합니다). 배포 전 실제 판매자/관리자 계정으로 이미지 1건을 업로드해 R2가 presigned POST를 정상 처리하는지 반드시 확인하세요.
 
 ## 운영 가이드
 
