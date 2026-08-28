@@ -13,6 +13,7 @@ import {
 import { prisma } from "./prisma";
 import { notifyUser } from "./notify";
 import { resolveExtraShipping, resolveSellerShippingFee } from "./pricing";
+import { createSettlementClawbackForOrder, nonSettleableStatusValues } from "./payout";
 
 const orderItemSchema = z.object({
   id: z.string().trim().min(1).max(200),
@@ -864,6 +865,35 @@ export async function cancelOrder(
     if (nextStatus === CANCEL_STATUS.PAYMENT_AFTER && order.paymentId) {
       const payment = await tx.payment.findUnique({ where: { id: order.paymentId } });
       if (payment && payment.status === "DONE") {
+        // 정산 후 취소 클로백: 이 주문이 이미 판매자에게 정산·지급된 뒤
+        // 취소되는 경우(가능한 경로는 ADMIN 뿐 — 비관리자는 배송중 이후
+        // 취소가 막혀 있고, 정산 대상이 되려면 최소 결제 승인까지는 끝나
+        // 있어야 한다), 아래의 구매자 환불 추적(Payment.refundRequiredAt)과
+        // 별개로 판매자가 이미 받아간 돈을 되돌려야 한다. returns.ts 의 반품
+        // 완료 클로백과 동일한 헬퍼 사용 — payout.ts 의
+        // createSettlementClawbackForOrder 참고. 이미 반품완료로 취소 상태가
+        // 된 주문은 위쪽 isCancelledOrderStatus 가드로 이 함수에 재진입할 수
+        // 없으므로 두 호출부가 같은 주문에 대해 중복 생성하는 경로는
+        // 구조적으로 없고, SettlementAdjustment.orderId 의 @unique 가 최후
+        // 안전망이다. 아래 배송비 승계 로직과는 서로 배타적으로 동작한다 —
+        // 승계는 이 주문이 미정산(settlementId === null)일 때만 일어나므로
+        // 같은 배송비가 승계와 클로백 양쪽에서 동시에 처리될 수 없다.
+        if (order.settlementId !== null) {
+          await createSettlementClawbackForOrder(
+            tx,
+            {
+              id: order.id,
+              sellerId: order.sellerId,
+              settlementId: order.settlementId,
+              unitPrice: order.unitPrice,
+              quantity: order.quantity,
+              extraShipping: order.extraShipping,
+              shippingFee: order.shippingFee,
+            },
+            "ORDER_CANCELLED_AFTER_SETTLEMENT",
+          );
+        }
+
         // 배송비 승계 (LEAK A 수정): 이 주문이 배송비를 짊어지고 있는데
         // (shippingFee > 0) 같은 결제·같은 판매자의 다른 주문이 아직 살아
         // 있다면, 그 배송비는 여전히 실제로 나갈 배송 건에 대한 몫이다 —
@@ -903,11 +933,22 @@ export async function cancelOrder(
         }
         const cancelledOrderAmount =
           order.unitPrice * order.quantity + order.extraShipping + refundableShippingFee;
+        // nonSettleableStatusValues (NOT the full cancelledStatusValues):
+        // the question here is "does any money on this payment still
+        // legitimately belong to a sale", and an EXCHANGE_COMPLETED sibling
+        // is exactly that — the buyer kept the goods and its money must stay
+        // charged. Counting it as inactive (the full set's answer) would
+        // flip isFullRefund to true and settleOrderRefundViaToss would then
+        // submit a null cancelAmount — a FULL Toss cancel that refunds the
+        // exchanged order's money to a buyer who keeps the goods. A
+        // RETURN_COMPLETED sibling stays "inactive" on purpose: its money is
+        // refund-owed anyway, so letting the full cancel sweep it up pays a
+        // debt that already exists.
         const remainingActiveOrders = await tx.order.count({
           where: {
             paymentId: payment.id,
             id: { not: orderId },
-            status: { notIn: cancelledStatusValues },
+            status: { notIn: nonSettleableStatusValues },
           },
         });
         // isFullRefund only ever means "this is the last active order on the

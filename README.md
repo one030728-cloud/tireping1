@@ -75,7 +75,7 @@ S3_PUBLIC_BASE_URL=https://cdn.example.com
 S3_FORCE_PATH_STYLE=false
 ```
 
-`S3_PUBLIC_BASE_URL`은 업로드된 파일을 브라우저가 읽을 수 있는 공개 도메인(Cloudflare R2 커스텀 도메인 또는 S3/CloudFront 주소)이어야 합니다. 버킷 CORS에는 앱 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허용해야 합니다.
+`S3_PUBLIC_BASE_URL`은 업로드된 파일을 브라우저가 읽을 수 있는 공개 도메인(Cloudflare R2 커스텀 도메인 또는 S3/CloudFront 주소)이어야 합니다. 업로드는 presigned **PUT**으로 이루어지며(R2는 presigned POST를 지원하지 않습니다 — [Cloudflare 문서](https://developers.cloudflare.com/r2/api/s3/presigned-urls/)에 "POST ... is not currently supported"로 명시), 서명에 Content-Length가 묶여 있어 선언한 파일 크기와 실제 업로드 크기가 정확히 일치해야 합니다. 버킷 CORS에는 앱 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허용해야 합니다. 배포 후 실제 판매자/관리자 계정으로 이미지 1건을 업로드해 정상 저장·표시되는지 확인하세요.
 
 ## 운영 가이드
 

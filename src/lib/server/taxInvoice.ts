@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import type { AdminTaxInvoiceView, TaxInvoiceView } from "@/lib/tax-invoice-types";
+import { kstMonthString } from "./kst";
 import { prisma } from "./prisma";
 import { notifyUser } from "./notify";
 import { getBuyerMonthPaidTotal } from "./settlement";
@@ -20,12 +21,13 @@ import { getBuyerMonthPaidTotal } from "./settlement";
 const PERIOD_MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 // Same "YYYY-MM" derivation getBuyerPaidOrderMonthlyAmounts (settlement.ts)
-// uses (paidAt.toISOString().slice(0, 7)) — i.e. UTC calendar month, not a
-// KST-shifted one. Using a different convention here would make "is this
-// month over yet" disagree by a few hours around midnight KST with how
-// months are actually bucketed everywhere else this app computes them.
+// uses (kstMonthString, src/lib/server/kst.ts) — i.e. KST calendar month, not
+// a UTC one. Using a different convention here would make "is this month
+// over yet" disagree by a few hours around midnight KST with how months are
+// actually bucketed everywhere else this app computes them (payout.ts's
+// settlement periods included — see kst.ts's header).
 function currentMonthString(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 7);
+  return kstMonthString(now);
 }
 
 export const requestTaxInvoiceSchema = z.object({

@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getPublicProduct, toProductView } from "@/lib/server/products";
+import { getSession } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,13 @@ export async function GET(
       return Response.json({ error: "PRODUCT_NOT_FOUND" }, { status: 404 });
     }
 
-    const view = toProductView(product, request.nextUrl.searchParams.get("dot"));
+    // Route stays public — only the wholesale-price-adjacent fields are
+    // gated inside toProductView/toSeller, not by a 401 here. See the
+    // SECURITY BOUNDARY comment in src/lib/server/products.ts.
+    const session = await getSession();
+    const view = toProductView(product, request.nextUrl.searchParams.get("dot"), {
+      includeSensitive: Boolean(session),
+    });
     if (!view) {
       return Response.json({ error: "PRODUCT_NOT_FOUND" }, { status: 404 });
     }

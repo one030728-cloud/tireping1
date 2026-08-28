@@ -22,13 +22,17 @@ export async function POST(request: Request) {
 
   const ip = getClientIp(request.headers);
   const identifierKey = `find-id:${payload.businessRegNumber}`;
-  const ipKey = `find-id-ip:${ip}`;
+  // getClientIp returns null when it can't determine a trustworthy IP (see
+  // requestIp.ts) — effectively local-dev-only behind Render's proxy in
+  // production. Skip only the IP axis then; the identifier axis still
+  // applies regardless, same pattern as auth.ts's login limiter.
+  const ipKey = ip !== null ? `find-id-ip:${ip}` : null;
 
-  if (findIdIdentifierLimiter.isBlocked(identifierKey) || findIdIpLimiter.isBlocked(ipKey)) {
+  if (findIdIdentifierLimiter.isBlocked(identifierKey) || (ipKey !== null && findIdIpLimiter.isBlocked(ipKey))) {
     return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
   }
   findIdIdentifierLimiter.record(identifierKey);
-  findIdIpLimiter.record(ipKey);
+  if (ipKey !== null) findIdIpLimiter.record(ipKey);
 
   try {
     const maskedLoginId = await findMaskedLoginId(payload.businessRegNumber, payload.mobilePhone);

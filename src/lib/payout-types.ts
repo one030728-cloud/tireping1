@@ -29,6 +29,13 @@ export interface PayoutSettlementView {
   grossAmount: number;
   commissionRate: number;
   commissionAmount: number;
+  // Clawback (SettlementAdjustment) total this settlement absorbed — see
+  // createSettlementClawbackForOrder/confirmPayout in payout.ts. Always <= 0.
+  // Already folded into netAmount below; exposed separately so a settlement
+  // screen can show a "정산 조정 -N원" line explaining why
+  // grossAmount - commissionAmount != netAmount, rather than the numbers just
+  // silently not adding up.
+  adjustmentAmount: number;
   netAmount: number;
   status: PayoutStatus;
   memo: string | null;
@@ -48,6 +55,12 @@ export interface AdminPayoutSettlementView extends PayoutSettlementView {
 export interface SellerPayoutView {
   commissionRate: number;
   period: PayoutPeriod;
+  // This seller's not-yet-absorbed clawback backlog (SettlementAdjustment
+  // rows with settlementId still null), NOT scoped to `period` — see
+  // getSellerUnsettledSummary in payout.ts. Already folded into
+  // unsettled.netAmount; exposed separately for the same reason
+  // PayoutSettlementView.adjustmentAmount is.
+  adjustmentAmount: number;
   unsettled: PayoutAggregate;
   settlements: PayoutSettlementView[];
 }
@@ -57,6 +70,11 @@ export interface AdminUnsettledSellerRow extends PayoutAggregate {
   sellerCode: string;
   businessName: string;
   commissionRate: number;
+  // Same meaning as SellerPayoutView.adjustmentAmount, for this one seller.
+  // A seller with a pending clawback but zero unsettled orders this period
+  // still gets a row (orderCount 0, grossAmount 0, commissionAmount 0,
+  // netAmount == adjustmentAmount) — see getAdminUnsettledBySeller.
+  adjustmentAmount: number;
 }
 
 export interface AdminPayoutView {

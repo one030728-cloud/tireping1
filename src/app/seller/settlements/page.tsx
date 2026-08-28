@@ -62,7 +62,7 @@ export default function SellerSettlementsPage() {
     );
   }
 
-  const { unsettled, settlements } = payout;
+  const { unsettled, settlements, adjustmentAmount } = payout;
 
   return (
     <div className="px-4 py-5 max-w-6xl">
@@ -94,6 +94,7 @@ export default function SellerSettlementsPage() {
         </div>
         <p className="text-xs text-muted mt-2">
           미정산 주문 {unsettled.orderCount}건 기준의 예상 금액이며, 실제 정산은 본사 확정 후 진행됩니다.
+          {adjustmentAmount !== 0 && <> 반품/취소 정산 조정 {won(adjustmentAmount)}이 포함된 금액입니다.</>}
         </p>
       </section>
 
@@ -125,7 +126,14 @@ export default function SellerSettlementsPage() {
                       {won(settlement.commissionAmount)}
                       <span className="text-xs text-muted ml-1">({settlement.commissionRate}%)</span>
                     </td>
-                    <td className="py-3 pr-3 tabular-nums font-semibold">{won(settlement.netAmount)}</td>
+                    <td className="py-3 pr-3 tabular-nums font-semibold">
+                      {won(settlement.netAmount)}
+                      {settlement.adjustmentAmount !== 0 && (
+                        <p className="text-xs text-muted mt-1 font-normal whitespace-nowrap">
+                          정산 조정 {won(settlement.adjustmentAmount)}
+                        </p>
+                      )}
+                    </td>
                     <td className={`py-3 pr-3 text-xs font-semibold ${STATUS_TONE[settlement.status]}`}>
                       {STATUS_LABEL[settlement.status]}
                     </td>

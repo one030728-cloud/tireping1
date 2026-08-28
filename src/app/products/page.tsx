@@ -283,16 +283,19 @@ function ProductsContent() {
                     <td className="py-3 px-4 text-muted">{r.productCode}</td>
                     <td className="py-3 px-4 text-muted">{r.dot}</td>
                     <td className="py-3 px-4 tabular-nums text-muted">
-                      {user ? `${r.factoryPrice.toLocaleString()}원` : "로그인 후 공개"}
+                      {/* user 가 true 면 서버가 includeSensitive:true 로 응답했으므로
+                          이 필드들은 null 일 수 없다 — 타입만 number | null (see
+                          src/lib/types.ts CatalogRow) 이라 단언이 필요하다. */}
+                      {user ? `${r.factoryPrice!.toLocaleString()}원` : "로그인 후 공개"}
                     </td>
                     <td className="py-3 px-4 tabular-nums font-bold text-brand">
-                      {user ? `${r.lowPrice.toLocaleString()}원` : "로그인 후 공개"}
+                      {user ? `${r.lowPrice!.toLocaleString()}원` : "로그인 후 공개"}
                     </td>
                     <td className="py-3 px-4 tabular-nums">
-                      {user ? `${r.highPrice.toLocaleString()}원` : "로그인 후 공개"}
+                      {user ? `${r.highPrice!.toLocaleString()}원` : "로그인 후 공개"}
                     </td>
                     <td className="py-3 px-4 tabular-nums">
-                      {user ? r.stock.toLocaleString() : "로그인 후 공개"}
+                      {user ? r.stock!.toLocaleString() : "로그인 후 공개"}
                     </td>
                   </tr>
                 ))}
@@ -317,7 +320,7 @@ function ProductsContent() {
                     {user ? `재고 ${r.stock}` : "재고 로그인 후 공개"}
                   </span>
                   <span className="font-extrabold text-brand tabular-nums">
-                    {user ? `${r.lowPrice.toLocaleString()}원` : "로그인 후 가격 확인"}
+                    {user ? `${r.lowPrice!.toLocaleString()}원` : "로그인 후 가격 확인"}
                   </span>
                 </div>
               </Link>

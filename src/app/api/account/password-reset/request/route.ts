@@ -31,13 +31,20 @@ export async function POST(request: Request) {
 
   const ip = getClientIp(request.headers);
   const identifierKey = `password-reset:${payload.loginId}`;
-  const ipKey = `password-reset-ip:${ip}`;
+  // getClientIp returns null when it can't determine a trustworthy IP (see
+  // requestIp.ts) — effectively local-dev-only behind Render's proxy in
+  // production. Skip only the IP axis then; the identifier axis still
+  // applies regardless, same pattern as auth.ts's login limiter.
+  const ipKey = ip !== null ? `password-reset-ip:${ip}` : null;
 
   // Same two-axis check-before-work shape as login (see auth.ts) — this also
   // means a blocked caller gets a 429 without us ever touching the DB, which
   // doubles as one more brute-force-cost limiter on top of the rate limit
   // itself.
-  if (passwordResetIdentifierLimiter.isBlocked(identifierKey) || passwordResetIpLimiter.isBlocked(ipKey)) {
+  if (
+    passwordResetIdentifierLimiter.isBlocked(identifierKey) ||
+    (ipKey !== null && passwordResetIpLimiter.isBlocked(ipKey))
+  ) {
     return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
   }
   // Record every attempt regardless of outcome — like login, and like
@@ -45,7 +52,7 @@ export async function POST(request: Request) {
   // "failures" (there's no way to define failure here without leaking
   // whether the account exists).
   passwordResetIdentifierLimiter.record(identifierKey);
-  passwordResetIpLimiter.record(ipKey);
+  if (ipKey !== null) passwordResetIpLimiter.record(ipKey);
 
   try {
     await requestPasswordReset(payload.loginId, payload.businessRegNumber);

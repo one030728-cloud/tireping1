@@ -7,7 +7,13 @@
 //
 // WHAT COUNTS AS SETTLEABLE
 // An order is only settleable once the sale is both real and final:
-//   1. `order.status` is not one of CANCEL_STATUS's values.
+//   1. `order.status` is not one of nonSettleableStatusValues — CANCEL_STATUS's
+//      values MINUS EXCHANGE_COMPLETED. An exchange is a completed sale, not a
+//      cancelled one: the buyer keeps the goods and the payment stays DONE, so
+//      unlike every other CANCEL_STATUS value there is no refund to net
+//      against here. See nonSettleableStatusValues below for the full
+//      reasoning and completeReturnRequest (returns.ts) for the concrete
+//      evidence this is built on (only a RETURN ever records a refund there).
 //   2. `order.paymentId` points at a Payment that was genuinely approved —
 //      `Payment.approvedAt` is the discriminator, not `status`. This mirrors
 //      getDeposits' reasoning in settlement.ts, and for the same reason:
@@ -50,10 +56,18 @@
 // ROUNDING. Commission is rounded once, on the summed goods amount for the
 // whole settlement batch (`Math.round(goodsAmount * rate / 100)`), not once
 // per order and then summed — summing N independently-rounded commissions
-// can drift a few won away from rounding the batch total once. netAmount is
-// never computed independently; it is always `grossAmount - commissionAmount`
-// by subtraction, so the two can never disagree with each other by
-// construction — see summarizeOrders below.
+// can drift a few won away from rounding the batch total once. summarizeOrders'
+// own netAmount (orders only, no adjustment) is never computed independently;
+// it is always `grossAmount - commissionAmount` by subtraction, so the two can
+// never disagree with each other by construction. Every netAmount actually
+// exposed by this module (the live preview aggregates AND a confirmed
+// Settlement row) goes one step further and also adds adjustmentAmount — the
+// seller's clawback backlog, see the SETTLEMENT CLAWBACK section below — on
+// top of that subtraction, which can legitimately push netAmount negative.
+// That is allowed on purpose (see confirmPayout's comment on this): a
+// negative netAmount is this app's only ledger entry for "this seller now
+// owes the platform", so it is carried through and shown as-is rather than
+// clamped to 0.
 //
 // DOUBLE-CLAIM GUARD. confirmPayout reads candidate orders, computes the
 // snapshot from exactly that set, then claims them with a conditional
@@ -73,44 +87,62 @@ import type {
   PayoutAggregate,
   PayoutSettlementView,
 } from "@/lib/payout-types";
+import { currentKstMonthPeriod, parseKstDateOnly } from "./kst";
 import { prisma } from "./prisma";
 
 const cancelledStatusValues = Object.values(CANCEL_STATUS);
+
+// Settlement-only exclusion set: every CANCEL_STATUS value EXCEPT
+// EXCHANGE_COMPLETED. cancelledStatusValues above stays the full set — other
+// screens (order-status.ts's own callers, cancelOrder's shipping-fee heir
+// query) need "has this order's progress ended" and an exchange's progress
+// genuinely has ended, so that broader meaning is correct for them. Payout
+// asks a narrower question — "did the seller stop being owed for this sale" —
+// and an exchange never un-owes the seller: the buyer keeps the goods and the
+// payment stays DONE, so completeReturnRequest (returns.ts) only ever records
+// a refund for a RETURN, never for an EXCHANGE. Excluding EXCHANGE_COMPLETED
+// from cancelledStatusValues everywhere would be wrong for those other
+// screens, so this is a second, deliberately narrower set defined only here.
+// Exported for orders.ts's cancelOrder, whose full-refund decision asks the
+// same narrower question ("is any money on this payment still legitimately
+// charged?") — see remainingActiveOrders there.
+export const nonSettleableStatusValues = cancelledStatusValues.filter(
+  (status) => status !== CANCEL_STATUS.EXCHANGE_COMPLETED,
+);
 
 // ---------------------------------------------------------------------------
 // Period helpers. Every query in this module is scoped to a period, expressed
 // internally as [start, end) — end is always exclusive so a date-only "정산
 // 기간 종료일" picked by a user can unambiguously include that whole day
-// (see parsePeriodRange).
+// (see parsePeriodRange). Month/day boundaries are KST, not UTC — see
+// src/lib/server/kst.ts's header for why this has to match settlement.ts and
+// taxInvoice.ts exactly.
 // ---------------------------------------------------------------------------
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
-function parseDateOnly(value: string): Date | null {
-  if (!DATE_ONLY_RE.test(value)) return null;
-  const [y, m, d] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
 // The default, no-picker period every "이번 기간" view uses: the 1st of the
-// current month at 00:00 through right now. Using `now` (not end-of-month) as
-// the upper bound is deliberate — the month isn't over, and nothing dated
-// later than "now" can exist yet, so there's no practical difference and this
-// avoids ever implying a future cutoff.
+// current KST calendar month at 00:00 KST through right now. Using `now` (not
+// end-of-month) as the upper bound is deliberate — the month isn't over, and
+// nothing dated later than "now" can exist yet, so there's no practical
+// difference and this avoids ever implying a future cutoff. Delegates to
+// kst.ts's currentKstMonthPeriod (the shared single source of truth for month
+// boundaries across payout/settlement/taxInvoice) — kept under this name so
+// existing call sites (app/api/admin/settlements/route.ts,
+// app/admin/settlements/page.tsx) don't have to change.
 export function getCurrentMonthPeriod(now: Date = new Date()): { start: Date; end: Date } {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  return { start, end: now };
+  return currentKstMonthPeriod(now);
 }
 
-// Parses two required "YYYY-MM-DD" strings (an admin-chosen period) into an
-// exclusive [start, end) range. `endStr` is the last day the admin wants
-// *included*, so it's bumped to the start of the following day rather than
-// used as-is — using it directly would silently drop that entire last day.
+// Parses two required "YYYY-MM-DD" strings (an admin-chosen period, KST wall-
+// clock dates) into an exclusive [start, end) range of UTC instants. `endStr`
+// is the last KST day the admin wants *included*, so it's bumped to the start
+// of the following KST day rather than used as-is — using it directly would
+// silently drop that entire last day.
 export function parsePeriodRange(startStr: string, endStr: string): { start: Date; end: Date } | null {
-  const start = parseDateOnly(startStr);
-  const endDay = parseDateOnly(endStr);
+  const start = parseKstDateOnly(startStr);
+  const endDay = parseKstDateOnly(endStr);
   if (!start || !endDay) return null;
   const end = new Date(endDay.getTime() + ONE_DAY_MS);
   if (start.getTime() >= end.getTime()) return null;
@@ -130,7 +162,7 @@ export function parsePeriodRange(startStr: string, endStr: string): { start: Dat
 // rather than lean on an implicit side effect of the other filter.
 function settleableInPeriodWhere(periodStart: Date, periodEnd: Date): Prisma.OrderWhereInput {
   return {
-    status: { notIn: cancelledStatusValues },
+    status: { notIn: nonSettleableStatusValues },
     paymentId: { not: null },
     payment: { approvedAt: { gte: periodStart, lt: periodEnd } },
   };
@@ -178,6 +210,7 @@ function toSettlementView(settlement: Settlement): PayoutSettlementView {
     grossAmount: settlement.grossAmount,
     commissionRate: Number(settlement.commissionRate),
     commissionAmount: settlement.commissionAmount,
+    adjustmentAmount: settlement.adjustmentAmount,
     netAmount: settlement.netAmount,
     status: settlement.status,
     memo: settlement.memo,
@@ -188,12 +221,106 @@ function toSettlementView(settlement: Settlement): PayoutSettlementView {
 }
 
 // ---------------------------------------------------------------------------
+// SETTLEMENT CLAWBACK (SettlementAdjustment)
+// ---------------------------------------------------------------------------
+// A RETURN completing (returns.ts) or an admin cancelling an order
+// (orders.ts's cancelOrder, 입금후취소 branch) can both happen AFTER that
+// order was already claimed into a CONFIRMED/PAID Settlement — the seller has
+// already been paid for it. That Settlement row is a locked-in snapshot (see
+// its own schema comment), so it can never be edited after the fact; instead
+// this records the money owed back as its own row, absorbed into the NEXT
+// settlement confirmPayout creates for that seller (see confirmPayout below).
+interface ClawbackOrderInput {
+  id: string;
+  sellerId: string;
+  // Callers must have already checked this is non-null (both call sites do:
+  // returns.ts only calls this when `order.settlementId !== null`, same for
+  // orders.ts's cancelOrder). Typed as required here so that check can never
+  // be silently skipped at a future call site.
+  settlementId: string;
+  unitPrice: number;
+  quantity: number;
+  extraShipping: number;
+  shippingFee: number;
+}
+
+// Records a clawback for one order that already belonged to a settlement.
+// Uses the commissionRate that Settlement actually paid the seller with at
+// the time — never the seller's CURRENT commissionRate, which may have
+// changed since — so the amount recovered exactly matches what was actually
+// paid out for this order, not what would be paid out today. Mirrors
+// summarizeOrders' commission math exactly (commission only on
+// unitPrice*quantity, gross includes shipping) for the same reasoning — see
+// the module header's SHIPPING AND COMMISSION section — with one deliberate
+// difference: summarizeOrders rounds commission once on a whole batch's
+// summed goods amount, while this rounds per order (there is no batch here,
+// just the one order being clawed back). The two can therefore disagree by a
+// won or two from what the original settlement's batch-rounded commission
+// attributed to this specific order; that drift is accepted, not a bug — see
+// the report for this task.
+//
+// Deliberately independent of any buyer-refund clamp (returns.ts's
+// clampedAmount, orders.ts's cancelAmount clamp against Toss's remaining
+// balance): those answer "how much can we still ask Toss to return to the
+// buyer", a question about the payment. This answers "how much did the
+// seller keep for this order", a question about the settlement — the two
+// numbers are not the same and must not be capped by each other.
+export async function createSettlementClawbackForOrder(
+  tx: Prisma.TransactionClient,
+  order: ClawbackOrderInput,
+  reason: string,
+): Promise<void> {
+  const settlement = await tx.settlement.findUniqueOrThrow({
+    where: { id: order.settlementId },
+    select: { commissionRate: true },
+  });
+  const commissionRate = Number(settlement.commissionRate);
+  const goodsAmount = order.unitPrice * order.quantity;
+  const commissionAmount = Math.round((goodsAmount * commissionRate) / 100);
+  const grossAmount = goodsAmount + order.extraShipping + order.shippingFee;
+  const amount = -(grossAmount - commissionAmount);
+
+  await tx.settlementAdjustment.create({
+    data: {
+      sellerId: order.sellerId,
+      orderId: order.id,
+      amount,
+      reason,
+    },
+  });
+}
+
+// Sum of one seller's not-yet-absorbed clawbacks (settlementId still null —
+// see confirmPayout for when this becomes non-null). Always <= 0. Used both
+// to preview "what would this seller's net payout include if confirmed right
+// now" (getSellerUnsettledSummary, getAdminUnsettledBySeller) and to actually
+// absorb the backlog at confirm time (confirmPayout) — kept as one function
+// so the preview a seller/admin sees before confirming can never drift from
+// what confirmPayout itself queries.
+async function getPendingAdjustmentTotal(sellerId: string): Promise<number> {
+  const result = await prisma.settlementAdjustment.aggregate({
+    where: { sellerId, settlementId: null },
+    _sum: { amount: true },
+  });
+  return result._sum.amount ?? 0;
+}
+
+// ---------------------------------------------------------------------------
 // TASK 2 — 판매자 화면
 // ---------------------------------------------------------------------------
 
 // Scoped to one seller's current-month orders only — small and bounded like
 // getTaxAggregate/getDeposits/getExtraFees in settlement.ts, not the
 // "every order in Node" pattern Task 3's cross-seller queries must avoid.
+//
+// unsettled.netAmount already folds in adjustmentAmount (the seller's
+// not-yet-absorbed clawback backlog, NOT scoped to this period — see
+// getPendingAdjustmentTotal and confirmPayout, which absorbs the whole
+// backlog regardless of period the same way) so this preview matches exactly
+// what confirmPayout would actually produce if confirmed right now.
+// adjustmentAmount is additionally exposed on its own so the screen can
+// explain the gap between grossAmount - commissionAmount and netAmount
+// instead of just silently not adding up.
 export async function getSellerUnsettledSummary(sellerId: string) {
   const seller = await prisma.seller.findUnique({
     where: { id: sellerId },
@@ -202,16 +329,21 @@ export async function getSellerUnsettledSummary(sellerId: string) {
   if (!seller) return null;
 
   const { start, end } = getCurrentMonthPeriod();
-  const orders = await prisma.order.findMany({
-    where: { ...settleableInPeriodWhere(start, end), sellerId, settlementId: null },
-    select: settleableOrderAmountSelect,
-  });
+  const [orders, adjustmentAmount] = await Promise.all([
+    prisma.order.findMany({
+      where: { ...settleableInPeriodWhere(start, end), sellerId, settlementId: null },
+      select: settleableOrderAmountSelect,
+    }),
+    getPendingAdjustmentTotal(sellerId),
+  ]);
 
   const commissionRate = Number(seller.commissionRate);
+  const orderAggregate = summarizeOrders(orders, commissionRate);
   return {
     period: { start, end },
     commissionRate,
-    unsettled: summarizeOrders(orders, commissionRate),
+    adjustmentAmount,
+    unsettled: { ...orderAggregate, netAmount: orderAggregate.netAmount + adjustmentAmount },
   };
 }
 
@@ -262,43 +394,70 @@ export async function getAdminUnsettledBySeller(
     FROM "Order" o
     JOIN "Payment" p ON p.id = o."paymentId"
     WHERE o."settlementId" IS NULL
-      AND o.status NOT IN (${Prisma.join(cancelledStatusValues)})
+      AND o.status NOT IN (${Prisma.join(nonSettleableStatusValues)})
       AND p."approvedAt" IS NOT NULL
       AND p."approvedAt" >= ${periodStart}
       AND p."approvedAt" < ${periodEnd}
     GROUP BY o."sellerId"
   `);
-  if (rows.length === 0) return [];
+
+  // Not period-scoped, deliberately — confirmPayout absorbs a seller's ENTIRE
+  // not-yet-absorbed clawback backlog regardless of which period is being
+  // confirmed (see confirmPayout), so this has to show the same backlog a
+  // confirm right now would actually claim. Separate groupBy + merge (not a
+  // join into the raw query above) specifically so a seller with adjustments
+  // but zero unsettled orders this period still gets a row — otherwise their
+  // debt would be invisible on this screen until they happened to have a new
+  // order in some future period.
+  const adjustmentRows = await prisma.settlementAdjustment.groupBy({
+    by: ["sellerId"],
+    where: { settlementId: null },
+    _sum: { amount: true },
+  });
+  const adjustmentBySeller = new Map(adjustmentRows.map((row) => [row.sellerId, row._sum.amount ?? 0] as const));
+
+  const sellerIds = new Set<string>([...rows.map((row) => row.seller_id), ...adjustmentBySeller.keys()]);
+  if (sellerIds.size === 0) return [];
 
   // Small, bounded follow-up (at most one row per seller that actually has
-  // unsettled orders this period) — not the "every order" pattern, just
-  // "every seller with something pending".
+  // unsettled orders and/or a pending adjustment) — not the "every order"
+  // pattern, just "every seller with something pending".
   const sellers = await prisma.seller.findMany({
-    where: { id: { in: rows.map((row) => row.seller_id) } },
+    where: { id: { in: [...sellerIds] } },
     select: { id: true, code: true, commissionRate: true, user: { select: { businessName: true } } },
   });
   const sellerById = new Map(sellers.map((seller) => [seller.id, seller] as const));
+  const orderRowBySeller = new Map(rows.map((row) => [row.seller_id, row] as const));
 
   const result: AdminUnsettledSellerRow[] = [];
-  for (const row of rows) {
-    // Order.sellerId is a required FK to Seller, so a missing lookup here
-    // would mean the FK is broken — defensive only, never expected to trigger.
-    const seller = sellerById.get(row.seller_id);
+  for (const sellerId of sellerIds) {
+    // Order.sellerId / SettlementAdjustment.sellerId are both required FKs to
+    // Seller, so a missing lookup here would mean a broken FK — defensive
+    // only, never expected to trigger.
+    const seller = sellerById.get(sellerId);
     if (!seller) continue;
 
-    const goodsAmount = row.goods_amount;
-    const grossAmount = goodsAmount + row.extra_shipping_amount + row.shipping_fee_amount;
+    const orderRow = orderRowBySeller.get(sellerId);
+    const goodsAmount = orderRow?.goods_amount ?? 0;
+    const grossAmount = goodsAmount + (orderRow?.extra_shipping_amount ?? 0) + (orderRow?.shipping_fee_amount ?? 0);
     const commissionRate = Number(seller.commissionRate);
     const commissionAmount = Math.round((goodsAmount * commissionRate) / 100);
+    const adjustmentAmount = adjustmentBySeller.get(sellerId) ?? 0;
     result.push({
       sellerId: seller.id,
       sellerCode: seller.code,
       businessName: seller.user.businessName,
       commissionRate,
-      orderCount: row.order_count,
+      orderCount: orderRow?.order_count ?? 0,
       grossAmount,
       commissionAmount,
-      netAmount: grossAmount - commissionAmount,
+      adjustmentAmount,
+      // Folds in the pending clawback backlog, same as
+      // getSellerUnsettledSummary — see that function's comment. A seller
+      // with only adjustments and no unsettled orders this period gets
+      // orderCount 0 / grossAmount 0 / commissionAmount 0 and netAmount ==
+      // adjustmentAmount (negative), which is exactly the outstanding debt.
+      netAmount: grossAmount - commissionAmount + adjustmentAmount,
     });
   }
   return result;
@@ -391,10 +550,38 @@ export async function confirmPayout(
         where: { ...settleableInPeriodWhere(periodStart, periodEnd), sellerId, settlementId: null },
         select: { id: true, ...settleableOrderAmountSelect },
       });
+      // Adjustments alone (no settleable orders this period) do NOT trigger a
+      // settlement here — an admin still has to confirm a period that
+      // actually has orders in it. The backlog isn't lost: it just keeps
+      // accumulating (still settlementId: null) until a period with at least
+      // one settleable order for this seller gets confirmed, at which point
+      // it's absorbed in full below. See the report for this task.
       if (candidates.length === 0) return { kind: "NO_SETTLEABLE_ORDERS" as const };
 
       const commissionRate = Number(seller.commissionRate);
-      const { grossAmount, commissionAmount, netAmount } = summarizeOrders(candidates, commissionRate);
+      const { grossAmount, commissionAmount, netAmount: orderNetAmount } = summarizeOrders(candidates, commissionRate);
+
+      // Absorb this seller's ENTIRE not-yet-absorbed clawback backlog into
+      // this settlement — not just clawbacks tied to orders in this period's
+      // candidate set. A clawback's order already belongs to a PAST
+      // settlement (that's what makes it a clawback); it has nothing to do
+      // with periodStart/periodEnd, so there is no period to scope this
+      // query to. Read before the claim below for the same double-claim-guard
+      // reason candidates is read before its own claim — see the module
+      // header.
+      const pendingAdjustments = await tx.settlementAdjustment.findMany({
+        where: { sellerId, settlementId: null },
+        select: { id: true, amount: true },
+      });
+      const adjustmentAmount = pendingAdjustments.reduce((sum, adjustment) => sum + adjustment.amount, 0);
+      // netAmount can go negative here — a seller whose clawback backlog
+      // exceeds this period's gross-minus-commission ends up owing the
+      // platform rather than being owed. Allowed on purpose: this app has no
+      // separate "seller owes platform" ledger, so a negative netAmount
+      // *is* that ledger entry, carried forward as-is for an admin to see
+      // and act on (e.g. net it against next period, or collect out of
+      // band) rather than silently clamped to 0 and quietly forgiven.
+      const netAmount = orderNetAmount + adjustmentAmount;
 
       const settlement = await tx.settlement.create({
         data: {
@@ -404,6 +591,7 @@ export async function confirmPayout(
           grossAmount,
           commissionRate,
           commissionAmount,
+          adjustmentAmount,
           netAmount,
           status: "CONFIRMED",
           memo,
@@ -415,11 +603,24 @@ export async function confirmPayout(
         where: {
           id: { in: candidates.map((order) => order.id) },
           settlementId: null,
-          status: { notIn: cancelledStatusValues },
+          status: { notIn: nonSettleableStatusValues },
         },
         data: { settlementId: settlement.id },
       });
       if (claim.count !== candidates.length) {
+        throw new PayoutClaimConflict();
+      }
+
+      // Same double-claim guard shape as the order claim above: re-check
+      // `settlementId: null` at claim time (not trusted from the read above)
+      // and abort the whole transaction on a count mismatch, rather than
+      // save a Settlement whose adjustmentAmount doesn't match what it
+      // actually claimed.
+      const adjustmentClaim = await tx.settlementAdjustment.updateMany({
+        where: { sellerId, settlementId: null },
+        data: { settlementId: settlement.id },
+      });
+      if (adjustmentClaim.count !== pendingAdjustments.length) {
         throw new PayoutClaimConflict();
       }
 

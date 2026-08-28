@@ -19,6 +19,7 @@ import type {
 import { prisma } from "./prisma";
 import { notifyUser } from "./notify";
 import { AUTO_REFUND_TOSS_FAILURE_REASON, restoreListingStockForCancelledOrder } from "./orders";
+import { createSettlementClawbackForOrder } from "./payout";
 
 // ---------------------------------------------------------------------------
 // 교환 / 반품
@@ -505,13 +506,24 @@ export type CompleteReturnRequestResult =
  *     nothing about stock or money changes here at all — Listing.stock is
  *     left untouched (the original order already decremented it once, and
  *     there is no second Order row for the replacement to decrement against
- *     a second time) and Payment is never touched.
+ *     a second time) and Payment is never touched. Order.status still moves
+ *     to EXCHANGE_COMPLETED (a CANCEL_STATUS value — see order-status.ts) but
+ *     payout.ts's settleableInPeriodWhere deliberately does NOT exclude that
+ *     one status: an exchange is a completed sale, not a cancelled one, so
+ *     the order stays (or becomes) settleable exactly like any other
+ *     fulfilled order — see nonSettleableStatusValues in payout.ts.
  *
- * Either way, Order.status becomes a CANCEL_STATUS value, which is exactly
- * what payout.ts's settleableInPeriodWhere excludes from ever becoming
- * settleable. For a RETURN that is correct. For an EXCHANGE it is a real,
- * documented gap this module cannot close (payout.ts is off-limits) — see
- * the alreadySettled/notYetSettled logging below and the report.
+ * One more effect, for a RETURN only: if this order was already claimed into
+ * a settlement (order.settlementId !== null — the seller has already been
+ * paid for it), the buyer refund recorded above is not enough on its own;
+ * the money already paid out to the seller for this order also has to come
+ * back. createSettlementClawbackForOrder (payout.ts) records that as a
+ * SettlementAdjustment, absorbed into the seller's next confirmPayout — see
+ * that function's comment for the full mechanism. This is independent of the
+ * buyer-refund clamp above (clampedAmount): that clamp answers "how much can
+ * still be owed to the buyer on this payment"; the clawback answers "how
+ * much did the seller keep for this order" — unrelated questions, so one
+ * must never cap the other.
  */
 export async function completeReturnRequest(
   returnRequestId: string,
@@ -557,8 +569,7 @@ export async function completeReturnRequest(
     });
 
     let refundOwedAmount = 0;
-    let returnAlreadySettled = false;
-    let exchangeNotYetSettled = false;
+    let clawbackCreated = false;
 
     if (existing.type === "RETURN") {
       await restoreListingStockForCancelledOrder(tx, {
@@ -597,35 +608,50 @@ export async function completeReturnRequest(
           }
         }
       }
-      returnAlreadySettled = order.settlementId !== null;
-    } else {
-      exchangeNotYetSettled = order.settlementId === null;
+
+      // 정산 후 회수(클로백): buyer refund above is tracked on Payment, but
+      // that alone leaves the seller's earlier payout for this order
+      // untouched. If this order was already claimed into a settlement, the
+      // seller has already been paid for it — record the clawback so the
+      // next confirmPayout for this seller nets it out. See the function doc
+      // comment and payout.ts's createSettlementClawbackForOrder.
+      if (order.settlementId !== null) {
+        await createSettlementClawbackForOrder(
+          tx,
+          {
+            id: order.id,
+            sellerId: order.sellerId,
+            settlementId: order.settlementId,
+            unitPrice: order.unitPrice,
+            quantity: order.quantity,
+            extraShipping: order.extraShipping,
+            shippingFee: order.shippingFee,
+          },
+          "RETURN_COMPLETED_AFTER_SETTLEMENT",
+        );
+        clawbackCreated = true;
+      }
     }
 
     return {
       kind: "OK" as const,
       record: updatedReturn,
       refundOwedAmount,
-      returnAlreadySettled,
-      exchangeNotYetSettled,
+      clawbackCreated,
       orderId: order.id,
     };
   });
 
   if (result.kind !== "OK") return result;
 
-  // Diagnostics for the two payout-visibility gaps this module cannot close
-  // itself (payout.ts is off-limits — see the function doc comment and the
-  // report). Logged, not silently swallowed, so an operator grepping logs
-  // can find and manually reconcile these cases.
-  if (result.returnAlreadySettled) {
-    console.error("RETURN_COMPLETED_ON_ALREADY_SETTLED_ORDER", {
+  // Not an error — a normal, now fully-handled outcome — but still worth a
+  // grep-able log for an operator reconciling payouts, same spirit as the
+  // other durable-money-event logs in this codebase.
+  if (result.clawbackCreated) {
+    console.error("RETURN_COMPLETED_SETTLEMENT_CLAWBACK_CREATED", {
       orderId: result.orderId,
       refundOwedAmount: result.refundOwedAmount,
     });
-  }
-  if (result.exchangeNotYetSettled) {
-    console.error("EXCHANGE_COMPLETED_ORDER_NO_LONGER_AUTO_SETTLEABLE", { orderId: result.orderId });
   }
 
   await notifyUser(result.record.buyerId, "BUYER_RETURN_REQUEST_COMPLETED", {
