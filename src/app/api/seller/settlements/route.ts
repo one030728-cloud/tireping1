@@ -30,6 +30,7 @@ export async function GET() {
     const payout: SellerPayoutView = {
       commissionRate: summary.commissionRate,
       period: { start: summary.period.start.toISOString(), end: summary.period.end.toISOString() },
+      adjustmentAmount: summary.adjustmentAmount,
       unsettled: summary.unsettled,
       settlements,
     };

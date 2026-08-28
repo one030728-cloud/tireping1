@@ -246,6 +246,7 @@ export default function AdminSettlementsPage() {
                   <th className="py-2 pr-3 font-medium whitespace-nowrap">거래액</th>
                   <th className="py-2 pr-3 font-medium whitespace-nowrap">수수료율</th>
                   <th className="py-2 pr-3 font-medium whitespace-nowrap">수수료</th>
+                  <th className="py-2 pr-3 font-medium whitespace-nowrap">정산 조정</th>
                   <th className="py-2 pr-3 font-medium whitespace-nowrap">실지급액</th>
                   <th className="py-2 pr-3" />
                 </tr>
@@ -261,6 +262,9 @@ export default function AdminSettlementsPage() {
                     <td className="py-3 pr-3 tabular-nums">{won(row.grossAmount)}</td>
                     <td className="py-3 pr-3 tabular-nums">{row.commissionRate}%</td>
                     <td className="py-3 pr-3 tabular-nums">{won(row.commissionAmount)}</td>
+                    <td className="py-3 pr-3 tabular-nums">
+                      {row.adjustmentAmount === 0 ? "-" : won(row.adjustmentAmount)}
+                    </td>
                     <td className="py-3 pr-3 tabular-nums font-semibold">{won(row.netAmount)}</td>
                     <td className="py-3 pr-3">
                       <button
@@ -313,7 +317,14 @@ export default function AdminSettlementsPage() {
                       {won(settlement.commissionAmount)}
                       <span className="text-xs text-muted ml-1">({settlement.commissionRate}%)</span>
                     </td>
-                    <td className="py-3 pr-3 tabular-nums font-semibold">{won(settlement.netAmount)}</td>
+                    <td className="py-3 pr-3 tabular-nums font-semibold">
+                      {won(settlement.netAmount)}
+                      {settlement.adjustmentAmount !== 0 && (
+                        <p className="text-xs text-muted mt-1 font-normal whitespace-nowrap">
+                          정산 조정 {won(settlement.adjustmentAmount)}
+                        </p>
+                      )}
+                    </td>
                     <td className={`py-3 pr-3 text-xs font-semibold ${STATUS_TONE[settlement.status]}`}>
                       {STATUS_LABEL[settlement.status]}
                     </td>

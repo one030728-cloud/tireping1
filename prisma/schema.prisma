@@ -147,9 +147,10 @@ model Seller {
   // 그 값 역시 정산 시점에 스냅샷된다.
   commissionRate Decimal @default(0) @db.Decimal(5, 2)
 
-  listings    Listing[]
-  settlements Settlement[]
-  reviews     Review[]
+  listings              Listing[]
+  settlements           Settlement[]
+  reviews               Review[]
+  settlementAdjustments SettlementAdjustment[]
 }
 
 model Buyer {
@@ -331,8 +332,9 @@ model Order {
   settlement   Settlement? @relation(fields: [settlementId], references: [id])
   settlementId String?
 
-  review        Review?
-  returnRequest ReturnRequest?
+  review               Review?
+  returnRequest        ReturnRequest?
+  settlementAdjustment SettlementAdjustment?
 
   @@index([buyerId])
   @@index([sellerId])
@@ -416,8 +418,13 @@ enum SettlementStatus {
 
 // 한 판매자의 한 정산 주기. 금액은 전부 정산 확정 시점의 스냅샷이다 —
 // 나중에 수수료율이나 주문이 바뀌어도 이미 지급한 정산서가 흔들리면 안 된다.
-// netAmount = grossAmount - commissionAmount 이며, 계산 결과가 아니라 확정값을
-// 저장한다.
+// netAmount = grossAmount - commissionAmount + adjustmentAmount 이며, 계산
+// 결과가 아니라 확정값을 저장한다. adjustmentAmount 는 이 정산 확정 시점에
+// 흡수한 미반영 SettlementAdjustment(클로백) 합계(0 이하)다 — 이 컬럼이
+// 생기기 전에는 흡수할 클로백 자체가 없었으므로 기본값 0, 즉
+// netAmount = grossAmount - commissionAmount 그대로가 기존 정산 행에도 그대로
+// 유지된다. 자세한 계산은 SettlementAdjustment/createSettlementClawbackForOrder
+// (payout.ts) 참고.
 model Settlement {
   id               String           @id @default(cuid())
   seller           Seller           @relation(fields: [sellerId], references: [id])
@@ -427,6 +434,7 @@ model Settlement {
   grossAmount      Int
   commissionRate   Decimal          @db.Decimal(5, 2)
   commissionAmount Int
+  adjustmentAmount Int              @default(0)
   netAmount        Int
   status           SettlementStatus @default(PENDING)
   memo             String?
@@ -434,9 +442,41 @@ model Settlement {
   paidAt           DateTime?
   createdAt        DateTime         @default(now())
 
-  orders Order[]
+  orders      Order[]
+  adjustments SettlementAdjustment[]
 
   @@index([sellerId, status])
+}
+
+// 정산·지급이 끝난 주문이 나중에 반품 완료되거나(returns.ts) 관리자에 의해
+// 취소되면(orders.ts cancelOrder 의 입금후취소 경로), 판매자에게 이미
+// 지급된 돈을 되돌려야 한다 — 하지만 그 지급은 이미 커밋된 Settlement 행에
+// 스냅샷돼 있으므로 그 행 자체를 고칠 수 없다(위 주석대로 "확정값"이다).
+// 대신 이 회수(클로백)를 별도 행으로 기록해 두었다가, 다음 confirmPayout
+// 확정 때 새 Settlement 의 adjustmentAmount 로 흡수한다 — payout.ts의
+// createSettlementClawbackForOrder / confirmPayout 참고.
+model SettlementAdjustment {
+  id       String @id @default(cuid())
+  seller   Seller @relation(fields: [sellerId], references: [id])
+  sellerId String
+  order    Order  @relation(fields: [orderId], references: [id])
+  // 흐름상 주문 하나가 정산 후 취소/반품될 수 있는 경로는 한 번뿐이지만,
+  // orderId 를 @unique 로 못박아 두면 로직이 회귀해도 조용한 이중 회수
+  // 대신 P2002 로 시끄럽게 실패한다.
+  orderId String @unique
+  // 음수 = 회수(클로백). 지금은 회수만 만들지만 부호를 필드에 고정하지
+  // 않은 이유는 나중에 반대 방향(추가 지급 조정)이 생겨도 같은 테이블을
+  // 재사용할 수 있게 하기 위함이다.
+  amount    Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  // null = 아직 어떤 정산에도 흡수되지 않음 — 다음 confirmPayout 확정 때
+  // 흡수된다(payout.ts). 흡수되고 나면 그 Settlement 를 가리킨다.
+  settlement   Settlement? @relation(fields: [settlementId], references: [id])
+  settlementId String?
+
+  @@index([sellerId, settlementId])
 }
 
 // ---------------------------------------------------------------------------
