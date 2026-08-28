@@ -2,6 +2,38 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { formatZodIssues } from "@/lib/validation-messages";
+
+// Matches sellerSignupSchema (src/lib/server/seller.ts) field-for-field.
+// contact1/contact2 have no input on this screen but are still valid
+// (optional) schema fields — kept here so a details entry for them (were the
+// schema ever tightened) wouldn't fall back to a raw field name.
+const LABELS: Record<string, string> = {
+  loginId: "아이디",
+  password: "비밀번호",
+  code: "판매자 코드",
+  businessName: "상호명",
+  businessRegNumber: "사업자등록번호",
+  ownerName: "대표자명",
+  mobilePhone: "휴대전화",
+  courier: "택배사",
+  email: "이메일",
+  businessType: "사업자 유형",
+  businessCategory: "업태/종목",
+  postalCode: "우편번호",
+  address: "주소",
+  officePhone: "사무실 전화",
+  contact1: "담당자 1",
+  contact2: "담당자 2",
+  shippingNote: "배송 안내",
+  location: "판매자 위치",
+  intro: "판매자 소개",
+};
+
+const OVERRIDES: Record<string, string> = {
+  loginId: "영문, 숫자, 점(.), 밑줄(_), 하이픈(-)만 사용할 수 있습니다",
+  code: "영문, 숫자, 밑줄(_), 하이픈(-)만 사용할 수 있습니다",
+};
 
 interface SignupForm {
   loginId: string;
@@ -64,8 +96,14 @@ export default function SellerSignupPage() {
     });
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as
-        | { error?: string; field?: string | null; message?: string }
+        | { error?: string; field?: string | null; message?: string; details?: unknown }
         | null;
+      if (body?.error === "VALIDATION_ERROR") {
+        const lines = formatZodIssues(body.details, LABELS, OVERRIDES);
+        setError(lines.length > 0 ? lines.join("\n") : "입력값을 확인해 주세요.");
+        setSubmitting(false);
+        return;
+      }
       setError(
         body?.error === "DUPLICATE_RESOURCE"
           ? body.message ?? "아이디 또는 판매자 코드가 이미 사용 중입니다."
@@ -103,7 +141,7 @@ export default function SellerSignupPage() {
           <p className="text-sm text-muted mt-1">가맹점 정보를 입력하면 본사 승인 후 판매자 센터를 이용할 수 있습니다.</p>
         </div>
 
-        {error && <p className="text-sm text-accent mb-4">{error}</p>}
+        {error && <p className="text-sm text-accent mb-4 whitespace-pre-line">{error}</p>}
 
         <section className="mb-6">
           <h2 className="font-bold mb-3">로그인 정보</h2>
