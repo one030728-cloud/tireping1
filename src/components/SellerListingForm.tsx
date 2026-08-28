@@ -8,6 +8,36 @@ import LoadingState from "@/components/LoadingState";
 import Select from "@/components/ui/Select";
 import { MANUFACTURERS } from "@/lib/mockData";
 import type { SellerListingView } from "@/lib/seller-types";
+import { formatZodIssues } from "@/lib/validation-messages";
+
+// Matches listingSchema / listingPatchSchema (src/lib/server/seller.ts —
+// the PATCH schema is `listingSchema.partial()`, same field names)
+// field-for-field.
+const LABELS: Record<string, string> = {
+  manufacturer: "제조사",
+  model: "모델명",
+  width: "단면폭",
+  ratio: "편평비",
+  rim: "림경",
+  dot: "DOT",
+  loadIndex: "하중지수",
+  speedIndex: "속도지수",
+  ply: "타이어겹수",
+  oe: "OE",
+  season: "계절",
+  productCode: "상품번호",
+  discountRate: "할인율",
+  price: "판매가",
+  factoryPrice: "공장도가",
+  stock: "재고",
+  minOrder: "최소 주문수량",
+  tag: "태그",
+  shippingNote: "배송 안내 문구",
+  courier: "택배사",
+  shippingFee: "배송비",
+  freeShippingThreshold: "무료배송 기준금액",
+  imageUrls: "상품 이미지",
+};
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_IMAGE_COUNT = 10;
@@ -225,8 +255,13 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
       });
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        setError(body?.error === "VALIDATION_ERROR" ? "입력값을 확인해 주세요." : "상품을 저장하지 못했습니다.");
+        const body = (await response.json().catch(() => null)) as { error?: string; details?: unknown } | null;
+        if (body?.error === "VALIDATION_ERROR") {
+          const lines = formatZodIssues(body.details, LABELS);
+          setError(lines.length > 0 ? lines.join("\n") : "입력값을 확인해 주세요.");
+          return;
+        }
+        setError("상품을 저장하지 못했습니다.");
         return;
       }
 
@@ -300,7 +335,7 @@ export default function SellerListingForm({ listingId }: { listingId?: string })
           반려 사유: {listing.rejectedReason}
         </div>
       )}
-      {error && <p className="text-sm text-accent mb-3">{error}</p>}
+      {error && <p className="text-sm text-accent mb-3 whitespace-pre-line">{error}</p>}
 
       <form onSubmit={handleSubmit} className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5">
         <div className="flex flex-col gap-5">

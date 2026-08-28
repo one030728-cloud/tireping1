@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { formatZodIssues } from "@/lib/validation-messages";
+
+// Matches passwordResetRequestSchema (src/lib/server/passwordReset.ts)
+// field-for-field.
+const LABELS: Record<string, string> = {
+  loginId: "아이디",
+  businessRegNumber: "사업자등록번호",
+};
 
 export default function ResetPasswordRequestPage() {
   const [loginId, setLoginId] = useState("");
@@ -26,6 +34,14 @@ export default function ResetPasswordRequestPage() {
         return;
       }
       if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string; details?: unknown }
+          | null;
+        if (body?.error === "VALIDATION_ERROR") {
+          const lines = formatZodIssues(body.details, LABELS);
+          setError(lines.length > 0 ? lines.join("\n") : "입력값을 확인해 주세요.");
+          return;
+        }
         setError("입력값을 확인해 주세요.");
         return;
       }
@@ -86,7 +102,7 @@ export default function ResetPasswordRequestPage() {
               </div>
 
               {error && (
-                <p role="alert" className="text-sm text-accent">
+                <p role="alert" className="text-sm text-accent whitespace-pre-line">
                   {error}
                 </p>
               )}

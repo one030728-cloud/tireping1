@@ -2,6 +2,29 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
+import { formatZodIssues } from "@/lib/validation-messages";
+
+// Matches buyerSignupSchema (src/lib/server/buyer.ts) field-for-field.
+const LABELS: Record<string, string> = {
+  loginId: "아이디",
+  password: "비밀번호",
+  businessName: "상호명",
+  businessRegNumber: "사업자등록번호",
+  ownerName: "대표자명",
+  mobilePhone: "휴대전화",
+  email: "이메일",
+  businessType: "사업자 유형",
+  businessCategory: "업태/종목",
+  postalCode: "우편번호",
+  address: "주소",
+  officePhone: "사무실 전화",
+  contact1: "담당자 1",
+  contact2: "담당자 2",
+};
+
+const OVERRIDES: Record<string, string> = {
+  loginId: "영문, 숫자, 점(.), 밑줄(_), 하이픈(-)만 사용할 수 있습니다",
+};
 
 interface SignupForm {
   loginId: string;
@@ -60,8 +83,13 @@ export default function BuyerSignupPage() {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as
-          | { error?: string; field?: string | null; message?: string }
+          | { error?: string; field?: string | null; message?: string; details?: unknown }
           | null;
+        if (body?.error === "VALIDATION_ERROR") {
+          const lines = formatZodIssues(body.details, LABELS, OVERRIDES);
+          setError(lines.length > 0 ? lines.join("\n") : "입력값을 확인해 주세요.");
+          return;
+        }
         setError(
           body?.error === "DUPLICATE_RESOURCE"
             ? body.message ?? "이미 사용 중인 아이디입니다."
@@ -106,7 +134,7 @@ export default function BuyerSignupPage() {
           </p>
         </div>
 
-        {error && <p className="text-sm text-accent mb-4">{error}</p>}
+        {error && <p className="text-sm text-accent mb-4 whitespace-pre-line">{error}</p>}
 
         <section className="mb-6">
           <h2 className="font-bold mb-3">로그인 정보</h2>
