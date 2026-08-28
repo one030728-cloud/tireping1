@@ -22,18 +22,25 @@ export const authOptions: NextAuthOptions = {
 
         const ip = getClientIp(req.headers);
         const loginIdKey = `login:${loginId}`;
-        const loginIpKey = `login-ip:${ip}`;
+        // getClientIp returns null when it can't determine a trustworthy IP
+        // (see requestIp.ts) — in production, behind Render's proxy,
+        // x-forwarded-for is always present, so this is effectively a local-
+        // dev-only case. When it happens, skip the IP axis entirely rather
+        // than interpolate null into a string key (`login-ip:null` would
+        // recreate a single shared bucket for every such request — the exact
+        // bug this change fixes). The loginId axis still applies regardless.
+        const loginIpKey = ip !== null ? `login-ip:${ip}` : null;
 
         // Check both axes — and skip the DB lookup and bcrypt compare below —
         // before doing any real work, so a lockout also caps the CPU/DB cost an
         // attacker can force per request.
-        if (loginIdLimiter.isBlocked(loginIdKey) || loginIpLimiter.isBlocked(loginIpKey)) {
+        if (loginIdLimiter.isBlocked(loginIdKey) || (loginIpKey !== null && loginIpLimiter.isBlocked(loginIpKey))) {
           return null;
         }
 
         const fail = () => {
           loginIdLimiter.record(loginIdKey);
-          loginIpLimiter.record(loginIpKey);
+          if (loginIpKey !== null) loginIpLimiter.record(loginIpKey);
           return null;
         };
 
@@ -54,7 +61,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         loginIdLimiter.reset(loginIdKey);
-        loginIpLimiter.reset(loginIpKey);
+        if (loginIpKey !== null) loginIpLimiter.reset(loginIpKey);
 
         return {
           id: user.id,

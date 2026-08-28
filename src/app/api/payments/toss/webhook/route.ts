@@ -209,16 +209,24 @@ export async function POST(request: Request) {
 
   // Flood guard before anything else — see rateLimit.ts for why this exists
   // even though it can't distinguish genuine Toss traffic from forged
-  // traffic by shape.
+  // traffic by shape. There's no other axis to key this on (unlike login/
+  // signup, which also have an identifier), so when getClientIp can't
+  // determine a trustworthy IP (see requestIp.ts; effectively local-dev-only
+  // behind Render's proxy in production) skip the flood limiter entirely
+  // rather than interpolate null into a shared bucket key.
   const ip = getClientIp(request.headers);
-  if (tossWebhookIpLimiter.isBlocked(ip)) {
-    return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
+  if (ip !== null) {
+    if (tossWebhookIpLimiter.isBlocked(ip)) {
+      return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
+    }
+    tossWebhookIpLimiter.record(ip);
   }
-  tossWebhookIpLimiter.record(ip);
 
   // Monitoring only, never a gate — see the file header for why a mismatch
   // here must not reject the request. `TOSS_WEBHOOK_ALLOWED_IPS` is an
-  // optional, comma-separated env var; when unset this check is a no-op.
+  // optional, comma-separated env var; when unset this check is a no-op. A
+  // null ip (see above) can never be "in" the allowlist, so it's treated the
+  // same as any other mismatch — logged, not gated.
   const allowedIpsEnv = process.env.TOSS_WEBHOOK_ALLOWED_IPS?.trim();
   if (allowedIpsEnv) {
     const allowedIps = new Set(
@@ -227,7 +235,7 @@ export async function POST(request: Request) {
         .map((entry) => entry.trim())
         .filter(Boolean),
     );
-    if (!allowedIps.has(ip)) {
+    if (ip === null || !allowedIps.has(ip)) {
       console.warn("TOSS_WEBHOOK_IP_NOT_IN_ALLOWLIST", { ip });
     }
   }
