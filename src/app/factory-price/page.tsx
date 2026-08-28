@@ -32,8 +32,13 @@ function FactoryPriceContent() {
       return true;
     });
     const copy = [...filtered];
-    if (sort === "lowest") copy.sort((a, b) => a.lowPrice - b.lowPrice);
-    else if (sort === "highest") copy.sort((a, b) => b.highPrice - a.highPrice);
+    // CatalogRow's price/stock fields are `number | null` because the real
+    // /api/products response nulls them for guests (see SECURITY BOUNDARY
+    // comment in src/lib/server/products.ts) — but this page only ever reads
+    // CATALOG, the hardcoded mock data (never null), and is itself wrapped in
+    // RequireAuth below. The assertions here just satisfy the shared type.
+    if (sort === "lowest") copy.sort((a, b) => a.lowPrice! - b.lowPrice!);
+    else if (sort === "highest") copy.sort((a, b) => b.highPrice! - a.highPrice!);
     else copy.sort((a, b) => b.registeredOrder - a.registeredOrder);
     return copy;
   }, [manufacturers, inStockOnly, size, sort]);
@@ -147,17 +152,17 @@ function FactoryPriceContent() {
                     <td className="py-3 px-4 text-muted">{r.productCode}</td>
                     <td className="py-3 px-4 text-muted">{r.dot}</td>
                     <td className="py-3 px-4 tabular-nums font-bold">
-                      {r.factoryPrice.toLocaleString()}원
+                      {r.factoryPrice!.toLocaleString()}원
                     </td>
                     <td className="py-3 px-4 tabular-nums text-brand font-bold">
-                      {r.lowPrice.toLocaleString()}원
+                      {r.lowPrice!.toLocaleString()}원
                     </td>
-                    <td className="py-3 px-4 tabular-nums">{r.highPrice.toLocaleString()}원</td>
+                    <td className="py-3 px-4 tabular-nums">{r.highPrice!.toLocaleString()}원</td>
                     <td className="py-3 px-4 tabular-nums">
                       {r.stock === 0 ? (
                         <span className="text-muted">품절</span>
                       ) : (
-                        r.stock.toLocaleString()
+                        r.stock!.toLocaleString()
                       )}
                     </td>
                   </tr>
@@ -182,10 +187,10 @@ function FactoryPriceContent() {
                 </p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs text-muted">
-                    공장도가 {r.factoryPrice.toLocaleString()}원
+                    공장도가 {r.factoryPrice!.toLocaleString()}원
                   </span>
                   <span className="font-extrabold text-brand tabular-nums">
-                    {r.lowPrice.toLocaleString()}원
+                    {r.lowPrice!.toLocaleString()}원
                   </span>
                 </div>
               </Link>

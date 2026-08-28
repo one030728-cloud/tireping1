@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { getPublicCatalogPage, isCatalogSortKey } from "@/lib/server/products";
+import { getSession } from "@/lib/server/auth";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,13 @@ export async function GET(request: NextRequest) {
     const pageParam = Number(params.get("page"));
     const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
 
+    // Route stays public (product spec/DOT/images/reviews are meant to be
+    // visible to visitors) — only the wholesale-price-adjacent fields are
+    // gated, and that gating happens inside getPublicCatalogPage/toCatalogRows,
+    // not by a 401 here. See the SECURITY BOUNDARY comment in
+    // src/lib/server/products.ts.
+    const session = await getSession();
+
     const { rows, total } = await getPublicCatalogPage(
       {
         size: params.get("size") ?? undefined,
@@ -33,6 +41,7 @@ export async function GET(request: NextRequest) {
       sort,
       page,
       PAGE_SIZE,
+      { includeSensitive: Boolean(session) },
     );
 
     return Response.json({ products: rows, total });

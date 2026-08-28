@@ -53,10 +53,13 @@ export interface Seller {
   // 배송비 정책 — 실서버 응답에만 있고 목데이터(getSellersForTire)에는 없어 optional.
   shippingFee?: number;
   freeShippingThreshold?: number | null;
-  discountRate: number;
-  price: number;
-  stock: number;
-  minOrder: number;
+  // null 은 비로그인 요청에 서버가 실제로 숨긴 값이다(0 이 아니라 null —
+  // src/lib/server/products.ts 의 toSeller 참고). 목데이터의 리터럴 number 는
+  // number | null 에 그대로 대입 가능하므로 호환된다.
+  discountRate: number | null;
+  price: number | null;
+  stock: number | null;
+  minOrder: number | null;
   shippingNote: string;
   courier: string;
   images?: string[];
@@ -188,11 +191,14 @@ export interface CatalogRow {
   spec: string;
   productCode: string;
   dot: string;
-  factoryPrice: number;
-  lowPrice: number;
-  highPrice: number;
-  stock: number;
-  discountRate: number;
+  // null 은 비로그인 요청에 서버가 실제로 숨긴 값이다(0 이 아니라 null —
+  // src/lib/server/products.ts 의 toCatalogRows 참고). 목데이터의 리터럴
+  // number 는 number | null 에 그대로 대입 가능하므로 호환된다.
+  factoryPrice: number | null;
+  lowPrice: number | null;
+  highPrice: number | null;
+  stock: number | null;
+  discountRate: number | null;
   tag: "EVENT" | "BEST" | null;
   registeredOrder: number;
 }

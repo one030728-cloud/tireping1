@@ -77,26 +77,46 @@ function groupByDot(listings: readonly PublicListing[]) {
   return groups;
 }
 
-function toSeller(listing: PublicListing) {
+// SECURITY BOUNDARY: the "로그인 후 공개" gate in the product list/detail UI
+// (src/app/products/page.tsx, src/app/products/[id]/page.tsx) is display-only
+// — it hides sensitive fields with CSS/conditional rendering, nothing more.
+// The actual enforcement is here: `includeSensitive` decides whether a
+// listing's wholesale-price-adjacent fields ever leave the server. When you
+// add a new field to a public view below, decide right here whether it's
+// sensitive (B2B price/stock info a suspended buyer signup is meant to keep
+// out) or safe to always return (spec/DOT/images/etc — intended to be public
+// so visitors have a reason to sign up).
+//
+// Sensitive fields, nulled (never 0 — 0 would read as a real "0원" price) for
+// anonymous requests: price, factoryPrice, lowPrice, highPrice, discountRate,
+// stock, minOrder.
+
+function toSeller(listing: PublicListing, { includeSensitive }: { includeSensitive: boolean }) {
   return {
     id: listing.id,
     code: listing.seller.code,
-    discountRate: Number(listing.discountRate),
-    price: listing.price,
-    stock: listing.stock,
-    minOrder: listing.minOrder,
+    discountRate: includeSensitive ? Number(listing.discountRate) : null,
+    price: includeSensitive ? listing.price : null,
+    stock: includeSensitive ? listing.stock : null,
+    minOrder: includeSensitive ? listing.minOrder : null,
     shippingNote: listing.seller.shippingNote ?? "",
     courier: listing.seller.courier,
     // QA 발견: 판매점 비교 화면이 택배사·배송메모는 보여주면서 정작 배송비
     // 금액과 무료배송 기준은 장바구니에 담기 전까지 알 수 없었다. 구매자가
     // 판매점을 고르는 화면이므로 가격 비교에 배송비도 필요하다.
+    // (Not in the sensitive list above — it's shipping policy, not B2B
+    // pricing, and the comparison table needs it regardless of session.)
     shippingFee: listing.seller.shippingFee,
     freeShippingThreshold: listing.seller.freeShippingThreshold,
     images: listing.images.map((image) => image.url),
   };
 }
 
-export function toProductView(product: PublicProduct, requestedDot: string | null) {
+export function toProductView(
+  product: PublicProduct,
+  requestedDot: string | null,
+  { includeSensitive }: { includeSensitive: boolean },
+) {
   const groups = groupByDot(product.listings);
   const fallbackDot = groups.keys().next().value;
   const dot = requestedDot && groups.has(requestedDot) ? requestedDot : fallbackDot;
@@ -113,7 +133,7 @@ export function toProductView(product: PublicProduct, requestedDot: string | nul
     ratio: product.ratio,
     rim: product.rim,
     dot,
-    factoryPrice: first.factoryPrice,
+    factoryPrice: includeSensitive ? first.factoryPrice : null,
     spec: {
       loadIndex: first.loadIndex,
       speedIndex: first.speedIndex,
@@ -122,7 +142,11 @@ export function toProductView(product: PublicProduct, requestedDot: string | nul
       season: first.season,
       productCode: first.productCode,
     },
-    sellers: [...listings].sort((a, b) => a.price - b.price).map(toSeller),
+    // Sort by the real (never-nulled) price so guests still see sellers
+    // ordered cheapest-first even though the price itself is hidden from them.
+    sellers: [...listings]
+      .sort((a, b) => a.price - b.price)
+      .map((listing) => toSeller(listing, { includeSensitive })),
   };
 }
 
@@ -239,11 +263,50 @@ interface ProductDotCountRow {
   dot_count: number;
 }
 
+// See the SECURITY BOUNDARY comment above toSeller/toProductView — same rule
+// applies here: sort/filter/paginate on the real (never-nulled) values (done
+// above, in SQL, before this runs), then null the sensitive fields only in
+// this final shaping step for anonymous callers.
+function toCatalogRows(
+  rows: readonly CatalogQueryRow[],
+  dotCounts: ReadonlyMap<string, number>,
+  { includeSensitive }: { includeSensitive: boolean },
+): CatalogRow[] {
+  return rows.map((row) => {
+    const hasMultipleDots = (dotCounts.get(row.product_id) ?? 1) > 1;
+    return {
+      id: `row-${row.product_id}-${row.dot}`,
+      detailId: row.product_id,
+      detailDot: hasMultipleDots ? row.dot : null,
+      manufacturer: row.manufacturer as Manufacturer,
+      model: row.model,
+      width: row.width,
+      ratio: row.ratio,
+      rim: row.rim,
+      spec: `${row.load_index} ${row.speed_index} ${row.ply} ${row.season}`,
+      productCode: row.product_code,
+      dot: row.dot,
+      factoryPrice: includeSensitive ? row.factory_price : null,
+      lowPrice: includeSensitive ? row.low_price : null,
+      highPrice: includeSensitive ? row.high_price : null,
+      stock: includeSensitive ? row.total_stock : null,
+      discountRate: includeSensitive ? toNumber(row.max_discount_rate) : null,
+      tag: (row.tag as CatalogRow["tag"] | null) ?? null,
+      // No longer used for client-side sorting (the server now returns rows
+      // already sorted), kept only so CatalogRow's shape is unchanged for
+      // any other consumer. Derived from the product's createdAt so "larger
+      // = registered more recently" still holds.
+      registeredOrder: new Date(row.product_created_at).getTime(),
+    };
+  });
+}
+
 export async function getPublicCatalogPage(
   filters: CatalogFilters,
   sort: CatalogSortKey,
   page: number,
   pageSize: number,
+  { includeSensitive }: { includeSensitive: boolean },
 ): Promise<CatalogPage> {
   const rawSize = filters.size ?? "";
   const trimmedSize = rawSize.trim();
@@ -453,33 +516,7 @@ export async function getPublicCatalogPage(
     for (const row of counts) dotCounts.set(row.product_id, row.dot_count);
   }
 
-  const catalogRows: CatalogRow[] = rows.map((row) => {
-    const hasMultipleDots = (dotCounts.get(row.product_id) ?? 1) > 1;
-    return {
-      id: `row-${row.product_id}-${row.dot}`,
-      detailId: row.product_id,
-      detailDot: hasMultipleDots ? row.dot : null,
-      manufacturer: row.manufacturer as Manufacturer,
-      model: row.model,
-      width: row.width,
-      ratio: row.ratio,
-      rim: row.rim,
-      spec: `${row.load_index} ${row.speed_index} ${row.ply} ${row.season}`,
-      productCode: row.product_code,
-      dot: row.dot,
-      factoryPrice: row.factory_price,
-      lowPrice: row.low_price,
-      highPrice: row.high_price,
-      stock: row.total_stock,
-      discountRate: toNumber(row.max_discount_rate),
-      tag: (row.tag as CatalogRow["tag"] | null) ?? null,
-      // No longer used for client-side sorting (the server now returns rows
-      // already sorted), kept only so CatalogRow's shape is unchanged for
-      // any other consumer. Derived from the product's createdAt so "larger
-      // = registered more recently" still holds.
-      registeredOrder: new Date(row.product_created_at).getTime(),
-    };
-  });
+  const catalogRows = toCatalogRows(rows, dotCounts, { includeSensitive });
 
   return { rows: catalogRows, total };
 }

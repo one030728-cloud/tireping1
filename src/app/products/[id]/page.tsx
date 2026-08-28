@@ -24,7 +24,10 @@ interface ProductView {
   ratio: number;
   rim: number;
   dot: string;
-  factoryPrice: number;
+  // null for anonymous requests — see the SECURITY BOUNDARY comment in
+  // src/lib/server/products.ts (toProductView). Never rendered without the
+  // `user ?` gate below.
+  factoryPrice: number | null;
   spec: {
     loadIndex: string;
     speedIndex: string;
@@ -222,10 +225,18 @@ function ProductDetailContent() {
     }
   }
 
-  const lowestPrice = useMemo(
-    () => (product ? Math.min(...product.sellers.map((s) => s.price)) : 0),
-    [product],
-  );
+  // Guests get null prices back from the API (see SECURITY BOUNDARY comment
+  // in src/lib/server/products.ts) — Math.min over a list that may contain
+  // null would throw/NaN, so filter nulls out first. When every seller's
+  // price is null (anonymous), lowestPrice is null and the "최저가" badge
+  // below is never shown, rather than every row matching a null lowestPrice.
+  const lowestPrice = useMemo(() => {
+    if (!product) return null;
+    const prices = product.sellers
+      .map((seller) => seller.price)
+      .filter((price): price is number => price !== null);
+    return prices.length > 0 ? Math.min(...prices) : null;
+  }, [product]);
 
   // Review.sellerId (a cuid) -> the seller.code shown throughout this page,
   // so the review feed below can label each review by the same "판매점"
@@ -271,6 +282,20 @@ function ProductDetailContent() {
 
   async function handleAdd(seller: Seller, buyNow: boolean) {
     if (!user || user.role !== "BUYER") {
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+
+    // seller.price/stock/minOrder are only null when the product fetch above
+    // ran without a session (see SECURITY BOUNDARY comment in
+    // src/lib/server/products.ts). The `user` check above makes that
+    // impossible in the common case, but `product` is fetched once in a
+    // useEffect keyed on [params.id, dot] — not on `user` — so a guest who
+    // logs in in another tab without this page reloading could still be
+    // holding stale null-priced seller data here. Treat that exactly like
+    // not being logged in rather than adding a null/undefined price to the
+    // cart.
+    if (seller.price === null || seller.stock === null || seller.minOrder === null) {
       router.push(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
@@ -366,7 +391,7 @@ function ProductDetailContent() {
             <SpecRow label="생산년도" value={product.dot} />
             <SpecRow
               label="공장도가"
-              value={user ? `${product.factoryPrice.toLocaleString()}원` : "로그인 후 공개"}
+              value={user ? `${product.factoryPrice!.toLocaleString()}원` : "로그인 후 공개"}
             />
             <SpecRow label="하중지수" value={product.spec.loadIndex} />
             <SpecRow label="속도지수" value={product.spec.speedIndex} />
@@ -431,7 +456,7 @@ function ProductDetailContent() {
                     </button>
                   )}
                   {seller.code}
-                  {seller.price === lowestPrice && (
+                  {seller.price !== null && seller.price === lowestPrice && (
                     <span className="ml-1.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent align-middle">
                       최저가
                     </span>
@@ -439,13 +464,13 @@ function ProductDetailContent() {
                   <span className="block text-[11px] mt-1">{ratingBadge(seller.id)}</span>
                 </td>
                 <td className="py-3 px-4 text-brand font-bold tabular-nums">
-                  {seller.discountRate}%
+                  {user ? `${seller.discountRate}%` : "로그인 후 공개"}
                 </td>
                 <td className="py-3 px-4 font-bold tabular-nums">
-                  {user ? `${seller.price.toLocaleString()}원` : "로그인 후 공개"}
+                  {user ? `${seller.price!.toLocaleString()}원` : "로그인 후 공개"}
                 </td>
                 <td className="py-3 px-4">
-                  {user ? seller.stock.toLocaleString() : "로그인 후 공개"}
+                  {user ? seller.stock!.toLocaleString() : "로그인 후 공개"}
                 </td>
                 <td className="py-3 px-4">{user ? seller.minOrder : "로그인 후 공개"}</td>
                 <td className="py-3 px-4 text-muted text-xs">
@@ -465,9 +490,9 @@ function ProductDetailContent() {
                   {user ? (
                     <input
                       type="number"
-                      min={seller.minOrder}
-                      max={seller.stock}
-                      defaultValue={seller.minOrder}
+                      min={seller.minOrder!}
+                      max={seller.stock!}
+                      defaultValue={seller.minOrder!}
                       aria-label="주문 수량"
                       onChange={(e) =>
                         setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))
@@ -533,7 +558,7 @@ function ProductDetailContent() {
                   </button>
                 )}
                 {seller.code}
-                {seller.price === lowestPrice && (
+                {seller.price !== null && seller.price === lowestPrice && (
                   <span className="ml-1.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
                     최저가
                   </span>
@@ -543,14 +568,14 @@ function ProductDetailContent() {
             </div>
             <p className="text-xs mb-1">{ratingBadge(seller.id)}</p>
             <div className="flex items-baseline gap-2 mb-1 tabular-nums">
-              <span className="text-brand font-bold">{seller.discountRate}%</span>
+              {user && <span className="text-brand font-bold">{seller.discountRate}%</span>}
               <span className="text-lg font-extrabold">
-                {user ? `${seller.price.toLocaleString()}원` : "로그인 후 가격 확인"}
+                {user ? `${seller.price!.toLocaleString()}원` : "로그인 후 가격 확인"}
               </span>
             </div>
             <p className="text-xs text-muted mb-3">
               {user
-                ? `재고 ${seller.stock.toLocaleString()} · 최소주문수량 ${seller.minOrder} · ${seller.shippingNote}`
+                ? `재고 ${seller.stock!.toLocaleString()} · 최소주문수량 ${seller.minOrder} · ${seller.shippingNote}`
                 : `재고·최소주문수량 로그인 후 공개 · ${seller.shippingNote}`}
               {typeof seller.shippingFee === "number" && (
                 <>
@@ -565,9 +590,9 @@ function ProductDetailContent() {
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  min={seller.minOrder}
-                  max={seller.stock}
-                  defaultValue={seller.minOrder}
+                  min={seller.minOrder!}
+                  max={seller.stock!}
+                  defaultValue={seller.minOrder!}
                   aria-label="주문 수량"
                   onChange={(e) =>
                     setQuantities((q) => ({ ...q, [seller.code]: Number(e.target.value) }))

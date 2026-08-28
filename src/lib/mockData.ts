@@ -682,7 +682,10 @@ function buildCatalog(): CatalogRow[] {
 
   for (const t of TIRES) {
     const sellers = getSellersForTire(t);
-    const prices = sellers.map((s) => s.price);
+    // Seller.price is `number | null` only because the shared type now models
+    // the guest-gated API response; every literal in this mock file is a real
+    // number, so the fallback never actually fires.
+    const prices = sellers.map((s) => s.price ?? 0);
     rows.push({
       id: `row-${t.id}`,
       detailId: t.id,
