@@ -1,11 +1,21 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  // "debian-openssl-3.0.x" is Render's runtime; "rhel-openssl-3.0.x" is
+  // Vercel's Lambda runtime. Without the rhel target, every request 500s
+  // after a Vercel deploy because the query engine binary is missing.
+  binaryTargets = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Runtime queries use the pooler address (DATABASE_URL, Supabase
+  // Supavisor port 6543, transaction mode). Migrations use the direct
+  // address (DIRECT_URL, port 5432) because pooled transaction-mode
+  // connections don't support the session-level statements migrations need.
+  // On platforms without a pooler (Render, local dev), just set both env
+  // vars to the same connection string.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {

@@ -25,6 +25,15 @@ services:
         fromDatabase:
           name: tirezone-db
           property: externalConnectionString
+      # Referenced by prisma/schema.prisma's datasource.directUrl. Without
+      # it, Render's build (prisma generate/migrate deploy) fails with
+      # "Environment variable not found: DIRECT_URL". Render has no
+      # connection pooler in front of this DB, so it's set to the same
+      # value as DATABASE_URL.
+      - key: DIRECT_URL
+        fromDatabase:
+          name: tirezone-db
+          property: externalConnectionString
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: NEXTAUTH_URL
