@@ -77,6 +77,41 @@ S3_FORCE_PATH_STYLE=false
 
 `S3_PUBLIC_BASE_URL`은 업로드된 파일을 브라우저가 읽을 수 있는 공개 도메인(Cloudflare R2 커스텀 도메인 또는 S3/CloudFront 주소)이어야 합니다. 업로드는 presigned **PUT**으로 이루어지며(R2는 presigned POST를 지원하지 않습니다 — [Cloudflare 문서](https://developers.cloudflare.com/r2/api/s3/presigned-urls/)에 "POST ... is not currently supported"로 명시), 서명에 Content-Length가 묶여 있어 선언한 파일 크기와 실제 업로드 크기가 정확히 일치해야 합니다. 버킷 CORS에는 앱 도메인의 `PUT` 요청과 `Content-Type` 헤더를 허용해야 합니다. 배포 후 실제 판매자/관리자 계정으로 이미지 1건을 업로드해 정상 저장·표시되는지 확인하세요.
 
+## Vercel + Supabase 배포
+
+이 앱은 Vercel(서버리스) + Supabase Postgres 배포를 지원합니다. Render 배포는 당분간 병행되며, 이 섹션의 변경은 두 플랫폼 모두에서 동작합니다.
+
+Supabase 프로젝트는 리전을 반드시 **Seoul (ap-northeast-2)** 로 생성하세요.
+
+### 환경 변수 (Vercel 대시보드)
+
+| 변수 | 값 |
+| --- | --- |
+| `DATABASE_URL` | Supabase 대시보드 Connect 화면의 **Transaction pooler** 주소(포트 6543)에 `?pgbouncer=true&connection_limit=1` 쿼리를 붙인 것. 서버리스는 요청마다 인스턴스가 새로 커넥션을 여므로 풀러 없이는 커넥션이 금방 고갈되고, `pgbouncer=true`는 Prisma가 트랜잭션 모드 풀러와 호환되도록 prepared statement를 끄는 스위치입니다. |
+| `DIRECT_URL` | 같은 화면의 **Direct connection** 주소(포트 5432). 마이그레이션 전용입니다. |
+| `NEXTAUTH_SECRET` | 기존 값을 재사용하거나 신규 발급 |
+| `NEXTAUTH_URL` | 배포 도메인 (`https://<app>.vercel.app` 또는 커스텀 도메인) |
+| `TOSS_CLIENT_KEY` / `TOSS_SECRET_KEY` / `TOSS_WEBHOOK_SECRET` | 기존과 동일 |
+| `S3_BUCKET` / `S3_ENDPOINT` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` / `S3_PUBLIC_BASE_URL` | 기존과 동일 |
+| `S3_REGION` | `auto` |
+| `S3_FORCE_PATH_STYLE` | `false` |
+| `TRUSTED_PROXY_HOPS` | `1` (Vercel 프록시도 1단이므로 Render와 동일) |
+
+### `vercel-build` 스크립트
+
+`package.json`의 `vercel-build`(`prisma generate && prisma migrate deploy && next build`)는 Vercel이 `build` 대신 자동으로 실행합니다. `prisma migrate deploy`는 `schema.prisma`의 `directUrl` 설정 덕분에 빌드 중 `DIRECT_URL`(직결 주소)로 적용되고, 런타임 쿼리는 계속 `DATABASE_URL`(풀러 주소)로 나갑니다.
+
+### 도메인이 바뀌면 해야 하는 것
+
+1. [Toss Payments 개발자센터](https://developers.tosspayments.com)에서 웹훅 URL을 새 도메인으로 재등록: `https://<새 도메인>/api/payments/toss/webhook?secret=<TOSS_WEBHOOK_SECRET>`
+2. R2 버킷 CORS의 `AllowedOrigins`에 새 도메인 추가
+3. `NEXTAUTH_URL` 갱신
+
+### 알려진 한계
+
+- `src/lib/server/rateLimit.ts`의 인메모리 레이트리미터는 서버리스에서 인스턴스별로 따로 적용되어 효과가 약해집니다(해당 파일의 기존 LIMITATION 주석 참고). 정식 오픈 전에는 공유 저장소(예: Upstash Redis) 기반으로 교체하는 것을 권장합니다.
+- Vercel Hobby 플랜은 비상업용 약관이므로, 상용 오픈 시 Pro 플랜으로 전환해야 합니다.
+
 ## 운영 가이드
 
 실제 서비스를 운영하는 담당자를 위한 안내입니다. 소스 코드 주석에만 남아 있던 위험한 동작들을 정리했으니, 배포/장애 대응 전에 반드시 읽어 주세요.
